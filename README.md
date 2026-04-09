@@ -1,9 +1,9 @@
-# Claude Code 源码还原
+# SPARK-Code 源码还原
 
-> 从 `@anthropic-ai/claude-code` npm 包的 source map 中还原的完整 TypeScript 源码，**可本地运行**
+> 从 `spark-code` npm 包的 source map 中还原的完整 TypeScript 源码，**可本地运行**
 
 <p align="center">
-  <img src="preview.png?raw=true" alt="Claude Code CLI" width="700">
+  <img src="preview.png?raw=true" alt="SPARK-Code CLI" width="700">
 </p>
 
 > [!WARNING]

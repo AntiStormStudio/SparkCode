@@ -7,8 +7,8 @@ export default () =>
     type: 'local-jsx',
     name: 'login',
     description: hasAnthropicApiKeyAuth()
-      ? 'Switch Anthropic accounts'
-      : 'Sign in with your Anthropic account',
+      ? '切换 SPARK API 凭证'
+      : '配置 SPARK API 凭证',
     isEnabled: () => !isEnvTruthy(process.env.DISABLE_LOGIN_COMMAND),
     load: () => import('./login.js'),
   }) satisfies Command

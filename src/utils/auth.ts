@@ -79,6 +79,7 @@ import { clearToolSchemaCache } from './toolSchemaCache.js'
 
 /** Default TTL for API key helper cache in milliseconds (5 minutes) */
 const DEFAULT_API_KEY_HELPER_TTL = 5 * 60 * 1000
+const BASE_URL_ENV_KEY = 'ANTHROPIC_BASE_URL'
 
 /**
  * CCR and Claude Desktop spawn the CLI with OAuth and should never fall back
@@ -210,6 +211,77 @@ export type ApiKeySource =
   | 'apiKeyHelper'
   | '/login managed key'
   | 'none'
+
+export function normalizeApiBaseUrl(baseUrlInput: string): string {
+  const trimmed = baseUrlInput.trim()
+  if (!trimmed) {
+    throw new Error('BASEURL 不能为空')
+  }
+
+  const withProtocol = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`
+
+  let parsed: URL
+  try {
+    parsed = new URL(withProtocol)
+  } catch {
+    throw new Error('BASEURL 格式无效，请填写类似 https://api.example.com')
+  }
+
+  if (parsed.search || parsed.hash) {
+    throw new Error('BASEURL 不能包含查询参数或哈希')
+  }
+
+  const normalizedPath = parsed.pathname.replace(/\/+$/g, '')
+  if (normalizedPath === '/v1') {
+    throw new Error('BASEURL 不要包含 /v1，请仅填写根地址')
+  }
+  if (normalizedPath.length > 0) {
+    throw new Error('BASEURL 不能包含路径，请仅填写协议和域名（可带端口）')
+  }
+
+  return parsed.origin
+}
+
+export function getConfiguredApiBaseUrl(): string | null {
+  const baseUrlFromEnv = process.env[BASE_URL_ENV_KEY]
+  if (baseUrlFromEnv) {
+    return baseUrlFromEnv
+  }
+  const configBaseUrl = getGlobalConfig().env?.[BASE_URL_ENV_KEY]
+  return configBaseUrl || null
+}
+
+export function saveConfiguredApiBaseUrl(baseUrl: string): string {
+  const normalized = normalizeApiBaseUrl(baseUrl)
+
+  saveGlobalConfig(current => ({
+    ...current,
+    env: {
+      ...(current.env ?? {}),
+      [BASE_URL_ENV_KEY]: normalized,
+    },
+  }))
+
+  process.env[BASE_URL_ENV_KEY] = normalized
+  return normalized
+}
+
+export function clearConfiguredApiBaseUrl(): void {
+  saveGlobalConfig(current => {
+    if (!current.env || !(BASE_URL_ENV_KEY in current.env)) {
+      return current
+    }
+    const { [BASE_URL_ENV_KEY]: _, ...restEnv } = current.env
+    return {
+      ...current,
+      env: restEnv,
+    }
+  })
+
+  delete process.env[BASE_URL_ENV_KEY]
+}
 
 export function getAnthropicApiKey(): null | string {
   const { key } = getAnthropicApiKeyWithSource()

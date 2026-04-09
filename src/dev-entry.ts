@@ -19,7 +19,7 @@ const defaultMacro: MacroConfig = {
   NATIVE_PACKAGE_URL: pkg.name,
   VERSION_CHANGELOG: '',
   ISSUES_EXPLAINER:
-    'file an issue at https://github.com/anthropics/claude-code/issues',
+    'file an issue in your SPARK-Code repository',
   FEEDBACK_CHANNEL: 'github',
 }
 
@@ -110,12 +110,12 @@ if (args.includes('--version')) {
 
 if (args.includes('--help')) {
   if (missingImports.length > 0) {
-    console.log('Claude Code restored development workspace')
+    console.log('SPARK-Code restored development workspace')
     console.log(`version: ${pkg.version}`)
     console.log(`missing relative imports: ${missingImports.length}`)
     process.exit(0)
   }
-  console.log('Usage: claude [options] [prompt]')
+  console.log('Usage: sparkc [options] [prompt]')
   console.log('')
   console.log('Basic restored commands:')
   console.log('  --help       Show this help')
@@ -126,7 +126,7 @@ if (args.includes('--help')) {
 }
 
 if (missingImports.length > 0) {
-  console.log('Claude Code restored development workspace')
+  console.log('SPARK-Code restored development workspace')
   console.log(`version: ${pkg.version}`)
   console.log(`missing relative imports: ${missingImports.length}`)
   console.log('')

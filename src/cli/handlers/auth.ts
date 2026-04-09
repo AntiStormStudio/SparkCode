@@ -8,27 +8,23 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from '../../services/analytics/index.js'
-import { getSSLErrorHint } from '../../services/api/errorUtils.js'
 import { fetchAndStoreClaudeCodeFirstTokenDate } from '../../services/api/firstTokenDate.js'
 import {
   createAndStoreApiKey,
   fetchAndStoreUserRoles,
-  refreshOAuthToken,
   shouldUseClaudeAIAuth,
   storeOAuthAccountInfo,
 } from '../../services/oauth/client.js'
 import { getOauthProfileFromOauthToken } from '../../services/oauth/getOauthProfile.js'
-import { OAuthService } from '../../services/oauth/index.js'
 import type { OAuthTokens } from '../../services/oauth/types.js'
 import {
   clearOAuthTokenCache,
+  getConfiguredApiBaseUrl,
   getAnthropicApiKeyWithSource,
-  getAuthTokenSource,
-  getOauthAccountInfo,
-  getSubscriptionType,
   isUsing3PServices,
+  saveApiKey,
+  saveConfiguredApiBaseUrl,
   saveOAuthTokensIfNeeded,
-  validateForceLoginOrg,
 } from '../../utils/auth.js'
 import { saveGlobalConfig } from '../../utils/config.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -36,12 +32,7 @@ import { isRunningOnHomespace } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import { logError } from '../../utils/log.js'
 import { getAPIProvider } from '../../utils/model/providers.js'
-import { getInitialSettings } from '../../utils/settings/settings.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
-import {
-  buildAccountProperties,
-  buildAPIProviderProperties,
-} from '../../utils/status.js'
 
 /**
  * Shared post-token-acquisition logic. Saves tokens, fetches profile/roles,
@@ -110,122 +101,41 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
 }
 
 export async function authLogin({
-  email,
-  sso,
-  console: useConsole,
-  claudeai,
+  baseUrl,
+  apiKey,
 }: {
-  email?: string
-  sso?: boolean
-  console?: boolean
-  claudeai?: boolean
+  baseUrl?: string
+  apiKey?: string
 }): Promise<void> {
-  if (useConsole && claudeai) {
+  const normalizedApiKey = apiKey?.trim()
+  if (!baseUrl || !normalizedApiKey) {
     process.stderr.write(
-      'Error: --console and --claudeai cannot be used together.\n',
+      'Error: --base-url 和 --api-key 都是必填参数。\n' +
+        '示例: sparkc auth login --base-url https://api.example.com --api-key sk-xxxx\n',
     )
     process.exit(1)
   }
 
-  const settings = getInitialSettings()
-  // forceLoginMethod is a hard constraint (enterprise setting) — matches ConsoleOAuthFlow behavior.
-  // Without it, --console selects Console; --claudeai (or no flag) selects claude.ai.
-  const loginWithClaudeAi = settings.forceLoginMethod
-    ? settings.forceLoginMethod === 'claudeai'
-    : !useConsole
-  const orgUUID = settings.forceLoginOrgUUID
-
-  // Fast path: if a refresh token is provided via env var, skip the browser
-  // OAuth flow and exchange it directly for tokens.
-  const envRefreshToken = process.env.CLAUDE_CODE_OAUTH_REFRESH_TOKEN
-  if (envRefreshToken) {
-    const envScopes = process.env.CLAUDE_CODE_OAUTH_SCOPES
-    if (!envScopes) {
-      process.stderr.write(
-        'CLAUDE_CODE_OAUTH_SCOPES is required when using CLAUDE_CODE_OAUTH_REFRESH_TOKEN.\n' +
-          'Set it to the space-separated scopes the refresh token was issued with\n' +
-          '(e.g. "user:inference" or "user:profile user:inference user:sessions:claude_code user:mcp_servers").\n',
-      )
-      process.exit(1)
-    }
-
-    const scopes = envScopes.split(/\s+/).filter(Boolean)
-
-    try {
-      logEvent('tengu_login_from_refresh_token', {})
-
-      const tokens = await refreshOAuthToken(envRefreshToken, { scopes })
-      await installOAuthTokens(tokens)
-
-      const orgResult = await validateForceLoginOrg()
-      if (!orgResult.valid) {
-        process.stderr.write(orgResult.message + '\n')
-        process.exit(1)
-      }
-
-      // Mark onboarding complete — interactive paths handle this via
-      // the Onboarding component, but the env var path skips it.
-      saveGlobalConfig(current => {
-        if (current.hasCompletedOnboarding) return current
-        return { ...current, hasCompletedOnboarding: true }
-      })
-
-      logEvent('tengu_oauth_success', {
-        loginWithClaudeAi: shouldUseClaudeAIAuth(tokens.scopes),
-      })
-      process.stdout.write('Login successful.\n')
-      process.exit(0)
-    } catch (err) {
-      logError(err)
-      const sslHint = getSSLErrorHint(err)
-      process.stderr.write(
-        `Login failed: ${errorMessage(err)}\n${sslHint ? sslHint + '\n' : ''}`,
-      )
-      process.exit(1)
-    }
-  }
-
-  const resolvedLoginMethod = sso ? 'sso' : undefined
-
-  const oauthService = new OAuthService()
-
   try {
-    logEvent('tengu_oauth_flow_start', { loginWithClaudeAi })
+    await performLogout({ clearOnboarding: false })
+    const normalizedBaseUrl = saveConfiguredApiBaseUrl(baseUrl)
+    await saveApiKey(normalizedApiKey)
 
-    const result = await oauthService.startOAuthFlow(
-      async url => {
-        process.stdout.write('Opening browser to sign in…\n')
-        process.stdout.write(`If the browser didn't open, visit: ${url}\n`)
-      },
-      {
-        loginWithClaudeAi,
-        loginHint: email,
-        loginMethod: resolvedLoginMethod,
-        orgUUID,
-      },
+    // Mark onboarding complete for CLI login path.
+    saveGlobalConfig(current => {
+      if (current.hasCompletedOnboarding) return current
+      return { ...current, hasCompletedOnboarding: true }
+    })
+
+    logEvent('tengu_api_key_login_success', {})
+    process.stdout.write(
+      `登录成功。\nBASEURL: ${normalizedBaseUrl}\n认证方式: API Key\n`,
     )
-
-    await installOAuthTokens(result)
-
-    const orgResult = await validateForceLoginOrg()
-    if (!orgResult.valid) {
-      process.stderr.write(orgResult.message + '\n')
-      process.exit(1)
-    }
-
-    logEvent('tengu_oauth_success', { loginWithClaudeAi })
-
-    process.stdout.write('Login successful.\n')
     process.exit(0)
   } catch (err) {
     logError(err)
-    const sslHint = getSSLErrorHint(err)
-    process.stderr.write(
-      `Login failed: ${errorMessage(err)}\n${sslHint ? sslHint + '\n' : ''}`,
-    )
+    process.stderr.write(`登录失败: ${errorMessage(err)}\n`)
     process.exit(1)
-  } finally {
-    oauthService.cleanup()
   }
 }
 
@@ -233,84 +143,54 @@ export async function authStatus(opts: {
   json?: boolean
   text?: boolean
 }): Promise<void> {
-  const { source: authTokenSource, hasToken } = getAuthTokenSource()
   const { source: apiKeySource } = getAnthropicApiKeyWithSource()
   const hasApiKeyEnvVar =
     !!process.env.ANTHROPIC_API_KEY && !isRunningOnHomespace()
-  const oauthAccount = getOauthAccountInfo()
-  const subscriptionType = getSubscriptionType()
   const using3P = isUsing3PServices()
-  const loggedIn =
-    hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P
+  const configuredBaseUrl = getConfiguredApiBaseUrl()
+  const resolvedApiKeySource =
+    apiKeySource !== 'none'
+      ? apiKeySource
+      : hasApiKeyEnvVar
+        ? 'ANTHROPIC_API_KEY'
+        : null
+  const loggedIn = using3P || resolvedApiKeySource !== null
 
   // Determine auth method
   let authMethod: string = 'none'
   if (using3P) {
     authMethod = 'third_party'
-  } else if (authTokenSource === 'claude.ai') {
-    authMethod = 'claude.ai'
-  } else if (authTokenSource === 'apiKeyHelper') {
+  } else if (resolvedApiKeySource === 'apiKeyHelper') {
     authMethod = 'api_key_helper'
-  } else if (authTokenSource !== 'none') {
-    authMethod = 'oauth_token'
-  } else if (apiKeySource === 'ANTHROPIC_API_KEY' || hasApiKeyEnvVar) {
+  } else if (resolvedApiKeySource !== null) {
     authMethod = 'api_key'
-  } else if (apiKeySource === '/login managed key') {
-    authMethod = 'claude.ai'
   }
 
   if (opts.text) {
-    const properties = [
-      ...buildAccountProperties(),
-      ...buildAPIProviderProperties(),
-    ]
-    let hasAuthProperty = false
-    for (const prop of properties) {
-      const value =
-        typeof prop.value === 'string'
-          ? prop.value
-          : Array.isArray(prop.value)
-            ? prop.value.join(', ')
-            : null
-      if (value === null || value === 'none') {
-        continue
-      }
-      hasAuthProperty = true
-      if (prop.label) {
-        process.stdout.write(`${prop.label}: ${value}\n`)
-      } else {
-        process.stdout.write(`${value}\n`)
-      }
+    process.stdout.write(`Logged in: ${loggedIn ? 'yes' : 'no'}\n`)
+    process.stdout.write(`Auth method: ${authMethod}\n`)
+    process.stdout.write(`API provider: ${getAPIProvider()}\n`)
+    if (resolvedApiKeySource) {
+      process.stdout.write(`API key source: ${resolvedApiKeySource}\n`)
     }
-    if (!hasAuthProperty && hasApiKeyEnvVar) {
-      process.stdout.write('API key: ANTHROPIC_API_KEY\n')
+    if (configuredBaseUrl) {
+      process.stdout.write(`Base URL: ${configuredBaseUrl}\n`)
     }
     if (!loggedIn) {
       process.stdout.write(
-        'Not logged in. Run claude auth login to authenticate.\n',
+        '未登录。请运行 `sparkc auth login --base-url <BASEURL> --api-key <APIKEY>` 或在交互模式使用 `/login`。\n',
       )
     }
   } else {
     const apiProvider = getAPIProvider()
-    const resolvedApiKeySource =
-      apiKeySource !== 'none'
-        ? apiKeySource
-        : hasApiKeyEnvVar
-          ? 'ANTHROPIC_API_KEY'
-          : null
     const output: Record<string, string | boolean | null> = {
       loggedIn,
       authMethod,
       apiProvider,
+      baseUrl: configuredBaseUrl,
     }
     if (resolvedApiKeySource) {
       output.apiKeySource = resolvedApiKeySource
-    }
-    if (authMethod === 'claude.ai') {
-      output.email = oauthAccount?.emailAddress ?? null
-      output.orgId = oauthAccount?.organizationUuid ?? null
-      output.orgName = oauthAccount?.organizationName ?? null
-      output.subscriptionType = subscriptionType ?? null
     }
 
     process.stdout.write(jsonStringify(output, null, 2) + '\n')
@@ -325,6 +205,6 @@ export async function authLogout(): Promise<void> {
     process.stderr.write('Failed to log out.\n')
     process.exit(1)
   }
-  process.stdout.write('Successfully logged out from your Anthropic account.\n')
+  process.stdout.write('已退出登录，凭证已清除。\n')
   process.exit(0)
 }

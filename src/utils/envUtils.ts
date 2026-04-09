@@ -2,15 +2,18 @@ import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import { join } from 'path'
 
-// Memoized: 150+ callers, many on hot paths. Keyed off CLAUDE_CONFIG_DIR so
+// Memoized: 150+ callers, many on hot paths. Keyed off SPARK_CONFIG_DIR /
+// CLAUDE_CONFIG_DIR so
 // tests that change the env var get a fresh value without explicit cache.clear.
 export const getClaudeConfigHomeDir = memoize(
   (): string => {
     return (
-      process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
+      process.env.SPARK_CONFIG_DIR ??
+      process.env.CLAUDE_CONFIG_DIR ??
+      join(homedir(), '.spark_config')
     ).normalize('NFC')
   },
-  () => process.env.CLAUDE_CONFIG_DIR,
+  () => `${process.env.SPARK_CONFIG_DIR ?? ''}:${process.env.CLAUDE_CONFIG_DIR ?? ''}`,
 )
 
 export function getTeamsDir(): string {
@@ -123,7 +126,7 @@ export function isRunningOnHomespace(): boolean {
 }
 
 /**
- * Conservative check for whether Claude Code is running inside a protected
+ * Conservative check for whether Spark Code is running inside a protected
  * (privileged or ASL3+) COO namespace or cluster.
  *
  * Conservative means: when signals are ambiguous, assume protected. We would

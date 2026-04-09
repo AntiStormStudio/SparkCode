@@ -119,17 +119,17 @@ export function ResumeTask({
     return <Box flexDirection="column" padding={1}>
         <Box flexDirection="row">
           <Spinner />
-          <Text bold>Loading Claude Code sessions…</Text>
+          <Text bold>Loading Spark Code sessions…</Text>
         </Box>
         <Text dimColor>
-          {retrying ? 'Retrying…' : 'Fetching your Claude Code sessions…'}
+          {retrying ? 'Retrying…' : 'Fetching your Spark Code sessions…'}
         </Text>
       </Box>;
   }
   if (loadErrorType) {
     return <Box flexDirection="column" padding={1}>
         <Text bold color="error">
-          Error loading Claude Code sessions
+          Error loading Spark Code sessions
         </Text>
 
         {renderErrorSpecificGuidance(loadErrorType)}
@@ -143,7 +143,7 @@ export function ResumeTask({
   if (sessions.length === 0) {
     return <Box flexDirection="column" padding={1}>
         <Text bold>
-          No Claude Code sessions found
+          No Spark Code sessions found
           {currentRepo && <Text> for {currentRepo}</Text>}
         </Text>
         <Box marginTop={1}>
@@ -249,10 +249,10 @@ function renderErrorSpecificGuidance(errorType: LoadErrorType): React.ReactNode 
         </Box>;
     case 'auth':
       return <Box marginY={1} flexDirection="column">
-          <Text dimColor>Teleport requires a Claude account</Text>
+          <Text dimColor>Teleport 远程功能依赖 claude.ai OAuth</Text>
           <Text dimColor>
-            Run <Text bold>/login</Text> and select &quot;Claude account with
-            subscription&quot;
+            当前构建已移除官方登录入口。请使用 <Text bold>/login</Text>{' '}
+            配置 BASEURL 与 APIKEY（仅本地 API 模式可用）。
           </Text>
         </Box>;
     case 'api':
@@ -261,7 +261,7 @@ function renderErrorSpecificGuidance(errorType: LoadErrorType): React.ReactNode 
         </Box>;
     case 'other':
       return <Box marginY={1} flexDirection="row">
-          <Text dimColor>Sorry, Claude Code encountered an error</Text>
+          <Text dimColor>Sorry, Spark Code encountered an error</Text>
         </Box>;
   }
 }

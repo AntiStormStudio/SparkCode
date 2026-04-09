@@ -4,7 +4,7 @@
 > 编译开关：`feature('KAIROS')`、`feature('KAIROS_BRIEF')`、`feature('KAIROS_CHANNELS')`
 > 远程开关：GrowthBook `tengu_kairos`
 
-关掉终端 Claude 还在运行的持久助手模式。KAIROS 是 Claude Code 中最复杂的隐藏功能之一。
+关掉终端 Claude 还在运行的持久助手模式。KAIROS 是 Spark Code 中最复杂的隐藏功能之一。
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 核心概念
 
-Bridge（Remote Control）让用户从 **claude.ai 网页端**远程操控运行在本地终端的 Claude Code：
+Bridge（Remote Control）让用户从 **claude.ai 网页端**远程操控运行在本地终端的 Spark Code：
 
 - 网页输入 prompt → 传送到本地 CLI 执行
 - CLI 输出实时回传到网页

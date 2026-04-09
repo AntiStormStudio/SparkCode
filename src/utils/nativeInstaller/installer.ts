@@ -109,7 +109,7 @@ export function getPlatform(): string {
 }
 
 export function getBinaryName(platform: string): string {
-  return platform.startsWith('win32') ? 'claude.exe' : 'claude'
+  return platform.startsWith('win32') ? 'sparkc.exe' : 'sparkc'
 }
 
 function getBaseDirectories() {
@@ -118,13 +118,13 @@ function getBaseDirectories() {
 
   return {
     // Data directories (permanent storage)
-    versions: join(getXDGDataHome(), 'claude', 'versions'),
+    versions: join(getXDGDataHome(), 'sparkc', 'versions'),
 
     // Cache directories (can be deleted)
-    staging: join(getXDGCacheHome(), 'claude', 'staging'),
+    staging: join(getXDGCacheHome(), 'sparkc', 'staging'),
 
     // State directories
-    locks: join(getXDGStateHome(), 'claude', 'locks'),
+    locks: join(getXDGStateHome(), 'sparkc', 'locks'),
 
     // User bin
     executable: join(getUserBinDir(), executableName),
@@ -465,7 +465,7 @@ async function performVersionUpdate(
     logForDebugging(`Version ${version} already installed, updating symlink`)
   }
 
-  // Create direct symlink from ~/.local/bin/claude to the version binary
+  // Create direct symlink from ~/.local/bin/sparkc to the version binary
   await removeDirectoryIfEmpty(executablePath)
   await updateSymlink(executablePath, installPath)
 
@@ -845,7 +845,7 @@ export async function checkInstall(
     })
   }
 
-  // Check if claude executable exists and is valid.
+  // Check if sparkc executable exists and is valid.
   // On non-Windows, call readlink directly and route errno — ENOENT means
   // the executable is missing, EINVAL means it exists but isn't a symlink.
   // This avoids an access()→readlink() TOCTOU where deletion between the
@@ -856,7 +856,7 @@ export async function checkInstall(
     // On Windows it's a copied executable, not a symlink
     if (!(await isPossibleClaudeBinary(dirs.executable))) {
       messages.push({
-        message: `installMethod is native, but claude command is missing or invalid at ${dirs.executable}`,
+        message: `installMethod is native, but sparkc command is missing or invalid at ${dirs.executable}`,
         userActionRequired: true,
         type: 'error',
       })
@@ -867,7 +867,7 @@ export async function checkInstall(
       const absoluteTarget = resolve(dirname(dirs.executable), target)
       if (!(await isPossibleClaudeBinary(absoluteTarget))) {
         messages.push({
-          message: `Claude symlink points to missing or invalid binary: ${target}`,
+          message: `sparkc symlink points to missing or invalid binary: ${target}`,
           userActionRequired: true,
           type: 'error',
         })
@@ -875,7 +875,7 @@ export async function checkInstall(
     } catch (e) {
       if (isENOENT(e)) {
         messages.push({
-          message: `installMethod is native, but claude command not found at ${dirs.executable}`,
+          message: `installMethod is native, but sparkc command not found at ${dirs.executable}`,
           userActionRequired: true,
           type: 'error',
         })
@@ -883,7 +883,7 @@ export async function checkInstall(
         // EINVAL (not a symlink) or other — check as regular binary
         if (!(await isPossibleClaudeBinary(dirs.executable))) {
           messages.push({
-            message: `${dirs.executable} exists but is not a valid Claude binary`,
+            message: `${dirs.executable} exists but is not a valid SPARK-Code binary`,
             userActionRequired: true,
             type: 'error',
           })
@@ -1458,7 +1458,7 @@ async function isNpmSymlink(executablePath: string): Promise<boolean> {
 }
 
 /**
- * Remove the claude symlink from the executable directory
+ * Remove the sparkc symlink from the executable directory
  * This is used when switching away from native installation
  * Will only remove if it's a native binary symlink, not npm-managed JS files
  */
@@ -1476,12 +1476,12 @@ export async function removeInstalledSymlink(): Promise<void> {
 
     // It's a native binary symlink, safe to remove
     await unlink(dirs.executable)
-    logForDebugging(`Removed claude symlink at ${dirs.executable}`)
+    logForDebugging(`Removed sparkc symlink at ${dirs.executable}`)
   } catch (error) {
     if (isENOENT(error)) {
       return
     }
-    logError(new Error(`Failed to remove claude symlink: ${error}`))
+    logError(new Error(`Failed to remove sparkc symlink: ${error}`))
   }
 }
 
