@@ -187,7 +187,7 @@ function ShowHelp(t0) {
   let t2;
   if ($[0] !== onDone) {
     t1 = () => {
-      onDone("Usage: /tag <tag-name>\n\nToggle a searchable tag on the current session.\nRun the same command again to remove the tag.\nTags are displayed after the branch name in /resume and can be searched with /.\n\nExamples:\n  /tag bugfix        # Add tag\n  /tag bugfix        # Remove tag (toggle)\n  /tag feature-auth\n  /tag wip", {
+      onDone("Usage: /tag <tag-name>\n\n切换当前会话的可搜索标签.\nRun the same command again to remove the tag.\nTags are displayed after the branch name in /resume and can be searched with /.\n\nExamples:\n  /tag bugfix        # Add tag\n  /tag bugfix        # Remove tag (toggle)\n  /tag feature-auth\n  /tag wip", {
         display: "system"
       });
     };

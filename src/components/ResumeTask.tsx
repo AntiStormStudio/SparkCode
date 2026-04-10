@@ -20,7 +20,7 @@ type Props = {
   isEmbedded?: boolean;
 };
 type LoadErrorType = 'network' | 'auth' | 'api' | 'other';
-const UPDATED_STRING = 'Updated';
+const UPDATED_STRING = '更新时间';
 const SPACE_BETWEEN_TABLE_COLUMNS = '  ';
 export function ResumeTask({
   onSelect,
@@ -119,36 +119,35 @@ export function ResumeTask({
     return <Box flexDirection="column" padding={1}>
         <Box flexDirection="row">
           <Spinner />
-          <Text bold>Loading Spark Code sessions…</Text>
+          <Text bold>正在加载 Spark Code 会话…</Text>
         </Box>
         <Text dimColor>
-          {retrying ? 'Retrying…' : 'Fetching your Spark Code sessions…'}
+          {retrying ? '正在重试…' : '正在获取你的 Spark Code 会话…'}
         </Text>
       </Box>;
   }
   if (loadErrorType) {
     return <Box flexDirection="column" padding={1}>
         <Text bold color="error">
-          Error loading Spark Code sessions
+          加载 Spark Code 会话失败
         </Text>
 
         {renderErrorSpecificGuidance(loadErrorType)}
 
         <Text dimColor>
-          Press <Text bold>Ctrl+R</Text> to retry · Press{' '}
-          <Text bold>{escKey}</Text> to cancel
+          按 <Text bold>Ctrl+R</Text> 重试 · 按 <Text bold>{escKey}</Text> 取消
         </Text>
       </Box>;
   }
   if (sessions.length === 0) {
     return <Box flexDirection="column" padding={1}>
         <Text bold>
-          No Spark Code sessions found
-          {currentRepo && <Text> for {currentRepo}</Text>}
+          未找到 Spark Code 会话
+          {currentRepo && <Text>（仓库：{currentRepo}）</Text>}
         </Text>
         <Box marginTop={1}>
           <Text dimColor>
-            Press <Text bold>{escKey}</Text> to cancel
+            按 <Text bold>{escKey}</Text> 取消
           </Text>
         </Box>
       </Box>;
@@ -182,10 +181,10 @@ export function ResumeTask({
   const showScrollPosition = sessions.length > maxVisibleOptions;
   return <Box flexDirection="column" padding={1} height={maxHeight}>
       <Text bold>
-        Select a session to resume
+        选择要恢复的会话
         {showScrollPosition && <Text dimColor>
             {' '}
-            ({focusedIndex} of {sessions.length})
+            （{focusedIndex}/{sessions.length}）
           </Text>}
         {currentRepo && <Text dimColor> ({currentRepo})</Text>}:
       </Text>
@@ -194,7 +193,7 @@ export function ResumeTask({
           <Text bold>
             {UPDATED_STRING.padEnd(maxTimeStringLength, ' ')}
             {SPACE_BETWEEN_TABLE_COLUMNS}
-            {'Session Title'}
+            {'会话标题'}
           </Text>
         </Box>
         <Select visibleOptionCount={maxVisibleOptions} options={options} onChange={value => {
@@ -214,7 +213,7 @@ export function ResumeTask({
           <Byline>
             <KeyboardShortcutHint shortcut="↑/↓" action="select" />
             <KeyboardShortcutHint shortcut="Enter" action="confirm" />
-            <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
+            <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="取消" />
           </Byline>
         </Text>
       </Box>
@@ -245,11 +244,11 @@ function renderErrorSpecificGuidance(errorType: LoadErrorType): React.ReactNode 
   switch (errorType) {
     case 'network':
       return <Box marginY={1} flexDirection="column">
-          <Text dimColor>Check your internet connection</Text>
+          <Text dimColor>请检查你的网络连接</Text>
         </Box>;
     case 'auth':
       return <Box marginY={1} flexDirection="column">
-          <Text dimColor>Teleport 远程功能依赖 claude.ai OAuth</Text>
+          <Text dimColor>Teleport 远程功能依赖 spark-ai.top OAuth</Text>
           <Text dimColor>
             当前构建已移除官方登录入口。请使用 <Text bold>/login</Text>{' '}
             配置 BASEURL 与 APIKEY（仅本地 API 模式可用）。
@@ -257,11 +256,11 @@ function renderErrorSpecificGuidance(errorType: LoadErrorType): React.ReactNode 
         </Box>;
     case 'api':
       return <Box marginY={1} flexDirection="column">
-          <Text dimColor>Sorry, Claude encountered an error</Text>
+          <Text dimColor>抱歉，Spark Code 遇到了错误</Text>
         </Box>;
     case 'other':
       return <Box marginY={1} flexDirection="row">
-          <Text dimColor>Sorry, Spark Code encountered an error</Text>
+          <Text dimColor>抱歉，Spark Code 遇到了错误</Text>
         </Box>;
   }
 }

@@ -33,8 +33,8 @@ const LOCAL_REVIEW_PROMPT = (args: string) => `
 const review: Command = {
   type: 'prompt',
   name: 'review',
-  description: 'Review a pull request',
-  progressMessage: 'reviewing pull request',
+  description: '审查拉取请求',
+  progressMessage: '正在审查拉取请求',
   contentLength: 0,
   source: 'builtin',
   async getPromptForCommand(args): Promise<ContentBlockParam[]> {
@@ -48,7 +48,7 @@ const review: Command = {
 const ultrareview: Command = {
   type: 'local-jsx',
   name: 'ultrareview',
-  description: `~10–20 min · Finds and verifies bugs in your branch. Runs in Spark Code on the web. See ${CCR_TERMS_URL}`,
+  description: `约 10–20 分钟 · 自动发现并验证当前分支中的缺陷。在 Spark Code 网页端运行。详见 ${CCR_TERMS_URL}`,
   isEnabled: () => isUltrareviewEnabled(),
   load: () => import('./review/ultrareviewCommand.js'),
 }

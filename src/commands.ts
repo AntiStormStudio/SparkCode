@@ -128,7 +128,7 @@ import stats from './commands/stats/index.js'
 const usageReport: Command = {
   type: 'prompt',
   name: 'insights',
-  description: 'Generate a report analyzing your Spark Code sessions',
+  description: '生成 Spark Code 会话分析报告',
   contentLength: 0,
   progressMessage: 'analyzing your sessions',
   source: 'builtin',
@@ -327,7 +327,7 @@ export function meetsAvailabilityRequirement(cmd: Command): boolean {
         if (isClaudeAISubscriber()) return true
         break
       case 'console':
-        // Console API key user = direct 1P API customer (not 3P, not claude.ai).
+        // Console API key user = direct 1P API customer (not 3P, not spark-ai.top).
         // Excludes 3P (Bedrock/Vertex/Foundry) who don't set ANTHROPIC_BASE_URL
         // and gateway users who proxy through a custom base URL.
         if (

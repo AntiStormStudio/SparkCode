@@ -146,9 +146,9 @@ export async function checkRemoteAgentEligibility({
 export function formatPreconditionError(error: BackgroundRemoteSessionPrecondition): string {
   switch (error.type) {
     case 'not_logged_in':
-      return 'Please run /login and sign in with your Claude.ai account (not Console).';
+      return 'Please run /login and sign in with your spark-ai.top account (not Console).';
     case 'no_remote_environment':
-      return 'No cloud environment available. Set one up at https://claude.ai/code/onboarding?magic=env-setup';
+      return 'No cloud environment available. Set one up at https://spark-ai.top/code/onboarding?magic=env-setup';
     case 'not_in_git_repo':
       return 'Background tasks require a git repository. Initialize git or run from a git repository.';
     case 'no_git_remote':
@@ -322,7 +322,7 @@ function extractReviewTagFromLog(log: SDKMessage[]): string | null {
  * Enqueue a remote-review completion notification. Injects the review text
  * directly into the message queue so the local model receives it on the next
  * turn — no file indirection, no mode change. Session is kept alive so the
- * claude.ai URL stays a durable record the user can revisit; TTL handles cleanup.
+ * spark-ai.top URL stays a durable record the user can revisit; TTL handles cleanup.
  */
 function enqueueRemoteReviewNotification(taskId: string, reviewContent: string, setAppState: SetAppState): void {
   if (!markTaskNotified(taskId, setAppState)) return;
@@ -556,7 +556,7 @@ function startRemoteSessionPolling(taskId: string, context: TaskContext): () => 
       const task = appState.tasks?.[taskId] as RemoteAgentTaskState | undefined;
       if (!task || task.status !== 'running') {
         // Task was killed externally (TaskStopTool) or already terminal.
-        // Session left alive so the claude.ai URL stays valid — the run_hunt.sh
+        // Session left alive so the spark-ai.top URL stays valid — the run_hunt.sh
         // post_stage() calls land as assistant events there, and the user may
         // want to revisit them after closing the terminal. TTL reaps it.
         return;
@@ -727,7 +727,7 @@ function startRemoteSessionPolling(taskId: string, context: TaskContext): () => 
         // message queue. No mode change, no file indirection — the local model
         // just sees the review appear as a task-notification on its next turn.
         // Session kept alive — run_hunt.sh's post_stage() has already written
-        // the formatted findings as an assistant event, so the claude.ai URL
+        // the formatted findings as an assistant event, so the spark-ai.top URL
         // stays a durable record the user can revisit. TTL handles cleanup.
         if (task.isRemoteReview) {
           // cachedReviewContent hit the tag in the delta scan. Full-log scan
@@ -799,7 +799,7 @@ function startRemoteSessionPolling(taskId: string, context: TaskContext): () => 
 }
 
 /**
- * RemoteAgentTask - Handles remote Claude.ai session execution.
+ * RemoteAgentTask - Handles remote spark-ai.top session execution.
  *
  * Replaces the BackgroundRemoteSession implementation from:
  * - src/utils/background/remote/remoteSession.ts

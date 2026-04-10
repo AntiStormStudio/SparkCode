@@ -6,7 +6,7 @@ const web = {
   type: 'local-jsx',
   name: 'web-setup',
   description:
-    'Setup Spark Code on the web (requires connecting your GitHub account)',
+    '在网页端设置 Spark Code（需要连接 GitHub 账号）',
   availability: ['claude-ai'],
   isEnabled: () =>
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_cobalt_lantern', false) &&

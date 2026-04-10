@@ -62,7 +62,7 @@ function stepTeammateSelection(
  * Custom hook that handles Shift+Up/Down keyboard navigation for background tasks.
  * When teammates (swarm) are present, navigates between leader and teammates.
  * When only non-teammate background tasks exist, opens the background tasks dialog.
- * Also handles Enter to confirm selection, 'f' to view transcript, and 'k' to kill.
+ * Also handles Enter 确认 selection, 'f' to view transcript, and 'k' to kill.
  */
 export function useBackgroundTaskNavigation(options?: {
   onOpenBackgroundTasks?: () => void
@@ -202,7 +202,7 @@ export function useBackgroundTaskNavigation(options?: {
       return
     }
 
-    // Enter to confirm selection (only when in selecting mode)
+    // Enter 确认 selection (only when in selecting mode)
     if (e.key === 'return' && viewSelectionMode === 'selecting-agent') {
       e.preventDefault()
       if (selectedIPAgentIndex === -1) {

@@ -17,23 +17,23 @@ export type Step = {
 }
 
 export function getSteps(): Step[] {
-  const hasClaudeMd = getFsImplementation().existsSync(
-    join(getCwd(), 'CLAUDE.md'),
-  )
+  const hasProjectInstructionFile =
+    getFsImplementation().existsSync(join(getCwd(), 'SPARK.md')) ||
+    getFsImplementation().existsSync(join(getCwd(), 'CLAUDE.md'))
   const isWorkspaceDirEmpty = isDirEmpty(getCwd())
 
   return [
     {
       key: 'workspace',
-      text: 'Ask Claude to create a new app or clone a repository',
+      text: '让 Spark 创建一个新应用，或克隆一个仓库',
       isComplete: false,
       isCompletable: true,
       isEnabled: isWorkspaceDirEmpty,
     },
     {
       key: 'claudemd',
-      text: 'Run /init to create a CLAUDE.md file with instructions for Claude',
-      isComplete: hasClaudeMd,
+      text: '运行 /init 创建 SPARK.md，为 Spark 添加项目指令',
+      isComplete: hasProjectInstructionFile,
       isCompletable: true,
       isEnabled: !isWorkspaceDirEmpty,
     },

@@ -292,7 +292,7 @@ function StatsContent(t0) {
   const t10 = copyStatus ? ` · ${copyStatus}` : "";
   let t11;
   if ($[29] !== t10) {
-    t11 = <Box paddingLeft={2}><Text dimColor={true}>Esc to cancel · r to cycle dates · ctrl+s to copy{t10}</Text></Box>;
+    t11 = <Box paddingLeft={2}><Text dimColor={true}>Esc 取消 · r to cycle dates · ctrl+s to copy{t10}</Text></Box>;
     $[29] = t10;
     $[30] = t11;
   } else {

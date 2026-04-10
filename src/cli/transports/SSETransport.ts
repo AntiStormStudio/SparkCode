@@ -30,6 +30,7 @@ const PERMANENT_HTTP_CODES = new Set([401, 403, 404])
 const POST_MAX_RETRIES = 10
 const POST_BASE_DELAY_MS = 500
 const POST_MAX_DELAY_MS = 8000
+const POST_REQUEST_TIMEOUT_MS = 15_000
 
 /** Hoisted TextDecoder options to avoid per-chunk allocation in readStream. */
 const STREAM_DECODE_OPTS: TextDecodeOptions = { stream: true }
@@ -592,6 +593,7 @@ export class SSETransport implements Transport {
       try {
         const response = await axios.post(this.postUrl, message, {
           headers,
+          timeout: POST_REQUEST_TIMEOUT_MS,
           validateStatus: alwaysValidStatus,
         })
 

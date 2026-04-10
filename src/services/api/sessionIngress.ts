@@ -76,6 +76,7 @@ async function appendSessionLogImpl(
 
       const response = await axios.put(url, entry, {
         headers: requestHeaders,
+        timeout: 20_000,
         validateStatus: status => status < 500,
       })
 

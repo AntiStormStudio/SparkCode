@@ -561,7 +561,7 @@ export function DiscoverPlugins({
         <EmptyStateMessage reason={emptyReason} />
         <Box marginTop={1}>
           <Text dimColor italic>
-            Esc to go back
+            Esc 返回
           </Text>
         </Box>
       </Box>;

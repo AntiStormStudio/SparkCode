@@ -125,13 +125,13 @@ const bothAuthMethodsNotice: StatusNoticeDefinition = {
         <Box flexDirection="column" marginLeft={3}>
           <Text color="warning">
             · Trying to use{' '}
-            {authTokenInfo.source === 'claude.ai' ? 'claude.ai' : authTokenInfo.source}
+            {authTokenInfo.source === 'spark-ai.top' ? 'spark-ai.top' : authTokenInfo.source}
             ?{' '}
             {apiKeySource === 'ANTHROPIC_API_KEY' ? 'Unset the ANTHROPIC_API_KEY environment variable, or claude /logout then say "No" to the API key approval before login.' : apiKeySource === 'apiKeyHelper' ? 'Unset the apiKeyHelper setting.' : 'claude /logout'}
           </Text>
           <Text color="warning">
             · Trying to use {apiKeySource}?{' '}
-            {authTokenInfo.source === 'claude.ai' ? 'claude /logout to sign out of claude.ai.' : `Unset the ${authTokenInfo.source} environment variable.`}
+            {authTokenInfo.source === 'spark-ai.top' ? 'claude /logout to sign out of spark-ai.top.' : `Unset the ${authTokenInfo.source} environment variable.`}
           </Text>
         </Box>
       </Box>;

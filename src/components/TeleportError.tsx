@@ -73,7 +73,7 @@ export function TeleportError({
           <Box flexDirection="column" gap={1}>
             <Text dimColor>此构建已移除 Claude 官方登录接口。</Text>
             <Text dimColor>
-              Teleport 远程功能依赖 claude.ai OAuth，当前无法继续。
+              Teleport 远程功能依赖 spark-ai.top OAuth，当前无法继续。
             </Text>
             <Text dimColor>
               如需本地 API 使用，请运行 <Text bold>/login</Text> 并填写 BASEURL 与 APIKEY。

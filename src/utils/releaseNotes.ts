@@ -11,6 +11,7 @@ import { isEssentialTrafficOnly } from './privacyLevel.js'
 import { gt } from './semver.js'
 
 const MAX_RELEASE_NOTES_SHOWN = 5
+const CHANGELOG_FETCH_TIMEOUT_MS = 10_000
 
 /**
  * We fetch the changelog from GitHub instead of bundling it with the build.
@@ -90,7 +91,9 @@ export async function fetchAndStoreChangelog(): Promise<void> {
     return
   }
 
-  const response = await axios.get(RAW_CHANGELOG_URL)
+  const response = await axios.get(RAW_CHANGELOG_URL, {
+    timeout: CHANGELOG_FETCH_TIMEOUT_MS,
+  })
   if (response.status === 200) {
     const changelogContent = response.data
 

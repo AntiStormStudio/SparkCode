@@ -67,7 +67,7 @@ const CHROME_ROWS = 10;
 const MIN_VISIBLE = 2;
 export function FuzzyPicker<T>({
   title,
-  placeholder = 'Type to search…',
+  placeholder = '输入搜索…',
   initialQuery,
   items,
   getKey,

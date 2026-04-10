@@ -5,6 +5,8 @@ import { jsonStringify } from '../utils/slowOperations.js'
 import type { DirectConnectConfig } from './directConnectManager.js'
 import { connectResponseSchema } from './types.js'
 
+const DIRECT_CONNECT_TIMEOUT_MS = 30_000
+
 /**
  * Errors thrown by createDirectConnectSession when the connection fails.
  */
@@ -49,6 +51,7 @@ export async function createDirectConnectSession({
     resp = await fetch(`${serverUrl}/sessions`, {
       method: 'POST',
       headers,
+      signal: AbortSignal.timeout(DIRECT_CONNECT_TIMEOUT_MS),
       body: jsonStringify({
         cwd,
         ...(dangerouslySkipPermissions && {

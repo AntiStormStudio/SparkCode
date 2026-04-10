@@ -4,7 +4,7 @@ import { env } from '../../utils/env.js'
 import { Clawd } from './Clawd.js'
 
 const WELCOME_V2_WIDTH = 58
-const WELCOME_MESSAGE = 'Welcome to SparkCode'
+const WELCOME_MESSAGE = '欢迎使用 SparkCode'
 
 type AppleTerminalWelcomeV2Props = {
   theme: string

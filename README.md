@@ -122,9 +122,9 @@ bun run version   # 验证版本
 
 > 源码位置：`src/bridge/`（33 个文件） · [查看完整分析 →](docs/06-bridge.md)
 
-从 claude.ai 或手机直接操控本地 CLI。
+从 spark-ai.top 或手机直接操控本地 CLI。
 
-- **WebSocket 实时连接**：本地 CLI 通过 WebSocket 与 claude.ai 建立双向通道
+- **WebSocket 实时连接**：本地 CLI 通过 WebSocket 与 spark-ai.top 建立双向通道
 - **完整远程控制**：远程端可以发送消息、批准权限、查看输出
 - **进程间通信**：跨 Claude 会话的消息传递机制
 - **状态同步**：`bridgeStatusUtil.ts` 实时同步运行状态

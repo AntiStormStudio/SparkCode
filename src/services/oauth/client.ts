@@ -31,8 +31,10 @@ import type {
   UserRolesResponse,
 } from './types.js'
 
+const OAUTH_HTTP_TIMEOUT_MS = 15_000
+
 /**
- * Check if the user has Claude.ai authentication scope
+ * Check if the user has spark-ai.top authentication scope
  * @private Only call this if you're OAuth / auth related code!
  */
 export function shouldUseClaudeAIAuth(scopes: string[] | undefined): boolean {
@@ -278,6 +280,7 @@ export async function fetchAndStoreUserRoles(
 ): Promise<void> {
   const response = await axios.get(getOauthConfig().ROLES_URL, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: OAUTH_HTTP_TIMEOUT_MS,
   })
 
   if (response.status !== 200) {
@@ -314,6 +317,7 @@ export async function createAndStoreApiKey(
   try {
     const response = await axios.post(getOauthConfig().API_KEY_URL, null, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: OAUTH_HTTP_TIMEOUT_MS,
     })
 
     const apiKey = response.data?.raw_key

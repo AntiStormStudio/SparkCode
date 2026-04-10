@@ -391,8 +391,8 @@ export function MessageSelector({
             </Box>
           </>}
         {!messageToRestore && <Text dimColor italic>
-            {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>
-                {!error && hasMessagesToSelect && 'Enter to continue · '}Esc to
+            {exitState.pending ? <>再次按 {exitState.keyName} 退出</> : <>
+                {!error && hasMessagesToSelect && 'Enter 继续 · '}Esc to
                 exit
               </>}
           </Text>}

@@ -441,7 +441,7 @@ export function MCPRemoteServerMenu({
             </Box>
           </> : <>
             <Text>
-              This will open claude.ai in the browser. Find the MCP server in
+              This will open spark-ai.top in the browser. Find the MCP server in
               the list and click &quot;Disconnect&quot;.
             </Text>
             <Box marginLeft={3} flexDirection="column">
@@ -637,7 +637,7 @@ export function MCPRemoteServerMenu({
 
       <Box marginTop={1}>
         <Text dimColor italic>
-          {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <Byline>
+          {exitState.pending ? <>再次按 {exitState.keyName} 退出</> : <Byline>
               <KeyboardShortcutHint shortcut="↑↓" action="navigate" />
               <KeyboardShortcutHint shortcut="Enter" action="select" />
               <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="back" />

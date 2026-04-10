@@ -12,6 +12,17 @@ type Props = {
   bold?: boolean;
 };
 
+function normalizeShortcutAction(action: string): string {
+  const normalized = action.trim().toLowerCase();
+  if (normalized === 'confirm') {
+    return '确认';
+  }
+  if (normalized === 'cancel') {
+    return '取消';
+  }
+  return action;
+}
+
 /**
  * Renders a keyboard shortcut hint like "ctrl+o to expand" or "(tab to toggle)"
  *
@@ -24,7 +35,7 @@ type Props = {
  * // With parentheses: "(ctrl+o to expand)"
  * <Text dimColor><KeyboardShortcutHint shortcut="ctrl+o" action="expand" parens /></Text>
  *
- * // With bold shortcut: "Enter to confirm" (Enter is bold)
+ * // With bold shortcut: "Enter 确认" (Enter is bold)
  * <Text dimColor><KeyboardShortcutHint shortcut="Enter" action="confirm" bold /></Text>
  *
  * // Multiple hints with middot separator - use Byline
@@ -45,6 +56,7 @@ export function KeyboardShortcutHint(t0) {
   } = t0;
   const parens = t1 === undefined ? false : t1;
   const bold = t2 === undefined ? false : t2;
+  const displayAction = normalizeShortcutAction(action);
   let t3;
   if ($[0] !== bold || $[1] !== shortcut) {
     t3 = bold ? <Text bold={true}>{shortcut}</Text> : shortcut;
@@ -57,9 +69,9 @@ export function KeyboardShortcutHint(t0) {
   const shortcutText = t3;
   if (parens) {
     let t4;
-    if ($[3] !== action || $[4] !== shortcutText) {
-      t4 = <Text>({shortcutText} to {action})</Text>;
-      $[3] = action;
+    if ($[3] !== displayAction || $[4] !== shortcutText) {
+      t4 = <Text>({shortcutText}：{displayAction})</Text>;
+      $[3] = displayAction;
       $[4] = shortcutText;
       $[5] = t4;
     } else {
@@ -68,9 +80,9 @@ export function KeyboardShortcutHint(t0) {
     return t4;
   }
   let t4;
-  if ($[6] !== action || $[7] !== shortcutText) {
-    t4 = <Text>{shortcutText} to {action}</Text>;
-    $[6] = action;
+  if ($[6] !== displayAction || $[7] !== shortcutText) {
+    t4 = <Text>{shortcutText}：{displayAction}</Text>;
+    $[6] = displayAction;
     $[7] = shortcutText;
     $[8] = t4;
   } else {

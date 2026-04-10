@@ -15,7 +15,7 @@ import type { SpinnerMode } from './types.js';
 import { useStalledAnimation } from './useStalledAnimation.js';
 import { interpolateColor, toRGBColor } from './utils.js';
 const SEP_WIDTH = stringWidth(' · ');
-const THINKING_BARE_WIDTH = stringWidth('thinking');
+const THINKING_BARE_WIDTH = stringWidth('思考中');
 const SHOW_TOKENS_AFTER_MS = 30_000;
 
 // Thinking shimmer constants. Previously lived in a separate ThinkingShimmerText
@@ -165,11 +165,11 @@ export function SpinnerAnimationRow({
   // === Token count (leader + teammates, or foregrounded teammate) ===
   const totalTokens = foregroundedTeammate && !foregroundedTeammate.isIdle ? foregroundedTeammate.progress?.tokenCount ?? 0 : leaderTokens + teammateTokens;
   const tokenCount = formatNumber(totalTokens);
-  const tokensText = hasRunningTeammates ? `${tokenCount} tokens` : `${figures.arrowDown} ${tokenCount} tokens`;
+  const tokensText = hasRunningTeammates ? `${tokenCount} 令牌` : `${figures.arrowDown} ${tokenCount} 令牌`;
   const tokensWidth = stringWidth(tokensText);
 
   // === Thinking text (may shrink to fit) ===
-  let thinkingText = thinkingStatus === 'thinking' ? `thinking${effortSuffix}` : typeof thinkingStatus === 'number' ? `thought for ${Math.max(1, Math.round(thinkingStatus / 1000))}s` : null;
+  let thinkingText = thinkingStatus === 'thinking' ? `思考中${effortSuffix}` : typeof thinkingStatus === 'number' ? `思考了 ${Math.max(1, Math.round(thinkingStatus / 1000))} 秒` : null;
   let thinkingWidthValue = thinkingText ? stringWidth(thinkingText) : 0;
 
   // === Progressive width gating ===
@@ -181,7 +181,7 @@ export function SpinnerAnimationRow({
   let showThinking = wantsThinking && availableSpace > thinkingWidthValue;
   if (!showThinking && wantsThinking && thinkingStatus === 'thinking' && effortSuffix) {
     if (availableSpace > THINKING_BARE_WIDTH) {
-      thinkingText = 'thinking';
+      thinkingText = '思考中';
       thinkingWidthValue = THINKING_BARE_WIDTH;
       showThinking = true;
     }
@@ -206,14 +206,14 @@ export function SpinnerAnimationRow({
             {timerText}
           </Text>] : []), ...(showTokens ? [<Box flexDirection="row" key="tokens">
             {!hasRunningTeammates && <SpinnerModeGlyph mode={mode} />}
-            <Text dimColor>{tokenCount} tokens</Text>
+            <Text dimColor>{tokenCount} 令牌</Text>
           </Box>] : []), ...(showThinking && thinkingText ? [thinkingStatus === 'thinking' && !reducedMotion ? <Text key="thinking" color={thinkingShimmerColor}>
               {thinkingOnly ? `(${thinkingText})` : thinkingText}
             </Text> : <Text dimColor key="thinking">
               {thinkingText}
             </Text>] : [])];
   const status = foregroundedTeammate && !foregroundedTeammate.isIdle ? <>
-        <Text dimColor>(esc to interrupt </Text>
+        <Text dimColor>(Esc 中断 </Text>
         <Text color={toInkColor(foregroundedTeammate.identity.color)}>
           {foregroundedTeammate.identity.agentName}
         </Text>

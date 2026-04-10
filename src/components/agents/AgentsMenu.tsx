@@ -553,7 +553,7 @@ export function AgentsMenu(t0) {
         }
         let t18;
         if ($[109] === Symbol.for("react.memo_cache_sentinel")) {
-          t18 = <AgentNavigationFooter instructions="Press Enter or Esc to go back" />;
+          t18 = <AgentNavigationFooter instructions="Press Enter or Esc 返回" />;
           $[109] = t18;
         } else {
           t18 = $[109];
@@ -663,7 +663,7 @@ export function AgentsMenu(t0) {
         }
         let t21;
         if ($[132] === Symbol.for("react.memo_cache_sentinel")) {
-          t21 = <AgentNavigationFooter instructions={"Press \u2191\u2193 to navigate, Enter to select, Esc to cancel"} />;
+          t21 = <AgentNavigationFooter instructions={"Press \u2191\u2193 to navigate, Enter to select, Esc 取消"} />;
           $[132] = t21;
         } else {
           t21 = $[132];

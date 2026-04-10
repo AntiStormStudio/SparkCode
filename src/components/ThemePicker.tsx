@@ -111,25 +111,25 @@ export function ThemePicker(t0) {
   let t10;
   if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
     t10 = [...(feature("AUTO_THEME") ? [{
-      label: "Auto (match terminal)",
+      label: "自动（跟随终端）",
       value: "auto" as const
     }] : []), {
-      label: "Dark mode",
+      label: "深色模式",
       value: "dark"
     }, {
-      label: "Light mode",
+      label: "浅色模式",
       value: "light"
     }, {
-      label: "Dark mode (colorblind-friendly)",
+      label: "深色模式（色弱友好）",
       value: "dark-daltonized"
     }, {
-      label: "Light mode (colorblind-friendly)",
+      label: "浅色模式（色弱友好）",
       value: "light-daltonized"
     }, {
-      label: "Dark mode (ANSI colors only)",
+      label: "深色模式（仅 ANSI 颜色）",
       value: "dark-ansi"
     }, {
-      label: "Light mode (ANSI colors only)",
+      label: "浅色模式（仅 ANSI 颜色）",
       value: "light-ansi"
     }];
     $[7] = t10;
@@ -139,7 +139,7 @@ export function ThemePicker(t0) {
   const themeOptions = t10;
   let t11;
   if ($[8] !== showIntroText) {
-    t11 = showIntroText ? <Text>Let's get started.</Text> : <Text bold={true} color="permission">Theme</Text>;
+    t11 = showIntroText ? <Text>让我们开始吧！</Text> : <Text bold={true} color="permission">主题</Text>;
     $[8] = showIntroText;
     $[9] = t11;
   } else {
@@ -147,7 +147,7 @@ export function ThemePicker(t0) {
   }
   let t12;
   if ($[10] === Symbol.for("react.memo_cache_sentinel")) {
-    t12 = <Text bold={true}>Choose the text style that looks best with your terminal</Text>;
+    t12 = <Text bold={true}>选择你的终端主题</Text>;
     $[10] = t12;
   } else {
     t12 = $[10];
@@ -235,7 +235,7 @@ export function ThemePicker(t0) {
       newStart: 1,
       oldLines: 3,
       newLines: 3,
-      lines: [" function greet() {", "-  console.log(\"Hello, World!\");", "+  console.log(\"Hello, Claude!\");", " }"]
+      lines: [" function greet() {", "-  console.log(\"你好，世界！\");", "+  console.log(\"你好，Spark！\");", " }"]
     };
     $[34] = t20;
   } else {
@@ -249,7 +249,7 @@ export function ThemePicker(t0) {
   } else {
     t21 = $[36];
   }
-  const t22 = colorModuleUnavailableReason === "env" ? `Syntax highlighting disabled (via CLAUDE_CODE_SYNTAX_HIGHLIGHT=${process.env.CLAUDE_CODE_SYNTAX_HIGHLIGHT})` : syntaxHighlightingDisabled ? `Syntax highlighting disabled (${syntaxToggleShortcut} to enable)` : syntaxTheme ? `Syntax theme: ${syntaxTheme.theme}${syntaxTheme.source ? ` (from ${syntaxTheme.source})` : ""} (${syntaxToggleShortcut} to disable)` : `Syntax highlighting enabled (${syntaxToggleShortcut} to disable)`;
+  const t22 = colorModuleUnavailableReason === "env" ? `语法高亮已禁用（由 CLAUDE_CODE_SYNTAX_HIGHLIGHT=${process.env.CLAUDE_CODE_SYNTAX_HIGHLIGHT} 控制）` : syntaxHighlightingDisabled ? `语法高亮已禁用（按 ${syntaxToggleShortcut} 启用）` : syntaxTheme ? `语法主题：${syntaxTheme.theme}${syntaxTheme.source ? `（来源：${syntaxTheme.source}）` : ""}（按 ${syntaxToggleShortcut} 禁用）` : `语法高亮已启用（按 ${syntaxToggleShortcut} 禁用）`;
   let t23;
   if ($[37] !== t22) {
     t23 = <Text dimColor={true}>{" "}{t22}</Text>;
@@ -297,7 +297,7 @@ export function ThemePicker(t0) {
     }
     let t28;
     if ($[50] !== exitState || $[51] !== hideEscToCancel) {
-      t28 = !hideEscToCancel && <Box><Text dimColor={true} italic={true}>{exitState.pending ? <>Press {exitState.keyName} again to exit</> : <Byline><KeyboardShortcutHint shortcut="Enter" action="select" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>}</Text></Box>;
+      t28 = !hideEscToCancel && <Box><Text dimColor={true} italic={true}>{exitState.pending ? <>再按一次 {exitState.keyName} 退出</> : <Byline><KeyboardShortcutHint shortcut="Enter" action="选择" /><KeyboardShortcutHint shortcut="Esc" action="取消" /></Byline>}</Text></Box>;
       $[50] = exitState;
       $[51] = hideEscToCancel;
       $[52] = t28;

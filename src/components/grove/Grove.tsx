@@ -53,7 +53,7 @@ function GracePeriodContentBody() {
   }
   let t4;
   if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box paddingLeft={1}><Text>{t2}{t3}<Text>— Allow the use of your chats and coding sessions to train and improve Anthropic AI models. Change anytime in your Privacy Settings (<Link url="https://claude.ai/settings/data-privacy-controls" />).</Text></Text></Box>;
+    t4 = <Box paddingLeft={1}><Text>{t2}{t3}<Text>— Allow the use of your chats and coding sessions to train and improve Anthropic AI models. Change anytime in your Privacy Settings (<Link url="https://spark-ai.top/settings/data-privacy-controls" />).</Text></Text></Box>;
     $[4] = t4;
   } else {
     t4 = $[4];
@@ -106,7 +106,7 @@ function PostGracePeriodContentBody() {
   }
   let t2;
   if ($[2] === Symbol.for("react.memo_cache_sentinel")) {
-    t2 = <Box flexDirection="column"><Text bold={true}>Help improve Claude</Text><Text>Allow the use of your chats and coding sessions to train and improve Anthropic AI models. You can change this anytime in Privacy Settings</Text><Link url="https://claude.ai/settings/data-privacy-controls" /></Box>;
+    t2 = <Box flexDirection="column"><Text bold={true}>Help improve Claude</Text><Text>Allow the use of your chats and coding sessions to train and improve Anthropic AI models. You can change this anytime in Privacy Settings</Text><Link url="https://spark-ai.top/settings/data-privacy-controls" /></Box>;
     $[2] = t2;
   } else {
     t2 = $[2];
@@ -347,7 +347,7 @@ export function GroveDialog(t0) {
   return t14;
 }
 function _temp(exitState) {
-  return exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : <Byline><KeyboardShortcutHint shortcut="Enter" action="confirm" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
+  return exitState.pending ? <Text>再次按 {exitState.keyName} 退出</Text> : <Byline><KeyboardShortcutHint shortcut="Enter" action="confirm" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
 }
 type PrivacySettingsDialogProps = {
   settings: AccountSettings;
@@ -417,7 +417,7 @@ export function PrivacySettingsDialog(t0) {
   }
   let t4;
   if ($[7] !== domainExcluded) {
-    t4 = exitState => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : domainExcluded ? <KeyboardShortcutHint shortcut="Esc" action="cancel" /> : <Byline><KeyboardShortcutHint shortcut="Enter/Tab/Space" action="toggle" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
+    t4 = exitState => exitState.pending ? <Text>再次按 {exitState.keyName} 退出</Text> : domainExcluded ? <KeyboardShortcutHint shortcut="Esc" action="cancel" /> : <Byline><KeyboardShortcutHint shortcut="Enter/Tab/Space" action="toggle" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
     $[7] = domainExcluded;
     $[8] = t4;
   } else {
@@ -425,7 +425,7 @@ export function PrivacySettingsDialog(t0) {
   }
   let t5;
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Text>Review and manage your privacy settings at{" "}<Link url="https://claude.ai/settings/data-privacy-controls" /></Text>;
+    t5 = <Text>Review and manage your privacy settings at{" "}<Link url="https://spark-ai.top/settings/data-privacy-controls" /></Text>;
     $[9] = t5;
   } else {
     t5 = $[9];

@@ -18,7 +18,7 @@ type PaneProps = {
  * padding. Used by all slash-command screens: /config, /help, /plugins,
  * /sandbox, /stats, /permissions.
  *
- * For confirm/cancel dialogs (Esc to dismiss, Enter to confirm), use
+ * For confirm/cancel dialogs (Esc to dismiss, Enter 确认), use
  * `<Dialog>` instead — it registers its own keybindings. For a full
  * rounded-border card, use `<Panel>`.
  *

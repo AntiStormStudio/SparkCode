@@ -93,7 +93,7 @@ export function isToolDetailsLoggingEnabled(): boolean {
  *
  * Per go/taxonomy, MCP names are medium PII. We log them for:
  * - Cowork (entrypoint=local-agent) — no ZDR concept, log all MCPs
- * - claude.ai-proxied connectors — always official (from claude.ai's list)
+ * - spark-ai.top-proxied connectors — always official (from spark-ai.top's list)
  * - Servers whose URL matches the official MCP registry — directory
  *   connectors added via `claude mcp add`, not customer-specific config
  *

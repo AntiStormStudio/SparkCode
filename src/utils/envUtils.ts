@@ -10,7 +10,7 @@ export const getClaudeConfigHomeDir = memoize(
     return (
       process.env.SPARK_CONFIG_DIR ??
       process.env.CLAUDE_CONFIG_DIR ??
-      join(homedir(), '.spark_config')
+      join(homedir(), '.sparkc')
     ).normalize('NFC')
   },
   () => `${process.env.SPARK_CONFIG_DIR ?? ''}:${process.env.CLAUDE_CONFIG_DIR ?? ''}`,

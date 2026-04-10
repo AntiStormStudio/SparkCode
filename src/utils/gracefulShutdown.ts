@@ -173,7 +173,7 @@ function printResumeHint(): void {
       writeSync(
         1,
         chalk.dim(
-          `\nResume this session with:\nclaude --resume ${resumeArg}\n`,
+          `\n使用以下命令恢复此会话：\nsparkc --resume ${resumeArg}\n`,
         ),
       )
       resumeHintPrinted = true

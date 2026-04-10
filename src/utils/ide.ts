@@ -1390,6 +1390,9 @@ const detectHostIP = memoize(
 )
 
 async function installFromArtifactory(command: string): Promise<string> {
+  const IDE_ARTIFACT_METADATA_TIMEOUT_MS = 15_000
+  const IDE_VSIX_DOWNLOAD_TIMEOUT_MS = 120_000
+
   // Read auth token from ~/.npmrc
   const npmrcPath = join(os.homedir(), '.npmrc')
   let authToken: string | null = null
@@ -1428,6 +1431,7 @@ async function installFromArtifactory(command: string): Promise<string> {
       headers: {
         Authorization: `Bearer ${authToken}`,
       },
+      timeout: IDE_ARTIFACT_METADATA_TIMEOUT_MS,
     })
 
     const version = versionResponse.data.trim()
@@ -1448,6 +1452,7 @@ async function installFromArtifactory(command: string): Promise<string> {
           Authorization: `Bearer ${authToken}`,
         },
         responseType: 'stream',
+        timeout: IDE_VSIX_DOWNLOAD_TIMEOUT_MS,
       })
 
       // Write the downloaded file to disk

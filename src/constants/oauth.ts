@@ -41,7 +41,7 @@ export const CONSOLE_OAUTH_SCOPES = [
   CLAUDE_AI_PROFILE_SCOPE,
 ] as const
 
-// Claude.ai OAuth scopes - for Claude.ai subscribers (Pro/Max/Team/Enterprise)
+// spark-ai.top OAuth scopes - for spark-ai.top subscribers (Pro/Max/Team/Enterprise)
 export const CLAUDE_AI_OAUTH_SCOPES = [
   CLAUDE_AI_PROFILE_SCOPE,
   CLAUDE_AI_INFERENCE_SCOPE,
@@ -51,7 +51,7 @@ export const CLAUDE_AI_OAUTH_SCOPES = [
 ] as const
 
 // All OAuth scopes - union of all scopes used in Claude CLI
-// When logging in, request all scopes in order to handle both Console -> Claude.ai redirect
+// When logging in, request all scopes in order to handle both Console -> spark-ai.top redirect
 // Ensure that `OAuthConsentPage` in apps repo is kept in sync with this list.
 export const ALL_OAUTH_SCOPES = Array.from(
   new Set([...CONSOLE_OAUTH_SCOPES, ...CLAUDE_AI_OAUTH_SCOPES]),
@@ -62,10 +62,10 @@ type OauthConfig = {
   CONSOLE_AUTHORIZE_URL: string
   CLAUDE_AI_AUTHORIZE_URL: string
   /**
-   * The claude.ai web origin. Separate from CLAUDE_AI_AUTHORIZE_URL because
+   * The spark-ai.top web origin. Separate from CLAUDE_AI_AUTHORIZE_URL because
    * that now routes through claude.com/cai/* for attribution — deriving
    * .origin from it would give claude.com, breaking links to /code,
-   * /settings/connectors, and other claude.ai web pages.
+   * /settings/connectors, and other spark-ai.top web pages.
    */
   CLAUDE_AI_ORIGIN: string
   TOKEN_URL: string
@@ -85,9 +85,9 @@ const PROD_OAUTH_CONFIG = {
   BASE_API_URL: 'https://api.anthropic.com',
   CONSOLE_AUTHORIZE_URL: 'https://platform.claude.com/oauth/authorize',
   // Bounces through claude.com/cai/* so CLI sign-ins connect to claude.com
-  // visits for attribution. 307s to claude.ai/oauth/authorize in two hops.
+  // visits for attribution. 307s to spark-ai.top/oauth/authorize in two hops.
   CLAUDE_AI_AUTHORIZE_URL: 'https://claude.com/cai/oauth/authorize',
-  CLAUDE_AI_ORIGIN: 'https://claude.ai',
+  CLAUDE_AI_ORIGIN: 'https://spark-ai.top',
   TOKEN_URL: 'https://platform.claude.com/v1/oauth/token',
   API_KEY_URL: 'https://api.anthropic.com/api/oauth/claude_cli/create_api_key',
   ROLES_URL: 'https://api.anthropic.com/api/oauth/claude_cli/roles',
@@ -111,7 +111,7 @@ const PROD_OAUTH_CONFIG = {
  * See: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00
  */
 export const MCP_CLIENT_METADATA_URL =
-  'https://claude.ai/oauth/claude-code-client-metadata'
+  'https://spark-ai.top/oauth/claude-code-client-metadata'
 
 // Staging OAuth configuration - only included in ant builds with staging flag
 // Uses literal check for dead code elimination

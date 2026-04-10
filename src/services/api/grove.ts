@@ -21,6 +21,7 @@ import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
 
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
+const GROVE_API_TIMEOUT_MS = 15_000
 
 export type AccountSettings = {
   grove_enabled: boolean | null
@@ -68,6 +69,7 @@ export const getGroveSettings = memoize(
               ...authHeaders.headers,
               'User-Agent': getClaudeCodeUserAgent(),
             },
+            timeout: GROVE_API_TIMEOUT_MS,
           },
         )
       })
@@ -102,6 +104,7 @@ export async function markGroveNoticeViewed(): Promise<void> {
             ...authHeaders.headers,
             'User-Agent': getClaudeCodeUserAgent(),
           },
+          timeout: GROVE_API_TIMEOUT_MS,
         },
       )
     })
@@ -136,6 +139,7 @@ export async function updateGroveSettings(
             ...authHeaders.headers,
             'User-Agent': getClaudeCodeUserAgent(),
           },
+          timeout: GROVE_API_TIMEOUT_MS,
         },
       )
     })

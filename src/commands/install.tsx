@@ -279,7 +279,7 @@ function Install({
 export const install = {
   type: 'local-jsx' as const,
   name: 'install',
-  description: 'Install SPARK-Code native build',
+  description: '安装 SPARK-Code 原生构建',
   argumentHint: '[options]',
   async call(onDone: (result: string, options?: {
     display?: CommandResultDisplay;

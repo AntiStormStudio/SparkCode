@@ -223,7 +223,7 @@ export function PowerShellPermissionRequest(props: PermissionRequestProps): Reac
           </Box>
           <Box justifyContent="space-between" marginTop={1}>
             <Text dimColor>
-              Esc to cancel
+              Esc 取消
               {(focusedOption === 'yes' && !yesInputMode || focusedOption === 'no' && !noInputMode) && ' · Tab to amend'}
               {explainerState.enabled && ` · ctrl+e to ${explainerState.visible ? 'hide' : 'explain'}`}
             </Text>

@@ -296,7 +296,7 @@ export function Feedback({
     }
 
     // When in userInput step with error, allow user to edit and retry
-    // (don't close on any keypress - they can still press Esc to cancel)
+    // (don't close on any keypress - they can still press Esc 取消)
     if (error && step !== 'userInput') {
       onDone('Error submitting feedback / bug report', {
         display: 'system'
@@ -307,7 +307,7 @@ export function Feedback({
       void submitReport();
     }
   });
-  return <Dialog title="Submit Feedback / Bug Report" onCancel={handleCancel} isCancelActive={step !== 'userInput'} inputGuide={exitState => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : step === 'userInput' ? <Byline>
+  return <Dialog title="Submit Feedback / Bug Report" onCancel={handleCancel} isCancelActive={step !== 'userInput'} inputGuide={exitState => exitState.pending ? <Text>再次按 {exitState.keyName} 退出</Text> : step === 'userInput' ? <Byline>
             <KeyboardShortcutHint shortcut="Enter" action="continue" />
             <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
           </Byline> : step === 'consent' ? <Byline>
@@ -328,7 +328,7 @@ export function Feedback({
           {error && <Box flexDirection="column" gap={1}>
               <Text color="error">{error}</Text>
               <Text dimColor>
-                Edit and press Enter to retry, or Esc to cancel
+                Edit and press Enter to retry, or Esc 取消
               </Text>
             </Box>}
         </Box>}

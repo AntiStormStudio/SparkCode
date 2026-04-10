@@ -1719,7 +1719,7 @@ export function Config({
               </Byline>
             </Text> : isSearchMode ? <Text dimColor>
               <Byline>
-                <Text>Type to filter</Text>
+                <Text>输入筛选</Text>
                 <KeyboardShortcutHint shortcut="Enter/↓" action="select" />
                 <KeyboardShortcutHint shortcut="↑" action="tabs" />
                 <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="clear" />

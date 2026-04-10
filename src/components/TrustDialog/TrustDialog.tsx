@@ -205,8 +205,8 @@ export function TrustDialog(t0) {
   let t18;
   if ($[20] === Symbol.for("react.memo_cache_sentinel")) {
     t16 = <Text bold={true}>{getFsImplementation().cwd()}</Text>;
-    t17 = <Text>Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what{"'"}s in this folder first.</Text>;
-    t18 = <Text>Spark Code{"'"}ll be able to read, edit, and execute files here.</Text>;
+    t17 = <Text>安全确认检查: 你创建了此项目或行人此项目? (比如你自己的代码或者知名的开源项目,又或是你团队的项目). 如果不是？花点时间看看这个项目先,兄弟</Text>;
+    t18 = <Text>Spark Code 可以在这里阅读和执行代码</Text>;
     $[20] = t16;
     $[21] = t17;
     $[22] = t18;
@@ -217,7 +217,7 @@ export function TrustDialog(t0) {
   }
   let t19;
   if ($[23] === Symbol.for("react.memo_cache_sentinel")) {
-    t19 = <Text dimColor={true}><Link url="https://code.claude.com/docs/en/security">Security guide</Link></Text>;
+    t19 = <Text dimColor={true}><Link>安全确认</Link></Text>;
     $[23] = t19;
   } else {
     t19 = $[23];
@@ -225,10 +225,10 @@ export function TrustDialog(t0) {
   let t20;
   if ($[24] === Symbol.for("react.memo_cache_sentinel")) {
     t20 = [{
-      label: "Yes, I trust this folder",
+      label: "我信任此文件夹,已阅读并已同意 用户协议",
       value: "enable_all"
     }, {
-      label: "No, exit",
+      label: "不信任,退出",
       value: "exit"
     }];
     $[24] = t20;
@@ -245,7 +245,7 @@ export function TrustDialog(t0) {
   }
   let t22;
   if ($[27] !== exitState.keyName || $[28] !== exitState.pending) {
-    t22 = <Text dimColor={true}>{exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>Enter to confirm · Esc to cancel</>}</Text>;
+    t22 = <Text dimColor={true}>{exitState.pending ? <>再次按 {exitState.keyName} 退出</> : <>Enter 确认 · Esc 取消</>}</Text>;
     $[27] = exitState.keyName;
     $[28] = exitState.pending;
     $[29] = t22;
@@ -254,7 +254,7 @@ export function TrustDialog(t0) {
   }
   let t23;
   if ($[30] !== t21 || $[31] !== t22) {
-    t23 = <PermissionDialog color="warning" titleColor="warning" title="Accessing workspace:"><Box flexDirection="column" gap={1} paddingTop={1}>{t16}{t17}{t18}{t19}{t21}{t22}</Box></PermissionDialog>;
+    t23 = <PermissionDialog color="warning" titleColor="warning" title="正在访问 workspace 工作空间:"><Box flexDirection="column" gap={1} paddingTop={1}>{t16}{t17}{t18}{t19}{t21}{t22}</Box></PermissionDialog>;
     $[30] = t21;
     $[31] = t22;
     $[32] = t23;

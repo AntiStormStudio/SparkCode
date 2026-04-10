@@ -147,6 +147,7 @@ export async function createBridgeSession({
     response = await axios.post(url, requestBody, {
       headers,
       signal,
+      timeout: 10_000,
       validateStatus: s => s < 500,
     })
   } catch (err: unknown) {
@@ -320,7 +321,7 @@ export async function archiveBridgeSession(
  * Update the title of a bridge session via PATCH /v1/sessions/{id}.
  *
  * Called when the user renames a session via /rename while a bridge
- * connection is active, so the title stays in sync on claude.ai/code.
+ * connection is active, so the title stays in sync on spark-ai.top/code.
  *
  * Errors are swallowed — title sync is best-effort.
  */

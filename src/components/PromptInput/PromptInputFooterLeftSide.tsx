@@ -408,7 +408,7 @@ function ModeIndicator({
   const tasksPart = hasBackgroundTasks && !hasTeammatePills && !shouldHideTasksFooter(tasks, showSpinnerTree) ? <BackgroundTaskStatus tasksSelected={tasksSelected} isViewingTeammate={isViewingTeammate} teammateFooterIndex={teammateFooterIndex} isLeaderIdle={!isLoading} onOpenDialog={onOpenTasksDialog} /> : null;
   if (parts.length === 0 && !tasksPart && !modePart && showHint) {
     parts.push(<Text dimColor key="shortcuts-hint">
-        ? for shortcuts
+        ? 查看快捷键
       </Text>);
   }
 

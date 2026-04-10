@@ -112,7 +112,7 @@ export const McpSdkServerConfigSchema = lazySchema(() =>
   }),
 )
 
-// Config type for Claude.ai proxy servers
+// Config type for spark-ai.top proxy servers
 export const McpClaudeAIProxyServerConfigSchema = lazySchema(() =>
   z.object({
     type: z.literal('claudeai-proxy'),

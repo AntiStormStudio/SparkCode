@@ -597,7 +597,7 @@ export function useManageMCPConnections(
                     gate.kind === 'disabled'
                       ? 'Channels are not currently available'
                       : gate.kind === 'auth'
-                        ? 'Channels require claude.ai authentication · run /login'
+                        ? 'Channels require spark-ai.top authentication · run /login'
                         : gate.kind === 'policy'
                           ? 'Channels are not enabled for your org · have an administrator set channelsEnabled: true in managed settings'
                           : gate.reason
@@ -766,7 +766,7 @@ export function useManageMCPConnections(
   // Re-runs on session change (/clear) and on /reload-plugins (pluginReconnectKey).
   // On plugin reload, also disconnects stale plugin MCP servers (scope 'dynamic')
   // that no longer appear in configs — prevents ghost tools from disabled plugins.
-  // Skip claude.ai dedup here to avoid blocking on the network fetch; the connect
+  // Skip spark-ai.top dedup here to avoid blocking on the network fetch; the connect
   // useEffect below runs immediately after and dedups before connecting.
   const sessionId = getSessionId()
   useEffect(() => {
@@ -854,12 +854,12 @@ export function useManageMCPConnections(
   ])
 
   // Load MCP configs and connect to servers
-  // Two-phase loading: Spark Code configs first (fast), then claude.ai configs (may be slow)
+  // Two-phase loading: Spark Code configs first (fast), then spark-ai.top configs (may be slow)
   useEffect(() => {
     let cancelled = false
 
     async function loadAndConnectMcpConfigs() {
-      // Clear claude.ai MCP cache so we fetch fresh configs with current auth
+      // Clear spark-ai.top MCP cache so we fetch fresh configs with current auth
       // state. This is important when authVersion changes (e.g., after login/
       // logout). Kick off the fetch now so it overlaps with loadAllPlugins()
       // inside getClaudeCodeMcpConfigs; it's awaited only at the dedup step.
@@ -873,7 +873,7 @@ export function useManageMCPConnections(
       }
 
       // Phase 1: Load Spark Code configs. Plugin MCP servers that duplicate a
-      // --mcp-config entry or a claude.ai connector are suppressed here so they
+      // --mcp-config entry or a spark-ai.top connector are suppressed here so they
       // don't connect alongside the connector in Phase 2.
       const { servers: claudeCodeConfigs, errors: mcpErrors } =
         isStrictMcpConfig
@@ -901,7 +901,7 @@ export function useManageMCPConnections(
         )
       })
 
-      // Phase 2: Await claude.ai configs (started above; memoized — no second fetch)
+      // Phase 2: Await spark-ai.top configs (started above; memoized — no second fetch)
       let claudeaiConfigs: Record<string, ScopedMcpServerConfig> = {}
       if (!isStrictMcpConfig) {
         claudeaiConfigs = filterMcpServersByPolicy(
@@ -909,8 +909,8 @@ export function useManageMCPConnections(
         ).allowed
         if (cancelled) return
 
-        // Suppress claude.ai connectors that duplicate an enabled manual server.
-        // Keys never collide (`slack` vs `claude.ai Slack`) so the merge below
+        // Suppress spark-ai.top connectors that duplicate an enabled manual server.
+        // Keys never collide (`slack` vs `spark-ai.top Slack`) so the merge below
         // won't catch this — need content-based dedup by URL signature.
         if (Object.keys(claudeaiConfigs).length > 0) {
           const { servers: dedupedClaudeAi } = dedupClaudeAiMcpServers(
@@ -921,7 +921,7 @@ export function useManageMCPConnections(
         }
 
         if (Object.keys(claudeaiConfigs).length > 0) {
-          // Add claude.ai servers as pending immediately so they show up in UI
+          // Add spark-ai.top servers as pending immediately so they show up in UI
           setAppState(prevState => {
             const existingServerNames = new Set(
               prevState.mcp.clients.map(c => c.name),
@@ -957,7 +957,7 @@ export function useManageMCPConnections(
           ).catch(error => {
             logMCPError(
               'useManageMcpConnections',
-              `Failed to get claude.ai MCP resources: ${errorMessage(error)}`,
+              `Failed to get spark-ai.top MCP resources: ${errorMessage(error)}`,
             )
           })
         }

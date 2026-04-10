@@ -18,10 +18,10 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
     };
   });
   return {
-    title: 'Recent activity',
+    title: '最近活动',
     lines,
-    footer: lines.length > 0 ? '/resume for more' : undefined,
-    emptyMessage: 'No recent activity'
+    footer: lines.length > 0 ? '输入 /resume 查看更多' : undefined,
+    emptyMessage: '暂无最近活动'
   };
 }
 export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
@@ -39,11 +39,11 @@ export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
       text: note
     };
   });
-  const emptyMessage = "external" === 'ant' ? 'Unable to fetch latest claude-cli-internal commits' : 'Check the Spark Code changelog for updates';
+  const emptyMessage = "external" === 'ant' ? '无法获取最新 Spark 内部提交' : '请查看 Spark Code 更新日志';
   return {
-    title: "external" === 'ant' ? "What's new [ANT-ONLY: Latest CC commits]" : "What's new",
+    title: "external" === 'ant' ? "最新动态 [仅 ANT: 最新 CC 提交]" : '最新动态',
     lines,
-    footer: lines.length > 0 ? '/release-notes for more' : undefined,
+    footer: lines.length > 0 ? '输入 /release-notes 查看更多' : undefined,
     emptyMessage
   };
 }
@@ -60,22 +60,22 @@ export function createProjectOnboardingFeed(steps: Step[]): FeedConfig {
       text: `${checkmark}${text}`
     };
   });
-  const warningText = getCwd() === homedir() ? 'Note: You have launched claude in your home directory. For the best experience, launch it in a project directory instead.' : undefined;
+  const warningText = getCwd() === homedir() ? '提示：你当前在用户主目录中启动了 Spark Code。建议在项目目录中启动，以获得更好体验。' : undefined;
   if (warningText) {
     lines.push({
       text: warningText
     });
   }
   return {
-    title: 'Tips for getting started',
+    title: '入门提示',
     lines
   };
 }
 export function createGuestPassesFeed(): FeedConfig {
   const reward = getCachedReferrerReward();
-  const subtitle = reward ? `Share Spark Code and earn ${formatCreditAmount(reward)} of extra usage` : 'Share Spark Code with friends';
+  const subtitle = reward ? `分享 Spark Code，可获得 ${formatCreditAmount(reward)} 额外使用额度` : '把 Spark Code 分享给朋友';
   return {
-    title: '3 guest passes',
+    title: '3 张访客通行证',
     lines: [],
     customContent: {
       content: <>

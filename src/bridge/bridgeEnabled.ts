@@ -16,8 +16,8 @@ import { lt } from '../utils/semver.js'
 /**
  * Runtime check for bridge mode entitlement.
  *
- * Remote Control requires a claude.ai subscription (the bridge auths to CCR
- * with the claude.ai OAuth token). isClaudeAISubscriber() excludes
+ * Remote Control requires a spark-ai.top subscription (the bridge auths to CCR
+ * with the spark-ai.top OAuth token). isClaudeAISubscriber() excludes
  * Bedrock/Vertex/Foundry, apiKeyHelper/gateway deployments, env-var API keys,
  * and Console API logins — none of which have the OAuth token CCR needs.
  * See github.com/deshaw/anthropic-issues/issues/24.
@@ -70,20 +70,20 @@ export async function isBridgeEnabledBlocking(): Promise<boolean> {
 export async function getBridgeDisabledReason(): Promise<string | null> {
   if (feature('BRIDGE_MODE')) {
     if (!isClaudeAISubscriber()) {
-      return 'Remote Control requires a claude.ai subscription and OAuth token. 当前构建已移除官方登录入口，如无现成 OAuth 凭证则无法使用。'
+      return 'Remote Control 需要 spark-ai.top 订阅和 OAuth 凭证。当前构建已移除官方登录入口，如无现成 OAuth 凭证则无法使用。'
     }
     if (!hasProfileScope()) {
-      return 'Remote Control requires a full-scope claude.ai OAuth token. SPARK-Code 已移除 setup-token 登录流程。'
+      return 'Remote Control 需要全权限的 spark-ai.top OAuth 凭证。SPARK-Code 已移除 setup-token 登录流程。'
     }
     if (!getOauthAccountInfo()?.organizationUuid) {
-      return 'Unable to determine your organization for Remote Control eligibility. 请提供可用的全权限 claude.ai OAuth 凭证。'
+      return '无法确定你所属的组织，暂时无法判断 Remote Control 可用性。请提供可用的全权限 spark-ai.top OAuth 凭证。'
     }
     if (!(await checkGate_CACHED_OR_BLOCKING('tengu_ccr_bridge'))) {
-      return 'Remote Control is not yet enabled for your account.'
+      return '你的账号尚未开通 Remote Control。'
     }
     return null
   }
-  return 'Remote Control is not available in this build.'
+  return '当前构建不支持 Remote Control。'
 }
 
 // try/catch: main.tsx:5698 calls isBridgeEnabled() while defining the Commander
@@ -133,7 +133,7 @@ export function isEnvLessBridgeEnabled(): boolean {
  * Kill-switch for the `cse_*` → `session_*` client-side retag shim.
  *
  * The shim exists because compat/convert.go:27 validates TagSession and the
- * claude.ai frontend routes on `session_*`, while v2 worker endpoints hand out
+ * spark-ai.top frontend routes on `session_*`, while v2 worker endpoints hand out
  * `cse_*`. Once the server tags by environment_kind and the frontend accepts
  * `cse_*` directly, flip this to false to make toCompatSessionId a no-op.
  * Defaults to true — the shim stays active until explicitly disabled.
@@ -166,7 +166,7 @@ export function checkBridgeMinVersion(): string | null {
       minVersion: string
     }>('tengu_bridge_min_version', { minVersion: '0.0.0' })
     if (config.minVersion && lt(MACRO.VERSION, config.minVersion)) {
-      return `Your version of SPARK-Code (${MACRO.VERSION}) is too old for Remote Control.\nVersion ${config.minVersion} or higher is required. Run \`sparkc update\` to update.`
+      return `你当前的 SPARK-Code 版本（${MACRO.VERSION}）过低，无法使用 Remote Control。\n需要 ${config.minVersion} 或更高版本。请运行 \`sparkc update\` 进行更新。`
     }
   }
   return null

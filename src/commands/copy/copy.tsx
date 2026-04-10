@@ -146,7 +146,7 @@ function CopyPicker(t0) {
       t4 = {
         label: "Always copy full response",
         value: "always" as const,
-        description: "Skip this picker in the future (revert via /config)"
+        description: "以后跳过此选择器（可通过 /config 恢复）"
       };
       $[5] = t4;
     } else {

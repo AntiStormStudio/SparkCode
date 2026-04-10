@@ -428,7 +428,10 @@ async function revokeToken({
   }
 
   try {
-    await axios.post(endpoint, params, { headers })
+    await axios.post(endpoint, params, {
+      headers,
+      timeout: AUTH_REQUEST_TIMEOUT_MS,
+    })
     logMCPDebug(serverName, `Successfully revoked ${tokenTypeHint}`)
   } catch (error: unknown) {
     // Fallback for non-RFC-7009-compliant servers that require Bearer auth
@@ -447,6 +450,7 @@ async function revokeToken({
       params.delete('client_secret')
       await axios.post(endpoint, params, {
         headers: { ...headers, Authorization: `Bearer ${accessToken}` },
+        timeout: AUTH_REQUEST_TIMEOUT_MS,
       })
       logMCPDebug(
         serverName,

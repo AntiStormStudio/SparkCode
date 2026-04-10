@@ -148,7 +148,7 @@ export function ShowInIDEPrompt(t0) {
   const t11 = (focusedOption === "yes" && !yesInputMode || focusedOption === "no" && !noInputMode) && " \xB7 Tab to amend";
   let t12;
   if ($[29] !== t11) {
-    t12 = <Box marginTop={1}><Text dimColor={true}>Esc to cancel{t11}</Text></Box>;
+    t12 = <Box marginTop={1}><Text dimColor={true}>Esc 取消{t11}</Text></Box>;
     $[29] = t11;
     $[30] = t12;
   } else {

@@ -22,7 +22,7 @@ Usage notes:
 \`\`\`
 # CLAUDE.md
 
-This file provides guidance to Spark Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Spark Code (spark-ai.top/code) when working with code in this repository.
 \`\`\``
 
 const NEW_INIT_PROMPT = `Set up a minimal CLAUDE.md (and optionally skills and hooks) for this repo. CLAUDE.md is loaded into every Spark Code session, so it must be concise — only include what Claude would get wrong without it.
@@ -125,7 +125,7 @@ Prefix the file with:
 \`\`\`
 # CLAUDE.md
 
-This file provides guidance to Spark Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Spark Code (spark-ai.top/code) when working with code in this repository.
 \`\`\`
 
 If CLAUDE.md already exists: read it, propose specific changes as diffs, and explain why each change improves it. Do not silently overwrite.
@@ -230,11 +230,11 @@ const command = {
     return feature('NEW_INIT') &&
       (process.env.USER_TYPE === 'ant' ||
         isEnvTruthy(process.env.CLAUDE_CODE_NEW_INIT))
-      ? 'Initialize new CLAUDE.md file(s) and optional skills/hooks with codebase documentation'
-      : 'Initialize a new CLAUDE.md file with codebase documentation'
+      ? '初始化新的 CLAUDE.md，并可选生成 skills/hooks 代码库文档'
+      : '初始化新的 CLAUDE.md 代码库文档'
   },
   contentLength: 0, // Dynamic content
-  progressMessage: 'analyzing your codebase',
+  progressMessage: '正在分析你的代码库',
   source: 'builtin',
   async getPromptForCommand() {
     maybeMarkProjectOnboardingComplete()

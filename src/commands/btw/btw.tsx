@@ -140,7 +140,7 @@ function BtwSideQuestion(t0) {
   }
   let t7;
   if ($[10] !== error || $[11] !== frame || $[12] !== response) {
-    t7 = <ScrollBox ref={scrollRef} flexDirection="column" flexGrow={1}>{error ? <Text color="error">{error}</Text> : response ? <Markdown>{response}</Markdown> : <Box><SpinnerGlyph frame={frame} messageColor="warning" /><Text color="warning">Answering...</Text></Box>}</ScrollBox>;
+    t7 = <ScrollBox ref={scrollRef} flexDirection="column" flexGrow={1}>{error ? <Text color="error">{error}</Text> : response ? <Markdown>{response}</Markdown> : <Box><SpinnerGlyph frame={frame} messageColor="warning" /><Text color="warning">正在回答...</Text></Box>}</ScrollBox>;
     $[10] = error;
     $[11] = frame;
     $[12] = response;
@@ -159,7 +159,7 @@ function BtwSideQuestion(t0) {
   }
   let t9;
   if ($[17] !== error || $[18] !== response) {
-    t9 = (response || error) && <Box marginTop={1}><Text dimColor={true}>{UP_ARROW}/{DOWN_ARROW} to scroll · Space, Enter, or Escape to dismiss</Text></Box>;
+    t9 = (response || error) && <Box marginTop={1}><Text dimColor={true}>{UP_ARROW}/{DOWN_ARROW} 滚动 · Space、Enter 或 Escape 关闭</Text></Box>;
     $[17] = error;
     $[18] = response;
     $[19] = t9;

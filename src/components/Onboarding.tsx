@@ -11,14 +11,12 @@ import { getCustomApiKeyStatus } from '../utils/config.js';
 import { env } from '../utils/env.js';
 import { isRunningOnHomespace } from '../utils/envUtils.js';
 import { PreflightStep } from '../utils/preflightChecks.js';
-import type { ThemeSetting } from '../utils/theme.js';
 import { ApproveApiKey } from './ApproveApiKey.js';
 import { Select } from './CustomSelect/select.js';
 import { WelcomeV2 } from './LogoV2/WelcomeV2.js';
 import { PressEnterToContinue } from './PressEnterToContinue.js';
-import { ThemePicker } from './ThemePicker.js';
 import { OrderedList } from './ui/OrderedList.js';
-type StepId = 'preflight' | 'theme' | 'api-key' | 'security' | 'terminal-setup';
+type StepId = 'preflight' | 'api-key' | 'security' | 'terminal-setup';
 interface OnboardingStep {
   id: StepId;
   component: React.ReactNode;
@@ -37,6 +35,11 @@ export function Onboarding({
       oauthEnabled
     });
   }, [oauthEnabled]);
+  useEffect(() => {
+    if (theme !== 'dark') {
+      setTheme('dark');
+    }
+  }, [theme, setTheme]);
   function goToNextStep() {
     if (currentStepIndex < steps.length - 1) {
       const nextIndex = currentStepIndex + 1;
@@ -49,19 +52,9 @@ export function Onboarding({
       onDone();
     }
   }
-  function handleThemeSelection(newTheme: ThemeSetting) {
-    setTheme(newTheme);
-    goToNextStep();
-  }
   const exitState = useExitOnCtrlCDWithKeybindings();
-
-  // Define all onboarding steps
-  const themeStep = <Box marginX={1}>
-      <ThemePicker onThemeSelect={handleThemeSelection} showIntroText={true} helpText="To change this later, run /theme" hideEscToCancel={true} skipExitHandling={true} // Skip exit handling as Onboarding already handles it
-    />
-    </Box>;
   const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
-      <Text bold>Security notes:</Text>
+      <Text bold>安全提示：</Text>
       <Box flexDirection="column" width={70}>
         {/**
          * OrderedList misnumbers items when rendering conditionally,
@@ -69,22 +62,20 @@ export function Onboarding({
          */}
         <OrderedList>
           <OrderedList.Item>
-            <Text>Claude can make mistakes</Text>
+            <Text>Spark Code 可能会犯错</Text>
             <Text dimColor wrap="wrap">
-              You should always review Claude&apos;s responses, especially when
-              <Newline />
-              running code.
+              尤其在运行代码时，请始终人工复核 Spark Code 的回复。
               <Newline />
             </Text>
           </OrderedList.Item>
           <OrderedList.Item>
             <Text>
-              Due to prompt injection risks, only use it with code you trust
+              由于存在提示注入风险，请仅在你信任的代码上使用它
             </Text>
             <Text dimColor wrap="wrap">
-              For more details see:
+              更多详情请见：
               <Newline />
-              <Link url="https://code.claude.com/docs/en/security" />
+              <Link url="https://spark-ai.top/docs/en/security" />
             </Text>
           </OrderedList.Item>
         </OrderedList>
@@ -115,10 +106,6 @@ export function Onboarding({
       component: preflightStep
     });
   }
-  steps.push({
-    id: 'theme',
-    component: themeStep
-  });
   if (apiKeyNeedingApproval) {
     steps.push({
       id: 'api-key',
@@ -133,19 +120,18 @@ export function Onboarding({
     steps.push({
       id: 'terminal-setup',
       component: <Box flexDirection="column" gap={1} paddingLeft={1}>
-          <Text bold>Use Spark Code&apos;s terminal setup?</Text>
+          <Text bold>是否启用 Spark Code 的终端配置？</Text>
           <Box flexDirection="column" width={70} gap={1}>
             <Text>
-              For the optimal coding experience, enable the recommended settings
+              为获得更好的编码体验，建议为你的终端启用推荐设置：
               <Newline />
-              for your terminal:{' '}
-              {env.terminal === 'Apple_Terminal' ? 'Option+Enter for newlines and visual bell' : 'Shift+Enter for newlines'}
+              {env.terminal === 'Apple_Terminal' ? 'Option+Enter 输入换行并启用可视铃声' : 'Shift+Enter 输入换行'}
             </Text>
             <Select options={[{
-            label: 'Yes, use recommended settings',
+            label: '是，使用推荐设置',
             value: 'install'
           }, {
-            label: 'No, maybe later with /terminal-setup',
+            label: '否，稍后通过 /terminal-setup 设置',
             value: 'no'
           }]} onChange={value => {
             if (value === 'install') {
@@ -156,7 +142,7 @@ export function Onboarding({
             }
           }} onCancel={() => goToNextStep()} />
             <Text dimColor>
-              {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>Enter to confirm · Esc to skip</>}
+              {exitState.pending ? <>再按一次 {exitState.keyName} 退出</> : <>Enter 确认 · Esc 跳过</>}
             </Text>
           </Box>
         </Box>
@@ -193,7 +179,7 @@ export function Onboarding({
       <Box flexDirection="column" marginTop={1}>
         {currentStep?.component}
         {exitState.pending && <Box padding={1}>
-            <Text dimColor>Press {exitState.keyName} again to exit</Text>
+            <Text dimColor>再按一次 {exitState.keyName} 退出</Text>
           </Box>}
       </Box>
     </Box>;

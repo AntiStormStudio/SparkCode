@@ -189,9 +189,9 @@ export function LogoV2() {
       t12 = <VoiceModeNotice />;
       t13 = <Opus1mMergeNotice />;
       t14 = ChannelsNoticeModule && <ChannelsNoticeModule.ChannelsNotice />;
-      t15 = isDebugMode() && <Box paddingLeft={2} flexDirection="column"><Text color="warning">Debug mode enabled</Text><Text dimColor={true}>Logging to: {isDebugToStdErr() ? "stderr" : getDebugLogPath()}</Text></Box>;
+      t15 = isDebugMode() && <Box paddingLeft={2} flexDirection="column"><Text color="warning">调试模式已启用</Text><Text dimColor={true}>日志输出：{isDebugToStdErr() ? "stderr" : getDebugLogPath()}</Text></Box>;
       t16 = <EmergencyTip />;
-      t17 = process.env.CLAUDE_CODE_TMUX_SESSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>tmux session: {process.env.CLAUDE_CODE_TMUX_SESSION}</Text><Text dimColor={true}>{process.env.CLAUDE_CODE_TMUX_PREFIX_CONFLICTS ? `Detach: ${process.env.CLAUDE_CODE_TMUX_PREFIX} ${process.env.CLAUDE_CODE_TMUX_PREFIX} d (press prefix twice - Claude uses ${process.env.CLAUDE_CODE_TMUX_PREFIX})` : `Detach: ${process.env.CLAUDE_CODE_TMUX_PREFIX} d`}</Text></Box>;
+      t17 = process.env.CLAUDE_CODE_TMUX_SESSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>tmux 会话：{process.env.CLAUDE_CODE_TMUX_SESSION}</Text><Text dimColor={true}>{process.env.CLAUDE_CODE_TMUX_PREFIX_CONFLICTS ? `分离：${process.env.CLAUDE_CODE_TMUX_PREFIX} ${process.env.CLAUDE_CODE_TMUX_PREFIX} d（前缀按两次，Spark 使用 ${process.env.CLAUDE_CODE_TMUX_PREFIX}）` : `分离：${process.env.CLAUDE_CODE_TMUX_PREFIX} d`}</Text></Box>;
       $[15] = t11;
       $[16] = t12;
       $[17] = t13;
@@ -210,7 +210,7 @@ export function LogoV2() {
     }
     let t18;
     if ($[22] !== announcement || $[23] !== config) {
-      t18 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>Message from {config.oauthAccount.organizationName}:</Text>}<Text>{announcement}</Text></Box>;
+      t18 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>来自 {config.oauthAccount.organizationName} 的消息：</Text>}<Text>{announcement}</Text></Box>;
       $[22] = announcement;
       $[23] = config;
       $[24] = t18;
@@ -222,8 +222,8 @@ export function LogoV2() {
     let t21;
     let t22;
     if ($[25] === Symbol.for("react.memo_cache_sentinel")) {
-      t19 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>Use /issue to report model behavior issues</Text></Box>;
-      t20 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[ANT-ONLY] Logs:</Text><Text dimColor={true}>API calls: {getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>Debug logs: {getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>Startup Perf: {getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
+      t19 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>使用 /issue 报告模型行为问题</Text></Box>;
+      t20 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[仅 ANT] 日志：</Text><Text dimColor={true}>API 调用：{getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>调试日志：{getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>启动性能：{getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
       t21 = false && <GateOverridesWarning />;
       t22 = false && <ExperimentEnrollmentNotice />;
       $[25] = t19;
@@ -309,7 +309,7 @@ export function LogoV2() {
     }
     let t17;
     if ($[40] !== showSandboxStatus) {
-      t17 = showSandboxStatus && <Box marginTop={1} flexDirection="column"><Text color="warning">Your bash commands will be sandboxed. Disable with /sandbox.</Text></Box>;
+      t17 = showSandboxStatus && <Box marginTop={1} flexDirection="column"><Text color="warning">你的 Bash 命令将受沙箱限制。可用 /sandbox 关闭。</Text></Box>;
       $[40] = showSandboxStatus;
       $[41] = t17;
     } else {
@@ -460,9 +460,9 @@ export function LogoV2() {
     t29 = <VoiceModeNotice />;
     t30 = <Opus1mMergeNotice />;
     t31 = ChannelsNoticeModule && <ChannelsNoticeModule.ChannelsNotice />;
-    t32 = isDebugMode() && <Box paddingLeft={2} flexDirection="column"><Text color="warning">Debug mode enabled</Text><Text dimColor={true}>Logging to: {isDebugToStdErr() ? "stderr" : getDebugLogPath()}</Text></Box>;
+    t32 = isDebugMode() && <Box paddingLeft={2} flexDirection="column"><Text color="warning">调试模式已启用</Text><Text dimColor={true}>日志输出：{isDebugToStdErr() ? "stderr" : getDebugLogPath()}</Text></Box>;
     t33 = <EmergencyTip />;
-    t34 = process.env.CLAUDE_CODE_TMUX_SESSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>tmux session: {process.env.CLAUDE_CODE_TMUX_SESSION}</Text><Text dimColor={true}>{process.env.CLAUDE_CODE_TMUX_PREFIX_CONFLICTS ? `Detach: ${process.env.CLAUDE_CODE_TMUX_PREFIX} ${process.env.CLAUDE_CODE_TMUX_PREFIX} d (press prefix twice - Claude uses ${process.env.CLAUDE_CODE_TMUX_PREFIX})` : `Detach: ${process.env.CLAUDE_CODE_TMUX_PREFIX} d`}</Text></Box>;
+    t34 = process.env.CLAUDE_CODE_TMUX_SESSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>tmux 会话：{process.env.CLAUDE_CODE_TMUX_SESSION}</Text><Text dimColor={true}>{process.env.CLAUDE_CODE_TMUX_PREFIX_CONFLICTS ? `分离：${process.env.CLAUDE_CODE_TMUX_PREFIX} ${process.env.CLAUDE_CODE_TMUX_PREFIX} d（前缀按两次，Spark 使用 ${process.env.CLAUDE_CODE_TMUX_PREFIX}）` : `分离：${process.env.CLAUDE_CODE_TMUX_PREFIX} d`}</Text></Box>;
     $[75] = t29;
     $[76] = t30;
     $[77] = t31;
@@ -479,7 +479,7 @@ export function LogoV2() {
   }
   let t35;
   if ($[81] !== announcement || $[82] !== config) {
-    t35 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>Message from {config.oauthAccount.organizationName}:</Text>}<Text>{announcement}</Text></Box>;
+    t35 = announcement && <Box paddingLeft={2} flexDirection="column">{!process.env.IS_DEMO && config.oauthAccount?.organizationName && <Text dimColor={true}>来自 {config.oauthAccount.organizationName} 的消息：</Text>}<Text>{announcement}</Text></Box>;
     $[81] = announcement;
     $[82] = config;
     $[83] = t35;
@@ -488,7 +488,7 @@ export function LogoV2() {
   }
   let t36;
   if ($[84] !== showSandboxStatus) {
-    t36 = showSandboxStatus && <Box paddingLeft={2} flexDirection="column"><Text color="warning">Your bash commands will be sandboxed. Disable with /sandbox.</Text></Box>;
+    t36 = showSandboxStatus && <Box paddingLeft={2} flexDirection="column"><Text color="warning">你的 Bash 命令将受沙箱限制。可用 /sandbox 关闭。</Text></Box>;
     $[84] = showSandboxStatus;
     $[85] = t36;
   } else {
@@ -499,8 +499,8 @@ export function LogoV2() {
   let t39;
   let t40;
   if ($[86] === Symbol.for("react.memo_cache_sentinel")) {
-    t37 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>Use /issue to report model behavior issues</Text></Box>;
-    t38 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[ANT-ONLY] Logs:</Text><Text dimColor={true}>API calls: {getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>Debug logs: {getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>Startup Perf: {getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
+    t37 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>使用 /issue 报告模型行为问题</Text></Box>;
+    t38 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[仅 ANT] 日志：</Text><Text dimColor={true}>API 调用：{getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>调试日志：{getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>启动性能：{getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
     t39 = false && <GateOverridesWarning />;
     t40 = false && <ExperimentEnrollmentNotice />;
     $[86] = t37;

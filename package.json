@@ -1,10 +1,10 @@
 {
   "name": "spark-code",
-  "version": "999.0.0-restored",
+  "version": "0.1.0-insider",
   "private": true,
-  "description": "Restored SPARK-Code source tree reconstructed from source maps.",
+  "description": "从 source map 重建并恢复的 SPARK-Code 源码树。",
   "bin": {
-    "sparkc": "./src/dev-entry.ts"
+    "sparkc": "./bin/sparkc"
   },
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",

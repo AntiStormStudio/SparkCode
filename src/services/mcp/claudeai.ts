@@ -31,8 +31,8 @@ const FETCH_TIMEOUT_MS = 5000
 const MCP_SERVERS_BETA_HEADER = 'mcp-servers-2025-12-04'
 
 /**
- * Fetches MCP server configurations from Claude.ai org configs.
- * These servers are managed by the organization via Claude.ai.
+ * Fetches MCP server configurations from spark-ai.top org configs.
+ * These servers are managed by the organization via spark-ai.top.
  *
  * Results are memoized for the session lifetime (fetch once per CLI session).
  */
@@ -62,7 +62,7 @@ export const fetchClaudeAIMcpConfigsIfEligible = memoize(
       // In non-interactive mode, isClaudeAISubscriber() returns false when ANTHROPIC_API_KEY
       // is set (even with valid OAuth tokens) because preferThirdPartyAuthentication() causes
       // isAnthropicAuthEnabled() to return false. Checking the scope directly allows users
-      // with both API keys and OAuth tokens to access claude.ai MCPs in print mode.
+      // with both API keys and OAuth tokens to access spark-ai.top MCPs in print mode.
       if (!tokens.scopes?.includes('user:mcp_servers')) {
         logForDebugging(
           `[claudeai-mcp] Missing user:mcp_servers scope (scopes=${tokens.scopes?.join(',') || 'none'})`,
@@ -97,7 +97,7 @@ export const fetchClaudeAIMcpConfigsIfEligible = memoize(
       const usedNormalizedNames = new Set<string>()
 
       for (const server of response.data.data) {
-        const baseName = `claude.ai ${server.display_name}`
+        const baseName = `spark-ai.top ${server.display_name}`
 
         // Try without suffix first, then increment until we find an unused normalized name
         let finalName = baseName
@@ -144,7 +144,7 @@ export function clearClaudeAIMcpConfigsCache(): void {
 }
 
 /**
- * Record that a claude.ai connector successfully connected. Idempotent.
+ * Record that a spark-ai.top connector successfully connected. Idempotent.
  *
  * Gates the "N connectors unavailable/need auth" startup notifications: a
  * connector that was working yesterday and is now failed is a state change

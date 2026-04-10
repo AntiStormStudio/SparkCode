@@ -64,7 +64,7 @@ export function ErrorStep(t0) {
   }
   let t7;
   if ($[12] === Symbol.for("react.memo_cache_sentinel")) {
-    t7 = <Box marginLeft={3}><Text dimColor={true}>Press any key to exit</Text></Box>;
+    t7 = <Box marginLeft={3}><Text dimColor={true}>按任意键退出</Text></Box>;
     $[12] = t7;
   } else {
     t7 = $[12];

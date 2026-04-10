@@ -136,7 +136,7 @@ function _temp3(item) {
   };
 }
 function _temp2() {
-  return <Text>Esc to go back</Text>;
+  return <Text>Esc 返回</Text>;
 }
 function _temp(h) {
   return h.source;

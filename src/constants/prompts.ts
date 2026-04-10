@@ -696,7 +696,7 @@ export async function computeSimpleEnvInfo(
       : `The most recent Claude model family is Claude 4.5/4.6. Model IDs — Opus 4.6: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.opus}', Sonnet 4.6: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.sonnet}', Haiku 4.5: '${CLAUDE_4_5_OR_4_6_MODEL_IDS.haiku}'. When building AI applications, default to the latest and most capable Claude models.`,
     process.env.USER_TYPE === 'ant' && isUndercover()
       ? null
-      : `Spark Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (claude.ai/code), and IDE extensions (VS Code, JetBrains).`,
+      : `Spark Code is available as a CLI in the terminal, desktop app (Mac/Windows), web app (spark-ai.top/code), and IDE extensions (VS Code, JetBrains).`,
     process.env.USER_TYPE === 'ant' && isUndercover()
       ? null
       : `Fast mode for Spark Code uses the same ${FRONTIER_MODEL_NAME} model with faster output. It does NOT switch to a different model. It can be toggled with /fast.`,

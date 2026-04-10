@@ -1904,10 +1904,10 @@ function generateTimeOfDayChart(messageHours: number[]): string {
 
   // Group into time periods
   const periods = [
-    { label: 'Morning (6-12)', range: [6, 7, 8, 9, 10, 11] },
-    { label: 'Afternoon (12-18)', range: [12, 13, 14, 15, 16, 17] },
-    { label: 'Evening (18-24)', range: [18, 19, 20, 21, 22, 23] },
-    { label: 'Night (0-6)', range: [0, 1, 2, 3, 4, 5] },
+    { label: '上午 (6-12)', range: [6, 7, 8, 9, 10, 11] },
+    { label: '下午 (12-18)', range: [12, 13, 14, 15, 16, 17] },
+    { label: '晚上 (18-24)', range: [18, 19, 20, 21, 22, 23] },
+    { label: '凌晨 (0-6)', range: [0, 1, 2, 3, 4, 5] },
   ]
 
   const hourCounts: Record<number, number> = {}
@@ -3039,9 +3039,9 @@ function safeKeys(obj: Record<string, unknown> | undefined | null): string[] {
 const usageReport: Command = {
   type: 'prompt',
   name: 'insights',
-  description: 'Generate a report analyzing your Spark Code sessions',
+  description: '生成 Spark Code 会话分析报告',
   contentLength: 0, // Dynamic content
-  progressMessage: 'analyzing your sessions',
+  progressMessage: '正在分析你的会话',
   source: 'builtin',
   async getPromptForCommand(args) {
     let collectRemote = false

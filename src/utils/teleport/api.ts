@@ -15,6 +15,7 @@ import { jsonStringify } from '../slowOperations.js'
 // Retry configuration for teleport API requests
 const TELEPORT_RETRY_DELAYS = [2000, 4000, 8000, 16000] // 4 retries with exponential backoff
 const MAX_TELEPORT_RETRIES = TELEPORT_RETRY_DELAYS.length
+const TELEPORT_API_TIMEOUT_MS = 30_000
 
 export const CCR_BYOC_BETA = 'ccr-byoc-2025-07-29'
 
@@ -52,7 +53,10 @@ export async function axiosGetWithRetry<T>(
 
   for (let attempt = 0; attempt <= MAX_TELEPORT_RETRIES; attempt++) {
     try {
-      return await axios.get<T>(url, config)
+      return await axios.get<T>(url, {
+        timeout: TELEPORT_API_TIMEOUT_MS,
+        ...config,
+      })
     } catch (error) {
       lastError = error
 
@@ -185,7 +189,7 @@ export async function prepareApiRequest(): Promise<{
   const accessToken = getClaudeAIOAuthTokens()?.accessToken
   if (accessToken === undefined) {
     throw new Error(
-      'Spark Code web sessions require authentication with a Claude.ai account. API key authentication is not sufficient. Please run /login to authenticate, or check your authentication status with /status.',
+      'Spark Code web sessions require authentication with a spark-ai.top account. API key authentication is not sufficient. Please run /login to authenticate, or check your authentication status with /status.',
     )
   }
 
@@ -444,6 +448,7 @@ export async function updateSessionTitle(
       { title },
       {
         headers,
+        timeout: TELEPORT_API_TIMEOUT_MS,
         validateStatus: status => status < 500,
       },
     )

@@ -152,7 +152,7 @@ export function isMediaSizeErrorMessage(msg: AssistantMessage): boolean {
   )
 }
 export const CREDIT_BALANCE_TOO_LOW_ERROR_MESSAGE = 'Credit balance is too low'
-export const INVALID_API_KEY_ERROR_MESSAGE = 'Not logged in · Please run /login'
+export const INVALID_API_KEY_ERROR_MESSAGE = '未登录 · 请运行 /login'
 export const INVALID_API_KEY_ERROR_MESSAGE_EXTERNAL =
   'Invalid API key · Fix external API key'
 export const ORG_DISABLED_ERROR_MESSAGE_ENV_KEY_WITH_OAUTH =
@@ -160,9 +160,9 @@ export const ORG_DISABLED_ERROR_MESSAGE_ENV_KEY_WITH_OAUTH =
 export const ORG_DISABLED_ERROR_MESSAGE_ENV_KEY =
   'Your ANTHROPIC_API_KEY belongs to a disabled organization · Update or unset the environment variable'
 export const TOKEN_REVOKED_ERROR_MESSAGE =
-  'OAuth token revoked · Please run /login'
+  'OAuth 令牌已失效 · 请运行 /login'
 export const CCR_AUTH_ERROR_MESSAGE =
-  'Authentication error · This may be a temporary network issue, please try again'
+  '认证失败 · 可能是临时网络问题，请重试'
 export const REPEATED_529_ERROR_MESSAGE = 'Repeated 529 Overloaded errors'
 export const CUSTOM_OFF_SWITCH_MESSAGE =
   'Opus is experiencing high load, please use /model to switch to Sonnet'
@@ -195,17 +195,17 @@ export function getRequestTooLargeErrorMessage(): string {
     : `Request too large (${limits}). Double press esc to go back and try with a smaller file.`
 }
 export const OAUTH_ORG_NOT_ALLOWED_ERROR_MESSAGE =
-  'Your account does not have access to Spark Code. Please run /login.'
+  '你的账号无权访问 Spark Code。请运行 /login。'
 
 export function getTokenRevokedErrorMessage(): string {
   return getIsNonInteractiveSession()
-    ? 'Your account does not have access to Claude. Please login again or contact your administrator.'
+    ? '你的账号无权访问 Spark。请重新登录或联系管理员。'
     : TOKEN_REVOKED_ERROR_MESSAGE
 }
 
 export function getOauthOrgNotAllowedErrorMessage(): string {
   return getIsNonInteractiveSession()
-    ? 'Your organization does not have access to Claude. Please login again or contact your administrator.'
+    ? '你的组织无权访问 Spark。请重新登录或联系管理员。'
     : OAUTH_ORG_NOT_ALLOWED_ERROR_MESSAGE
 }
 
@@ -539,7 +539,7 @@ export function getAssistantMessageFromError(
     // (e.g. 1M context without Extra Usage) and infra capacity 429s land here.
     if (error.message.includes('Extra usage is required for long context')) {
       const hint = getIsNonInteractiveSession()
-        ? 'enable extra usage at claude.ai/settings/usage, or use --model to switch to standard context'
+        ? 'enable extra usage at spark-ai.top/settings/usage, or use --model to switch to standard context'
         : 'run /extra-usage to enable, or /model to switch to standard context'
       return createAssistantAPIErrorMessage({
         content: `${API_ERROR_MESSAGE_PREFIX}: Extra usage is required for 1M context · ${hint}`,
@@ -742,7 +742,7 @@ export function getAssistantMessageFromError(
   ) {
     return createAssistantAPIErrorMessage({
       content:
-        'Claude Opus is not available with the Claude Pro plan. If you have updated your subscription plan recently, run /logout and /login for the plan to take effect.',
+        'Spark Opus is not available with the Spark Pro plan. If you have updated your subscription plan recently, run /logout and /login for the plan to take effect.',
       error: 'invalid_request',
     })
   }

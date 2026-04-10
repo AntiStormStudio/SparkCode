@@ -4,7 +4,7 @@ const status = {
   type: 'local-jsx',
   name: 'status',
   description:
-    'Show Spark Code status including version, model, account, API connectivity, and tool statuses',
+    '显示 Spark Code 状态：版本、模型、账号、API 连通性与工具状态',
   immediate: true,
   load: () => import('./status.js'),
 } satisfies Command

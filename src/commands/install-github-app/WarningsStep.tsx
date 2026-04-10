@@ -42,7 +42,7 @@ export function WarningsStep(t0) {
   }
   let t4;
   if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box marginTop={1}><Text bold={true} color="permission">Press Enter to continue anyway, or Ctrl+C to exit and fix issues</Text></Box>;
+    t4 = <Box marginTop={1}><Text bold={true} color="permission">Press Enter 继续 anyway, or Ctrl+C to exit and fix issues</Text></Box>;
     $[4] = t4;
   } else {
     t4 = $[4];

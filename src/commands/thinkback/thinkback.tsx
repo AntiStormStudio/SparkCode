@@ -282,23 +282,23 @@ function ThinkbackMenu(t0) {
     t1 = hasGenerated ? [{
       label: "Play animation",
       value: "play" as const,
-      description: "Watch your year in review"
+      description: "查看你的年度回顾"
     }, {
       label: "Edit content",
       value: "edit" as const,
-      description: "Modify the animation"
+      description: "修改动画"
     }, {
       label: "Fix errors",
       value: "fix" as const,
-      description: "Fix validation or rendering issues"
+      description: "修复校验或渲染问题"
     }, {
       label: "Regenerate",
       value: "regenerate" as const,
-      description: "Create a new animation from scratch"
+      description: "从零创建新动画"
     }] : [{
       label: "Let's go!",
       value: "regenerate" as const,
-      description: "Generate your personalized animation"
+      description: "生成你的个性化动画"
     }];
     $[0] = hasGenerated;
     $[1] = t1;

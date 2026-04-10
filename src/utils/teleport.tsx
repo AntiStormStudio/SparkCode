@@ -438,7 +438,7 @@ export async function teleportResumeCodeSession(sessionId: string, onProgress?: 
       logEvent('tengu_teleport_resume_error', {
         error_type: 'no_access_token' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
-      throw new Error('Spark Code web sessions require authentication with a Claude.ai account. API key authentication is not sufficient. Please run /login to authenticate, or check your authentication status with /status.');
+      throw new Error('Spark Code web sessions require authentication with a spark-ai.top account. API key authentication is not sufficient. Please run /login to authenticate, or check your authentication status with /status.');
     }
 
     // Get organization UUID
@@ -533,7 +533,7 @@ async function handleTeleportPrerequisites(root: Root, errorsToIgnore?: Set<Tele
 }
 
 /**
- * Creates a remote Claude.ai session with error handling and UI feedback.
+ * Creates a remote spark-ai.top session with error handling and UI feedback.
  * Shows prerequisite error dialog in the existing root if needed.
  * @param root The existing Ink root to render dialogs into
  * @param description The description/prompt for the new session (null for no initial prompt)
@@ -715,7 +715,7 @@ export async function pollRemoteSessionEvents(sessionId: string, afterId: string
 }
 
 /**
- * Creates a remote Claude.ai session using the Sessions API.
+ * Creates a remote spark-ai.top session using the Sessions API.
  *
  * Two source modes:
  * - GitHub (default): backend clones from the repo's origin URL. Requires a
@@ -880,7 +880,8 @@ export async function teleportToRemote(options: {
       logForDebugging(`[teleportToRemote] explicit env ${options.environmentId}, ${Object.keys(envVars).length} env vars, ${seedBundleFileId ? `bundle=${seedBundleFileId}` : `source=${gitSource?.url ?? 'none'}@${options.branchName ?? 'default'}`}`);
       const response = await axios.post(url, requestBody, {
         headers,
-        signal
+        signal,
+        timeout: 30_000
       });
       if (response.status !== 200 && response.status !== 201) {
         logError(new Error(`CreateSession ${response.status}: ${jsonStringify(response.data)}`));
@@ -1010,7 +1011,7 @@ export async function teleportToRemote(options: {
       if (!bundle.success) {
         logError(new Error(`Bundle upload failed: ${bundle.error}`));
         // Only steer users to GitHub setup when there's a remote to clone from.
-        const setup = repoInfo ? '. Please setup GitHub on https://claude.ai/code' : '';
+        const setup = repoInfo ? '. Please setup GitHub on https://spark-ai.top/code' : '';
         let msg: string;
         switch (bundle.failReason) {
           case 'empty_repo':
@@ -1163,7 +1164,8 @@ export async function teleportToRemote(options: {
     // Make API call
     const response = await axios.post(url, requestBody, {
       headers,
-      signal
+      signal,
+      timeout: 30_000
     });
     const isSuccess = response.status === 200 || response.status === 201;
     if (!isSuccess) {

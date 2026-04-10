@@ -1624,7 +1624,7 @@ export function ManagePlugins({
         </Box>
         <Text>No plugins or MCP servers installed.</Text>
         <Box marginTop={1}>
-          <Text dimColor>Esc to go back</Text>
+          <Text dimColor>Esc 返回</Text>
         </Box>
       </Box>;
   }

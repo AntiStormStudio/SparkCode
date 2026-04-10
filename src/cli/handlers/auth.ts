@@ -92,7 +92,7 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
     const apiKey = await createAndStoreApiKey(tokens.accessToken)
     if (!apiKey) {
       throw new Error(
-        'Unable to create API key. The server accepted the request but did not return a key.',
+        '无法创建 API Key。服务器已接受请求，但未返回 Key。',
       )
     }
   }
@@ -167,14 +167,14 @@ export async function authStatus(opts: {
   }
 
   if (opts.text) {
-    process.stdout.write(`Logged in: ${loggedIn ? 'yes' : 'no'}\n`)
-    process.stdout.write(`Auth method: ${authMethod}\n`)
-    process.stdout.write(`API provider: ${getAPIProvider()}\n`)
+    process.stdout.write(`登录状态: ${loggedIn ? '已登录' : '未登录'}\n`)
+    process.stdout.write(`认证方式: ${authMethod}\n`)
+    process.stdout.write(`API 提供方: ${getAPIProvider()}\n`)
     if (resolvedApiKeySource) {
-      process.stdout.write(`API key source: ${resolvedApiKeySource}\n`)
+      process.stdout.write(`API Key 来源: ${resolvedApiKeySource}\n`)
     }
     if (configuredBaseUrl) {
-      process.stdout.write(`Base URL: ${configuredBaseUrl}\n`)
+      process.stdout.write(`BASEURL: ${configuredBaseUrl}\n`)
     }
     if (!loggedIn) {
       process.stdout.write(
@@ -202,7 +202,7 @@ export async function authLogout(): Promise<void> {
   try {
     await performLogout({ clearOnboarding: false })
   } catch {
-    process.stderr.write('Failed to log out.\n')
+    process.stderr.write('退出登录失败。\n')
     process.exit(1)
   }
   process.stdout.write('已退出登录，凭证已清除。\n')

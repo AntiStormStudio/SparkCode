@@ -4,13 +4,13 @@
 > 编译开关：`feature('BRIDGE_MODE')`、`feature('DAEMON')`
 > 远程开关：GrowthBook `tengu_ccr_bridge`
 
-从 claude.ai 或手机直接操控本地 CLI。
+从 spark-ai.top 或手机直接操控本地 CLI。
 
 ---
 
 ## 核心概念
 
-Bridge（Remote Control）让用户从 **claude.ai 网页端**远程操控运行在本地终端的 Spark Code：
+Bridge（Remote Control）让用户从 **spark-ai.top 网页端**远程操控运行在本地终端的 Spark Code：
 
 - 网页输入 prompt → 传送到本地 CLI 执行
 - CLI 输出实时回传到网页
@@ -42,7 +42,7 @@ Bridge（Remote Control）让用户从 **claude.ai 网页端**远程操控运行
 在 `src/bridge/initReplBridge.ts` + `src/bridge/replBridge.ts` 中实现：
 
 - 在交互式 REPL 会话中启动
-- 将当前对话镜像到 claude.ai
+- 将当前对话镜像到 spark-ai.top
 - 支持双向：本地打字和网页打字都能驱动同一个会话
 
 ---
@@ -199,7 +199,7 @@ ready → connected → [reconnecting →] connected
 一个特殊的只写模式：
 
 - 只转发事件到远端，不接收入站提示
-- 本地 session 在 claude.ai 可见但不可被远程控制
+- 本地 session 在 spark-ai.top 可见但不可被远程控制
 - 由 `CCR_MIRROR` 编译 flag + `tengu_ccr_mirror` GrowthBook flag 门控
 
 ---

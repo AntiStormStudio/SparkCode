@@ -97,9 +97,9 @@ export function calculateOptimalLeftWidth(
  */
 export function formatWelcomeMessage(username: string | null): string {
   if (!username || username.length > MAX_USERNAME_LENGTH) {
-    return 'Welcome back!'
+    return '欢迎回来！'
   }
-  return `Welcome back ${username}!`
+  return `欢迎回来，${username}！`
 }
 
 /**
@@ -256,7 +256,7 @@ export function getLogoDisplayData(): {
     : displayPath
   const billingType = isClaudeAISubscriber()
     ? getSubscriptionName()
-    : 'API Usage Billing'
+    : 'API 用量计费'
   const agentName = getInitialSettings().agent
 
   return {

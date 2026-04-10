@@ -318,7 +318,7 @@ export function PreviewQuestionView({
               navigate · n to add notes
               {questions.length > 1 && <> · Tab to switch questions</>}
               {isInNotesInput && editorName && <> · ctrl+g to edit in {editorName}</>}{' '}
-              · Esc to cancel
+              · Esc 取消
             </Text>
           </Box>
         </Box>
