@@ -306,22 +306,22 @@ export function formatResolutionError(
 ): string {
   switch (r.reason) {
     case 'cycle':
-      return `Dependency cycle: ${r.chain.join(' → ')}`
+      return `依赖循环：${r.chain.join(' → ')}`
     case 'cross-marketplace': {
       const depMkt = parsePluginIdentifier(r.dependency).marketplace
       const where = depMkt
-        ? `marketplace "${depMkt}"`
-        : 'a different marketplace'
+        ? `插件市场“${depMkt}”`
+        : '另一个插件市场'
       const hint = depMkt
-        ? ` Add "${depMkt}" to allowCrossMarketplaceDependenciesOn in the ROOT marketplace's marketplace.json (the marketplace of the plugin you're installing — only its allowlist applies; no transitive trust).`
+        ? ` 请在根插件市场的 marketplace.json 中将“${depMkt}”加入 allowCrossMarketplaceDependenciesOn（也就是你正在安装的插件所在插件市场；只使用它的允许列表，不会传递信任）。`
         : ''
-      return `Dependency "${r.dependency}" (required by ${r.requiredBy}) is in ${where}, which is not in the allowlist — cross-marketplace dependencies are blocked by default. Install it manually first.${hint}`
+      return `依赖项“${r.dependency}”（由 ${r.requiredBy} 需要）位于 ${where}，不在允许列表中。默认会阻止跨插件市场依赖，请先手动安装。${hint}`
     }
     case 'not-found': {
       const { marketplace: depMkt } = parsePluginIdentifier(r.missing)
       return depMkt
-        ? `Dependency "${r.missing}" (required by ${r.requiredBy}) not found. Is the "${depMkt}" marketplace added?`
-        : `Dependency "${r.missing}" (required by ${r.requiredBy}) not found in any configured marketplace`
+        ? `未找到依赖项“${r.missing}”（由 ${r.requiredBy} 需要）。是否已添加“${depMkt}”插件市场？`
+        : `未在任何已配置的插件市场中找到依赖项“${r.missing}”（由 ${r.requiredBy} 需要）`
     }
   }
 }
@@ -529,12 +529,12 @@ export async function installPluginFromMarketplace({
         case 'local-source-no-location':
           return {
             success: false,
-            error: `Cannot install local plugin "${result.pluginName}" without marketplace install location`,
+            error: `没有插件市场安装位置时，无法安装本地插件“${result.pluginName}”`,
           }
         case 'settings-write-failed':
           return {
             success: false,
-            error: `Failed to update settings: ${result.message}`,
+            error: `更新设置失败：${result.message}`,
           }
         case 'resolution-failed':
           return {
@@ -544,12 +544,12 @@ export async function installPluginFromMarketplace({
         case 'blocked-by-policy':
           return {
             success: false,
-            error: `Plugin "${result.pluginName}" is blocked by your organization's policy and cannot be installed`,
+            error: `插件“${result.pluginName}”被你的组织策略阻止，无法安装`,
           }
         case 'dependency-blocked-by-policy':
           return {
             success: false,
-            error: `Cannot install "${result.pluginName}": dependency "${result.blockedDependency}" is blocked by your organization's policy`,
+            error: `无法安装“${result.pluginName}”：依赖项“${result.blockedDependency}”被你的组织策略阻止`,
           }
       }
     }
@@ -585,11 +585,11 @@ export async function installPluginFromMarketplace({
 
     return {
       success: true,
-      message: `✓ Installed ${entry.name}${result.depNote}. Run /reload-plugins to activate.`,
+      message: `✓ 已安装 ${entry.name}${result.depNote}。运行 /reload-plugins 以生效。`,
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     logError(toError(err))
-    return { success: false, error: `Failed to install: ${errorMessage}` }
+    return { success: false, error: `安装失败：${errorMessage}` }
   }
 }

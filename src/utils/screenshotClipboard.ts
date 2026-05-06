@@ -38,7 +38,7 @@ export async function copyAnsiToClipboard(
     logError(error)
     return {
       success: false,
-      message: `Failed to copy screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `复制截图失败：${error instanceof Error ? error.message : '未知错误'}`,
     }
   }
 }
@@ -58,11 +58,11 @@ async function copyPngToClipboard(
     })
 
     if (result.code === 0) {
-      return { success: true, message: 'Screenshot copied to clipboard' }
+      return { success: true, message: '截图已复制到剪贴板' }
     }
     return {
       success: false,
-      message: `Failed to copy to clipboard: ${result.stderr}`,
+      message: `复制到剪贴板失败：${result.stderr}`,
     }
   }
 
@@ -75,7 +75,7 @@ async function copyPngToClipboard(
     )
 
     if (xclipResult.code === 0) {
-      return { success: true, message: 'Screenshot copied to clipboard' }
+      return { success: true, message: '截图已复制到剪贴板' }
     }
 
     // Try xsel as fallback
@@ -86,13 +86,13 @@ async function copyPngToClipboard(
     )
 
     if (xselResult.code === 0) {
-      return { success: true, message: 'Screenshot copied to clipboard' }
+      return { success: true, message: '截图已复制到剪贴板' }
     }
 
     return {
       success: false,
       message:
-        'Failed to copy to clipboard. Please install xclip or xsel: sudo apt install xclip',
+        '复制到剪贴板失败。请安装 xclip 或 xsel：sudo apt install xclip',
     }
   }
 
@@ -106,11 +106,11 @@ async function copyPngToClipboard(
     )
 
     if (result.code === 0) {
-      return { success: true, message: 'Screenshot copied to clipboard' }
+      return { success: true, message: '截图已复制到剪贴板' }
     }
     return {
       success: false,
-      message: `Failed to copy to clipboard: ${result.stderr}`,
+      message: `复制到剪贴板失败：${result.stderr}`,
     }
   }
 

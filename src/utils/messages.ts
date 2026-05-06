@@ -174,9 +174,9 @@ import {
 } from './toolSearch.js'
 
 const MEMORY_CORRECTION_HINT =
-  "\n\nNote: The user's next message may contain a correction or preference. Pay close attention — if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions."
+  '\n\n注意：用户下一条消息可能包含纠正或偏好。请重点关注。如果用户解释哪里出了问题，或说明希望你以后怎么工作，请考虑把它保存到记忆中，供后续会话使用。'
 
-const TOOL_REFERENCE_TURN_BOUNDARY = 'Tool loaded.'
+const TOOL_REFERENCE_TURN_BOUNDARY = '工具已加载。'
 
 /**
  * Appends a memory correction hint to a rejection/cancellation message
@@ -204,51 +204,50 @@ export function deriveShortMessageId(uuid: string): string {
   return parseInt(hex, 16).toString(36).slice(0, 6)
 }
 
-export const INTERRUPT_MESSAGE = '[Request interrupted by user]'
+export const INTERRUPT_MESSAGE = '[请求已被用户中断]'
 export const INTERRUPT_MESSAGE_FOR_TOOL_USE =
-  '[Request interrupted by user for tool use]'
+  '[工具调用请求已被用户中断]'
 export const CANCEL_MESSAGE =
-  "The user doesn't want to take this action right now. STOP what you are doing and wait for the user to tell you how to proceed."
+  '用户现在不想执行这个操作。停止当前工作，等待用户说明接下来怎么做。'
 export const REJECT_MESSAGE =
-  "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed."
+  '用户不想继续这次工具调用。该工具调用已被拒绝（例如如果是文件编辑，new_string 并没有写入文件）。停止当前工作，等待用户说明接下来怎么做。'
 export const REJECT_MESSAGE_WITH_REASON_PREFIX =
-  "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). To tell you how to proceed, the user said:\n"
+  '用户不想继续这次工具调用。该工具调用已被拒绝（例如如果是文件编辑，new_string 并没有写入文件）。用户对下一步的说明是：\n'
 export const SUBAGENT_REJECT_MESSAGE =
-  'Permission for this tool use was denied. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). Try a different approach or report the limitation to complete your task.'
+  '这次工具调用的权限已被拒绝。该工具调用没有执行（例如如果是文件编辑，new_string 并没有写入文件）。请换一种方式完成任务，或者说明这个限制。'
 export const SUBAGENT_REJECT_MESSAGE_WITH_REASON_PREFIX =
-  'Permission for this tool use was denied. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). The user said:\n'
+  '这次工具调用的权限已被拒绝。该工具调用没有执行（例如如果是文件编辑，new_string 并没有写入文件）。用户说：\n'
 export const PLAN_REJECTION_PREFIX =
-  'The agent proposed a plan that was rejected by the user. The user chose to stay in plan mode rather than proceed with implementation.\n\nRejected plan:\n'
+  'agent 提出的计划已被用户拒绝。用户选择继续留在计划模式，而不是开始实现。\n\n被拒绝的计划：\n'
 
 /**
  * Shared guidance for permission denials, instructing the model on appropriate workarounds.
  */
 export const DENIAL_WORKAROUND_GUIDANCE =
-  `IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, ` +
-  `e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, ` +
-  `e.g. do not use your ability to run tests to execute non-test actions. ` +
-  `You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. ` +
-  `If you believe this capability is essential to complete the user's request, STOP and explain to the user ` +
-  `what you were trying to do and why you need this permission. Let the user decide how to proceed.`
+  `重要：你可以尝试用其他自然适合该目标的工具完成操作，` +
+  `例如用 head 代替 cat。但不要用恶意方式绕过这次拒绝，` +
+  `例如不要借“运行测试”的能力去执行非测试行为。` +
+  `你只能用合理方式处理这个限制，不能绕过拒绝背后的意图。` +
+  `如果你认为该能力是完成用户请求所必需的，请停止并向用户说明你想做什么、为什么需要该权限，让用户决定下一步。`
 
 export function AUTO_REJECT_MESSAGE(toolName: string): string {
-  return `Permission to use ${toolName} has been denied. ${DENIAL_WORKAROUND_GUIDANCE}`
+  return `使用 ${toolName} 的权限已被拒绝。${DENIAL_WORKAROUND_GUIDANCE}`
 }
 export function DONT_ASK_REJECT_MESSAGE(toolName: string): string {
-  return `Permission to use ${toolName} has been denied because Spark Code is running in don't ask mode. ${DENIAL_WORKAROUND_GUIDANCE}`
+  return `使用 ${toolName} 的权限已被拒绝，因为 Spark Code 当前处于不询问模式。${DENIAL_WORKAROUND_GUIDANCE}`
 }
-export const NO_RESPONSE_REQUESTED = 'No response requested.'
+export const NO_RESPONSE_REQUESTED = '无需回复。'
 
 // Synthetic tool_result content inserted by ensureToolResultPairing when a
 // tool_use block has no matching tool_result. Exported so HFI submission can
 // reject any payload containing it — placeholder satisfies pairing structurally
 // but the content is fake, which poisons training data if submitted.
 export const SYNTHETIC_TOOL_RESULT_PLACEHOLDER =
-  '[Tool result missing due to internal error]'
+  '[内部错误导致工具结果缺失]'
 
 // Prefix used by UI to detect classifier denials and render them concisely
 const AUTO_MODE_REJECTION_PREFIX =
-  'Permission for this action has been denied. Reason: '
+  '此操作的权限已被拒绝。原因：'
 
 /**
  * Check if a tool result message is a classifier denial.
@@ -3896,7 +3895,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
             transformedBlocks.push(
               {
                 type: 'text',
-                text: 'Full contents of resource:',
+                text: '资源的完整内容：',
               },
               {
                 type: 'text',
@@ -3904,7 +3903,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
               },
               {
                 type: 'text',
-                text: 'Do NOT read this resource again unless you think it may have changed, since you already have the full contents.',
+                text: '你已经拿到完整内容，除非认为资源可能已经变化，否则不要再次读取这个资源。',
               },
             )
           } else if ('blob' in item) {
@@ -4131,7 +4130,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
       return [
         createUserMessage({
           content: wrapInSystemReminder(
-            `${attachment.hookName} hook stopped continuation: ${attachment.message}`,
+            `${attachment.hookName} Hook 已停止继续执行：${attachment.message}`,
           ),
           isMeta: true,
         }),
@@ -4140,7 +4139,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
       return wrapMessagesInSystemReminder([
         createUserMessage({
           content:
-            'Auto-compact is enabled. When the context window is nearly full, older messages will be automatically summarized so you can continue working seamlessly. There is no need to stop or rush \u2014 you have unlimited context through automatic compaction.',
+            '自动压缩已启用。当上下文窗口接近满时，较早的消息会自动总结，让你可以继续工作。无需停止或着急，自动压缩会持续管理上下文。',
           isMeta: true,
         }),
       ])
@@ -4162,7 +4161,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
     case 'date_change': {
       return wrapMessagesInSystemReminder([
         createUserMessage({
-          content: `The date has changed. Today's date is now ${attachment.newDate}. DO NOT mention this to the user explicitly because they are already aware.`,
+          content: `日期已变化。今天的日期现在是 ${attachment.newDate}。不要主动向用户说明，因为用户已经知道。`,
           isMeta: true,
         }),
       ])
@@ -4170,7 +4169,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
     case 'ultrathink_effort': {
       return wrapMessagesInSystemReminder([
         createUserMessage({
-          content: `The user has requested reasoning effort level: ${attachment.level}. Apply this to the current turn.`,
+          content: `用户请求的推理强度为：${attachment.level}。请应用到当前轮次。`,
           isMeta: true,
         }),
       ])
@@ -4179,12 +4178,12 @@ You have exited auto mode. The user may now want to interact more directly. You 
       const parts: string[] = []
       if (attachment.addedLines.length > 0) {
         parts.push(
-          `The following deferred tools are now available via ToolSearch:\n${attachment.addedLines.join('\n')}`,
+          `以下按需加载工具现在可通过 ToolSearch 使用：\n${attachment.addedLines.join('\n')}`,
         )
       }
       if (attachment.removedNames.length > 0) {
         parts.push(
-          `The following deferred tools are no longer available (their MCP server disconnected). Do not search for them — ToolSearch will return no match:\n${attachment.removedNames.join('\n')}`,
+          `以下按需加载工具已不可用（对应 MCP 服务器已断开）。不要再搜索它们，ToolSearch 不会返回匹配项：\n${attachment.removedNames.join('\n')}`,
         )
       }
       return wrapMessagesInSystemReminder([
@@ -4195,18 +4194,18 @@ You have exited auto mode. The user may now want to interact more directly. You 
       const parts: string[] = []
       if (attachment.addedLines.length > 0) {
         const header = attachment.isInitial
-          ? 'Available agent types for the Agent tool:'
-          : 'New agent types are now available for the Agent tool:'
+          ? 'Agent 工具可用的 agent 类型：'
+          : 'Agent 工具现在新增了这些 agent 类型：'
         parts.push(`${header}\n${attachment.addedLines.join('\n')}`)
       }
       if (attachment.removedTypes.length > 0) {
         parts.push(
-          `The following agent types are no longer available:\n${attachment.removedTypes.map(t => `- ${t}`).join('\n')}`,
+          `以下 agent 类型已不可用：\n${attachment.removedTypes.map(t => `- ${t}`).join('\n')}`,
         )
       }
       if (attachment.isInitial && attachment.showConcurrencyNote) {
         parts.push(
-          `Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses.`,
+          `尽量并发启动多个 agent 以提升效率；做法是在一条消息里发起多个工具调用。`,
         )
       }
       return wrapMessagesInSystemReminder([
@@ -4537,7 +4536,7 @@ export function createCompactBoundaryMessage(
   return {
     type: 'system',
     subtype: 'compact_boundary',
-    content: `Conversation compacted`,
+    content: `对话已压缩`,
     isMeta: false,
     timestamp: new Date().toISOString(),
     uuid: randomUUID(),
@@ -4567,7 +4566,7 @@ export function createMicrocompactBoundaryMessage(
   return {
     type: 'system',
     subtype: 'microcompact_boundary',
-    content: 'Context microcompacted',
+    content: '上下文已微压缩',
     isMeta: false,
     timestamp: new Date().toISOString(),
     uuid: randomUUID(),

@@ -55,23 +55,23 @@ function getDisabledReasonMessage(
   switch (disabledReason) {
     case 'free':
       return authType === 'oauth'
-        ? 'Fast mode requires a paid subscription'
-        : 'Fast mode unavailable during evaluation. Please purchase credits.'
+        ? '快速模式需要付费订阅'
+        : '评估期间无法使用快速模式。请先购买额度。'
     case 'preference':
-      return 'Fast mode has been disabled by your organization'
+      return '快速模式已被你的组织停用'
     case 'extra_usage_disabled':
       // Only OAuth users can have extra_usage_disabled; console users don't have this concept
-      return 'Fast mode requires extra usage billing · /extra-usage to enable'
+      return '快速模式需要启用额外用量计费 · 使用 /extra-usage 开启'
     case 'network_error':
-      return 'Fast mode unavailable due to network connectivity issues'
+      return '网络连接异常，快速模式暂不可用'
     case 'unknown':
-      return 'Fast mode is currently unavailable'
+      return '快速模式当前不可用'
   }
 }
 
 export function getFastModeUnavailableReason(): string | null {
   if (!isFastModeEnabled()) {
-    return 'Fast mode is not available'
+    return '快速模式不可用'
   }
 
   const statigReason = getFeatureValue_CACHED_MAY_BE_STALE(
@@ -90,7 +90,7 @@ export function getFastModeUnavailableReason(): string | null {
     !isInBundledMode() &&
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_marble_sandcastle', false)
   ) {
-    return 'Fast mode requires the native binary · Install from: https://claude.com/product/claude-code'
+    return '快速模式需要原生二进制版本 · 请从 https://claude.com/product/claude-code 安装'
   }
 
   // Not available in the SDK unless explicitly opted in via --settings.
@@ -103,7 +103,7 @@ export function getFastModeUnavailableReason(): string | null {
   ) {
     const flagFastMode = getSettingsForSource('flagSettings')?.fastMode
     if (!flagFastMode) {
-      const reason = 'Fast mode is not available in the Agent SDK'
+      const reason = 'Agent SDK 中不可使用快速模式'
       logForDebugging(`Fast mode unavailable: ${reason}`)
       return reason
     }
@@ -111,7 +111,7 @@ export function getFastModeUnavailableReason(): string | null {
 
   // Only available for 1P (not Bedrock/Vertex/Foundry)
   if (getAPIProvider() !== 'firstParty') {
-    const reason = 'Fast mode is not available on Bedrock, Vertex, or Foundry'
+    const reason = 'Bedrock、Vertex 或 Foundry 上不可使用快速模式'
     logForDebugging(`Fast mode unavailable: ${reason}`)
     return reason
   }
@@ -263,23 +263,23 @@ export const onFastModeOverageRejection = overageRejection.subscribe
 function getOverageDisabledMessage(reason: string | null): string {
   switch (reason) {
     case 'out_of_credits':
-      return 'Fast mode disabled · extra usage credits exhausted'
+      return '快速模式已关闭 · 额外用量额度已耗尽'
     case 'org_level_disabled':
     case 'org_service_level_disabled':
-      return 'Fast mode disabled · extra usage disabled by your organization'
+      return '快速模式已关闭 · 你的组织已停用额外用量'
     case 'org_level_disabled_until':
-      return 'Fast mode disabled · extra usage spending cap reached'
+      return '快速模式已关闭 · 额外用量支出上限已达到'
     case 'member_level_disabled':
-      return 'Fast mode disabled · extra usage disabled for your account'
+      return '快速模式已关闭 · 你的账号已停用额外用量'
     case 'seat_tier_level_disabled':
     case 'seat_tier_zero_credit_limit':
     case 'member_zero_credit_limit':
-      return 'Fast mode disabled · extra usage not available for your plan'
+      return '快速模式已关闭 · 当前套餐不可用额外用量'
     case 'overage_not_provisioned':
     case 'no_limits_configured':
-      return 'Fast mode requires extra usage billing · /extra-usage to enable'
+      return '快速模式需要启用额外用量计费 · 使用 /extra-usage 开启'
     default:
-      return 'Fast mode disabled · extra usage not available'
+      return '快速模式已关闭 · 额外用量不可用'
   }
 }
 

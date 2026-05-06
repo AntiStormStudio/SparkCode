@@ -980,38 +980,13 @@ export function getSearchReadSummaryText(
     const { memorySearchCount, memoryReadCount, memoryWriteCount } =
       memoryCounts
     if (memoryReadCount > 0) {
-      const verb = isActive
-        ? parts.length === 0
-          ? 'Recalling'
-          : 'recalling'
-        : parts.length === 0
-          ? 'Recalled'
-          : 'recalled'
-      parts.push(
-        `${verb} ${memoryReadCount} ${memoryReadCount === 1 ? 'memory' : 'memories'}`,
-      )
+      parts.push(isActive ? `正在读取 ${memoryReadCount} 条记忆` : `已读取 ${memoryReadCount} 条记忆`)
     }
     if (memorySearchCount > 0) {
-      const verb = isActive
-        ? parts.length === 0
-          ? 'Searching'
-          : 'searching'
-        : parts.length === 0
-          ? 'Searched'
-          : 'searched'
-      parts.push(`${verb} memories`)
+      parts.push(isActive ? '正在搜索记忆' : '已搜索记忆')
     }
     if (memoryWriteCount > 0) {
-      const verb = isActive
-        ? parts.length === 0
-          ? 'Writing'
-          : 'writing'
-        : parts.length === 0
-          ? 'Wrote'
-          : 'wrote'
-      parts.push(
-        `${verb} ${memoryWriteCount} ${memoryWriteCount === 1 ? 'memory' : 'memories'}`,
-      )
+      parts.push(isActive ? `正在写入 ${memoryWriteCount} 条记忆` : `已写入 ${memoryWriteCount} 条记忆`)
     }
     // Team memory operations
     if (feature('TEAMMEM') && teamMemOps) {
@@ -1020,45 +995,19 @@ export function getSearchReadSummaryText(
   }
 
   if (searchCount > 0) {
-    const searchVerb = isActive
-      ? parts.length === 0
-        ? 'Searching for'
-        : 'searching for'
-      : parts.length === 0
-        ? 'Searched for'
-        : 'searched for'
-    parts.push(
-      `${searchVerb} ${searchCount} ${searchCount === 1 ? 'pattern' : 'patterns'}`,
-    )
+    parts.push(isActive ? `正在搜索 ${searchCount} 个模式` : `已搜索 ${searchCount} 个模式`)
   }
 
   if (readCount > 0) {
-    const readVerb = isActive
-      ? parts.length === 0
-        ? 'Reading'
-        : 'reading'
-      : parts.length === 0
-        ? 'Read'
-        : 'read'
-    parts.push(`${readVerb} ${readCount} ${readCount === 1 ? 'file' : 'files'}`)
+    parts.push(isActive ? `正在读取 ${readCount} 个文件` : `已读取 ${readCount} 个文件`)
   }
 
   if (listCount > 0) {
-    const listVerb = isActive
-      ? parts.length === 0
-        ? 'Listing'
-        : 'listing'
-      : parts.length === 0
-        ? 'Listed'
-        : 'listed'
-    parts.push(
-      `${listVerb} ${listCount} ${listCount === 1 ? 'directory' : 'directories'}`,
-    )
+    parts.push(isActive ? `正在列出 ${listCount} 个目录` : `已列出 ${listCount} 个目录`)
   }
 
   if (replCount > 0) {
-    const replVerb = isActive ? "REPL'ing" : "REPL'd"
-    parts.push(`${replVerb} ${replCount} ${replCount === 1 ? 'time' : 'times'}`)
+    parts.push(isActive ? `正在运行 ${replCount} 次 REPL` : `已运行 ${replCount} 次 REPL`)
   }
 
   const text = parts.join(', ')

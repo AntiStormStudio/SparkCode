@@ -187,8 +187,8 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     }
     const summary =
       descriptions.length === 1
-        ? `Background agent "${descriptions[0]}" was stopped by the user.`
-        : `${descriptions.length} background agents were stopped by the user: ${descriptions.map(d => `"${d}"`).join(', ')}.`
+        ? `后台 agent "${descriptions[0]}" 已被用户停止。`
+        : `${descriptions.length} 个后台 agent 已被用户停止：${descriptions.map(d => `"${d}"`).join(', ')}。`
     enqueuePendingNotification({ value: summary, mode: 'task-notification' })
     onAgentsKilled()
     return true
@@ -230,7 +230,7 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     if (!hasRunningAgents) {
       addNotification({
         key: 'kill-agents-none',
-        text: 'No background agents running',
+        text: '当前没有正在运行的后台代理',
         priority: 'immediate',
         timeoutMs: 2000,
       })
@@ -259,7 +259,7 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     )
     addNotification({
       key: 'kill-agents-confirm',
-      text: `Press ${shortcut} again to stop background agents`,
+      text: `再按一次 ${shortcut} 以停止后台代理`,
       priority: 'immediate',
       timeoutMs: KILL_AGENTS_CONFIRM_WINDOW_MS,
     })

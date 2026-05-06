@@ -3,21 +3,21 @@ import type { Command } from '../commands.js'
 import { maybeMarkProjectOnboardingComplete } from '../projectOnboardingState.js'
 import { isEnvTruthy } from '../utils/envUtils.js'
 
-const OLD_INIT_PROMPT = `Please analyze this codebase and create a CLAUDE.md file, which will be given to future instances of Spark Code to operate in this repository.
+const OLD_INIT_PROMPT = `请分析这个代码库并创建 CLAUDE.md 文件，后续 Spark Code 在此仓库中工作时会读取它。
 
-What to add:
-1. Commands that will be commonly used, such as how to build, lint, and run tests. Include the necessary commands to develop in this codebase, such as how to run a single test.
-2. High-level code architecture and structure so that future instances can be productive more quickly. Focus on the "big picture" architecture that requires reading multiple files to understand.
+需要添加：
+1. 常用命令，例如构建、lint、运行测试。请包含开发此代码库所需的命令，例如如何运行单个测试。
+2. 高层代码架构和结构，让后续会话能更快进入状态。重点写需要阅读多个文件才能理解的整体架构。
 
-Usage notes:
-- If there's already a CLAUDE.md, suggest improvements to it.
-- When you make the initial CLAUDE.md, do not repeat yourself and do not include obvious instructions like "Provide helpful error messages to users", "Write unit tests for all new utilities", "Never include sensitive information (API keys, tokens) in code or commits".
-- Avoid listing every component or file structure that can be easily discovered.
-- Don't include generic development practices.
-- If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (in .github/copilot-instructions.md), make sure to include the important parts.
-- If there is a README.md, make sure to include the important parts.
-- Do not make up information such as "Common Development Tasks", "Tips for Development", "Support and Documentation" unless this is expressly included in other files that you read.
-- Be sure to prefix the file with the following text:
+使用说明：
+- 如果已经存在 CLAUDE.md，请提出改进建议。
+- 创建初始 CLAUDE.md 时不要重复，也不要包含显而易见的说明，例如“向用户提供有用的错误信息”“为所有新工具编写单元测试”“不要在代码或提交中包含敏感信息（API key、token）”。
+- 不要列出很容易通过阅读代码发现的组件或文件结构。
+- 不要包含通用开发实践。
+- 如果存在 Cursor 规则（.cursor/rules/ 或 .cursorrules）或 Copilot 规则（.github/copilot-instructions.md），请纳入重要部分。
+- 如果存在 README.md，请纳入重要部分。
+- 除非你读到的文件中明确包含，否则不要编造“常见开发任务”“开发提示”“支持与文档”等信息。
+- 文件开头必须包含以下内容：
 
 \`\`\`
 # CLAUDE.md

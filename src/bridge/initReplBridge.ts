@@ -157,7 +157,7 @@ export async function initReplBridge(
       'policy_denied',
       '[bridge:repl] Skipping: allow_remote_control policy not allowed',
     )
-    onStateChange?.('failed', "disabled by your organization's policy")
+    onStateChange?.('failed', '已被你所在组织的策略禁用')
     return null
   }
 
@@ -415,7 +415,7 @@ export async function initReplBridge(
         `[bridge:repl] Skipping: ${versionError}`,
         true,
       )
-      onStateChange?.('failed', 'run `claude update` to upgrade')
+      onStateChange?.('failed', '请运行 `sparkc update` 升级')
       return null
     }
     logForDebugging(
@@ -456,7 +456,7 @@ export async function initReplBridge(
   const versionError = checkBridgeMinVersion()
   if (versionError) {
     logBridgeSkip('version_too_old', `[bridge:repl] Skipping: ${versionError}`)
-    onStateChange?.('failed', 'run `claude update` to upgrade')
+    onStateChange?.('failed', '请运行 `sparkc update` 升级')
     return null
   }
 

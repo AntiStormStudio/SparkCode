@@ -24,14 +24,14 @@ export async function validateModel(
 
   // Empty model is invalid
   if (!normalizedModel) {
-    return { valid: false, error: 'Model name cannot be empty' }
+    return { valid: false, error: '模型名称不能为空' }
   }
 
   // Check against availableModels allowlist before any API call
   if (!isModelAllowed(normalizedModel)) {
     return {
       valid: false,
-      error: `Model '${normalizedModel}' is not in the list of available models`,
+      error: `模型 ${normalizedModel} 不在可用模型列表中`,
     }
   }
 
@@ -88,10 +88,10 @@ function handleValidationError(
   // NotFoundError (404) means the model doesn't exist
   if (error instanceof NotFoundError) {
     const fallback = get3PFallbackSuggestion(modelName)
-    const suggestion = fallback ? `. Try '${fallback}' instead` : ''
+    const suggestion = fallback ? `，可以试试 ${fallback}` : ''
     return {
       valid: false,
-      error: `Model '${modelName}' not found${suggestion}`,
+      error: `没有找到模型 ${modelName}${suggestion}`,
     }
   }
 
@@ -100,14 +100,14 @@ function handleValidationError(
     if (error instanceof AuthenticationError) {
       return {
         valid: false,
-        error: 'Authentication failed. Please check your API credentials.',
+        error: '认证失败，请检查 API 凭据。',
       }
     }
 
     if (error instanceof APIConnectionError) {
       return {
         valid: false,
-        error: 'Network error. Please check your internet connection.',
+        error: '网络错误，请检查网络连接。',
       }
     }
 
@@ -122,18 +122,18 @@ function handleValidationError(
       typeof errorBody.message === 'string' &&
       errorBody.message.includes('model:')
     ) {
-      return { valid: false, error: `Model '${modelName}' not found` }
+      return { valid: false, error: `没有找到模型 ${modelName}` }
     }
 
     // Generic API error
-    return { valid: false, error: `API error: ${error.message}` }
+    return { valid: false, error: `API 错误：${error.message}` }
   }
 
   // For unknown errors, be safe and reject
   const errorMessage = error instanceof Error ? error.message : String(error)
   return {
     valid: false,
-    error: `Unable to validate model: ${errorMessage}`,
+    error: `无法校验模型：${errorMessage}`,
   }
 }
 

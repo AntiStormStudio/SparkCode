@@ -62,8 +62,8 @@ import { buildEffectiveSystemPrompt } from './systemPrompt.js'
 import type { Theme } from './theme.js'
 import { getCurrentUsage } from './tokens.js'
 
-const RESERVED_CATEGORY_NAME = 'Autocompact buffer'
-const MANUAL_COMPACT_BUFFER_NAME = 'Compact buffer'
+const RESERVED_CATEGORY_NAME = '自动压缩缓冲区'
+const MANUAL_COMPACT_BUFFER_NAME = '压缩缓冲区'
 
 /**
  * Fixed token overhead added by the API when tools are present.
@@ -1010,7 +1010,7 @@ export async function analyzeContextUsage(
   // System prompt is always shown first (fixed overhead)
   if (systemPromptTokens > 0) {
     cats.push({
-      name: 'System prompt',
+      name: '系统提示',
       tokens: systemPromptTokens,
       color: 'promptBorder',
     })
@@ -1023,8 +1023,8 @@ export async function analyzeContextUsage(
     cats.push({
       name:
         process.env.USER_TYPE === 'ant'
-          ? '[ANT-ONLY] System tools'
-          : 'System tools',
+          ? '[仅 ANT] 系统工具'
+          : '系统工具',
       tokens: systemToolsTokens,
       color: 'inactive',
     })
@@ -1033,7 +1033,7 @@ export async function analyzeContextUsage(
   // MCP tools after system tools
   if (mcpToolTokens > 0) {
     cats.push({
-      name: 'MCP tools',
+      name: 'MCP 工具',
       tokens: mcpToolTokens,
       color: 'cyan_FOR_SUBAGENTS_ONLY',
     })
@@ -1043,7 +1043,7 @@ export async function analyzeContextUsage(
   // These don't count toward context usage but we show them for visibility
   if (deferredToolTokens > 0) {
     cats.push({
-      name: 'MCP tools (deferred)',
+      name: 'MCP 工具（延迟加载）',
       tokens: deferredToolTokens,
       color: 'inactive',
       isDeferred: true,
@@ -1053,7 +1053,7 @@ export async function analyzeContextUsage(
   // Show deferred builtin tools (when tool search is enabled)
   if (deferredBuiltinTokens > 0) {
     cats.push({
-      name: 'System tools (deferred)',
+      name: '系统工具（延迟加载）',
       tokens: deferredBuiltinTokens,
       color: 'inactive',
       isDeferred: true,
@@ -1063,7 +1063,7 @@ export async function analyzeContextUsage(
   // Custom agents after MCP tools
   if (agentTokens > 0) {
     cats.push({
-      name: 'Custom agents',
+      name: '自定义 Agent',
       tokens: agentTokens,
       color: 'permission',
     })
@@ -1072,7 +1072,7 @@ export async function analyzeContextUsage(
   // Memory files after custom agents
   if (claudeMdTokens > 0) {
     cats.push({
-      name: 'Memory files',
+      name: 'Memory 文件',
       tokens: claudeMdTokens,
       color: 'claude',
     })
@@ -1081,7 +1081,7 @@ export async function analyzeContextUsage(
   // Skills after memory files
   if (skillFrontmatterTokens > 0) {
     cats.push({
-      name: 'Skills',
+      name: 'Skill',
       tokens: skillFrontmatterTokens,
       color: 'warning',
     })
@@ -1089,7 +1089,7 @@ export async function analyzeContextUsage(
 
   if (messageTokens !== null && messageTokens > 0) {
     cats.push({
-      name: 'Messages',
+      name: '消息',
       tokens: messageTokens,
       color: 'purple_FOR_SUBAGENTS_ONLY',
     })
@@ -1150,7 +1150,7 @@ export async function analyzeContextUsage(
   const freeTokens = Math.max(0, contextWindow - actualUsage - reservedTokens)
 
   cats.push({
-    name: 'Free space',
+    name: '可用空间',
     tokens: freeTokens,
     color: 'promptBorder',
   })
@@ -1196,7 +1196,7 @@ export async function analyzeContextUsage(
   const categorySquares = nonDeferredCats.map(cat => ({
     ...cat,
     squares:
-      cat.name === 'Free space'
+      cat.name === '可用空间'
         ? Math.round((cat.tokens / contextWindow) * TOTAL_SQUARES)
         : Math.max(1, Math.round((cat.tokens / contextWindow) * TOTAL_SQUARES)),
     percentageOfTotal: Math.round((cat.tokens / contextWindow) * 100),
@@ -1245,7 +1245,7 @@ export async function analyzeContextUsage(
     cat =>
       cat.name !== RESERVED_CATEGORY_NAME &&
       cat.name !== MANUAL_COMPACT_BUFFER_NAME &&
-      cat.name !== 'Free space',
+      cat.name !== '可用空间',
   )
 
   // Add all non-reserved, non-free-space squares first
@@ -1262,14 +1262,14 @@ export async function analyzeContextUsage(
   const reservedSquareCount = reservedCategory ? reservedCategory.squares : 0
 
   // Fill with free space, leaving room for reserved at the end
-  const freeSpaceCat = cats.find(c => c.name === 'Free space')
+  const freeSpaceCat = cats.find(c => c.name === '可用空间')
   const freeSpaceTarget = TOTAL_SQUARES - reservedSquareCount
 
   while (gridSquares.length < freeSpaceTarget) {
     gridSquares.push({
       color: 'promptBorder',
       isFilled: true,
-      categoryName: 'Free space',
+      categoryName: '可用空间',
       tokens: freeSpaceCat?.tokens || 0,
       percentage: freeSpaceCat
         ? Math.round((freeSpaceCat.tokens / contextWindow) * 100)

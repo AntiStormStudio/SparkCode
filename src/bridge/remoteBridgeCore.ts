@@ -177,7 +177,7 @@ export async function initEnvLessBridgeCore(
     cfg,
   )
   if (!createdSessionId) {
-    onStateChange?.('failed', 'Session creation failed — see debug log')
+    onStateChange?.('failed', '会话创建失败，请查看调试日志')
     logBridgeSkip('v2_session_create_failed', undefined, true)
     return null
   }
@@ -198,7 +198,7 @@ export async function initEnvLessBridgeCore(
     cfg,
   )
   if (!credentials) {
-    onStateChange?.('failed', 'Remote credentials fetch failed — see debug log')
+    onStateChange?.('failed', '远程凭证获取失败，请查看调试日志')
     logBridgeSkip('v2_remote_creds_failed', undefined, true)
     void archiveSession(
       sessionId,
@@ -239,7 +239,7 @@ export async function initEnvLessBridgeCore(
       `[remote-bridge] v2 transport setup failed: ${errorMessage(err)}`,
       { level: 'error' },
     )
-    onStateChange?.('failed', `Transport setup failed: ${errorMessage(err)}`)
+    onStateChange?.('failed', `传输层初始化失败：${errorMessage(err)}`)
     logBridgeSkip('v2_transport_setup_failed', undefined, true)
     void archiveSession(
       sessionId,
@@ -365,7 +365,7 @@ export async function initEnvLessBridgeCore(
             'bridge_repl_v2_proactive_refresh_failed',
           )
           if (!tornDown) {
-            onStateChange?.('failed', `Refresh failed: ${errorMessage(err)}`)
+            onStateChange?.('failed', `刷新失败：${errorMessage(err)}`)
           }
         } finally {
           authRecoveryInFlight = false
@@ -461,7 +461,7 @@ export async function initEnvLessBridgeCore(
         void recoverFromAuthFailure()
         return
       }
-      onStateChange?.('failed', `Transport closed (code ${code})`)
+      onStateChange?.('failed', `传输层已关闭（代码 ${code}）`)
     })
   }
 
@@ -533,7 +533,7 @@ export async function initEnvLessBridgeCore(
     // any await. Laptop wake fires both paths ~simultaneously.
     if (authRecoveryInFlight) return
     authRecoveryInFlight = true
-    onStateChange?.('reconnecting', 'JWT expired — refreshing')
+    onStateChange?.('reconnecting', 'JWT 已过期，正在刷新')
     logForDebugging('[remote-bridge] 401 on SSE — attempting JWT refresh')
     try {
       // Unconditionally try OAuth refresh — getAccessToken() returns expired
@@ -545,7 +545,7 @@ export async function initEnvLessBridgeCore(
       const oauthToken = getAccessToken() ?? stale
       if (!oauthToken || tornDown) {
         if (!tornDown) {
-          onStateChange?.('failed', 'JWT refresh failed: no OAuth token')
+          onStateChange?.('failed', 'JWT 刷新失败：无 OAuth 令牌')
         }
         return
       }
@@ -563,7 +563,7 @@ export async function initEnvLessBridgeCore(
       )
       if (!fresh || tornDown) {
         if (!tornDown) {
-          onStateChange?.('failed', 'JWT refresh failed after 401')
+          onStateChange?.('failed', 'JWT 刷新失败（收到 401 后）')
         }
         return
       }
@@ -582,7 +582,7 @@ export async function initEnvLessBridgeCore(
       )
       logForDiagnosticsNoPII('error', 'bridge_repl_v2_jwt_refresh_failed')
       if (!tornDown) {
-        onStateChange?.('failed', `JWT refresh failed: ${errorMessage(err)}`)
+        onStateChange?.('failed', `JWT 刷新失败：${errorMessage(err)}`)
       }
     } finally {
       authRecoveryInFlight = false

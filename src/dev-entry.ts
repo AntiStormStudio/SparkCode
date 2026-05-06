@@ -19,7 +19,7 @@ const defaultMacro: MacroConfig = {
   NATIVE_PACKAGE_URL: pkg.name,
   VERSION_CHANGELOG: '',
   ISSUES_EXPLAINER:
-    'file an issue in your SPARK-Code repository',
+    '请在你的 SPARK-Code 仓库里提交 issue',
   FEEDBACK_CHANNEL: 'github',
 }
 
@@ -100,7 +100,7 @@ const missingImports = collectMissingRelativeImports()
 
 if (args.includes('--version')) {
   if (missingImports.length > 0) {
-    console.log(`${pkg.version} (restored dev workspace)`)
+    console.log(`${pkg.version}（已还原的开发工作区）`)
     console.log(`missing_relative_imports=${missingImports.length}`)
     process.exit(0)
   }
@@ -110,33 +110,33 @@ if (args.includes('--version')) {
 
 if (args.includes('--help')) {
   if (missingImports.length > 0) {
-    console.log('SPARK-Code restored development workspace')
-    console.log(`version: ${pkg.version}`)
-    console.log(`missing relative imports: ${missingImports.length}`)
+    console.log('SPARK-Code 已还原开发工作区')
+    console.log(`版本：${pkg.version}`)
+    console.log(`缺失的相对导入：${missingImports.length}`)
     process.exit(0)
   }
-  console.log('Usage: sparkc [options] [prompt]')
+  console.log('用法：sparkc [options] [prompt]')
   console.log('')
-  console.log('Basic restored commands:')
-  console.log('  --help       Show this help')
-  console.log('  --version    Show version')
+  console.log('基础还原命令：')
+  console.log('  --help       显示帮助')
+  console.log('  --version    显示版本')
   console.log('')
-  console.log('Interactive REPL startup is routed to src/main.tsx when run without these flags.')
+  console.log('不带这些参数运行时，交互式 REPL 会转到 src/main.tsx 启动。')
   process.exit(0)
 }
 
 if (missingImports.length > 0) {
-  console.log('SPARK-Code restored development workspace')
-  console.log(`version: ${pkg.version}`)
-  console.log(`missing relative imports: ${missingImports.length}`)
+  console.log('SPARK-Code 已还原开发工作区')
+  console.log(`版本：${pkg.version}`)
+  console.log(`缺失的相对导入：${missingImports.length}`)
   console.log('')
-  console.log('Top missing modules:')
+  console.log('主要缺失模块：')
   for (const item of missingImports.slice(0, 20)) {
     console.log(`- ${item.importer.replace(`${process.cwd()}/`, '')} -> ${item.specifier}`)
   }
   console.log('')
-  console.log('The original app entry is still blocked by missing restored sources.')
-  console.log('Use this workspace to continue restoration; once missing imports reach 0, this launcher will forward to src/main.tsx automatically.')
+  console.log('原始应用入口仍被缺失的还原源码阻塞。')
+  console.log('请继续在此工作区修复还原内容；缺失导入归零后，启动器会自动转发到 src/main.tsx。')
   process.exit(0)
 }
 

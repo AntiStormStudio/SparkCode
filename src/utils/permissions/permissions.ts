@@ -576,11 +576,11 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         if (appState.toolPermissionContext.shouldAvoidPermissionPrompts) {
           return {
             behavior: 'deny',
-            message: 'PowerShell tool requires interactive approval',
+            message: 'PowerShell 工具需要交互式批准',
             decisionReason: {
               type: 'asyncAgent',
               reason:
-                'PowerShell tool requires interactive approval and permission prompts are not available in this context',
+                'PowerShell 工具需要交互式批准，但当前环境无法显示权限提示',
             },
           }
         }
@@ -1084,7 +1084,7 @@ export async function checkRuleBasedPermissions(
         type: 'rule',
         rule: denyRule,
       },
-      message: `Permission to use ${tool.name} has been denied.`,
+      message: `使用 ${tool.name} 的权限已被拒绝。`,
     }
   }
 
@@ -1176,7 +1176,7 @@ async function hasPermissionsToUseToolInner(
         type: 'rule',
         rule: denyRule,
       },
-      message: `Permission to use ${tool.name} has been denied.`,
+      message: `使用 ${tool.name} 的权限已被拒绝。`,
     }
   }
 

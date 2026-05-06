@@ -76,7 +76,7 @@ export function TeleportError({
               Teleport 远程功能依赖 spark-ai.top OAuth，当前无法继续。
             </Text>
             <Text dimColor>
-              如需本地 API 使用，请运行 <Text bold>/login</Text> 并填写 BASEURL 与 APIKEY。
+              如需本地 API 使用，请运行 <Text bold>/login</Text> 并配置后端地址与 API Key。
             </Text>
           </Box>
           <Select

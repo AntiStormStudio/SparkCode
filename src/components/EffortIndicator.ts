@@ -21,7 +21,22 @@ export function getEffortNotificationText(
 ): string | undefined {
   if (!modelSupportsEffort(model)) return undefined
   const level = getDisplayedEffortLevel(model, effortValue)
-  return `${effortLevelToSymbol(level)} ${level} · /effort`
+  return `${effortLevelToSymbol(level)} ${effortLevelToLabel(level)} · /effort`
+}
+
+function effortLevelToLabel(level: EffortLevel): string {
+  switch (level) {
+    case 'low':
+      return '低'
+    case 'medium':
+      return '中'
+    case 'high':
+      return '高'
+    case 'max':
+      return '最高'
+    default:
+      return '高'
+  }
 }
 
 export function effortLevelToSymbol(level: EffortLevel): string {

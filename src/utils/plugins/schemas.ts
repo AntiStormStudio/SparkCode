@@ -174,14 +174,14 @@ const McpbPath = lazySchema(() =>
   z.union([
     RelativePath()
       .refine(path => path.endsWith('.mcpb') || path.endsWith('.dxt'), {
-        message: 'MCPB file path must end with .mcpb or .dxt',
+        message: 'MCPB 文件路径必须以 .mcpb 或 .dxt 结尾',
       })
       .describe('Path to MCPB file relative to plugin root'),
     z
       .string()
       .url()
       .refine(url => url.endsWith('.mcpb') || url.endsWith('.dxt'), {
-        message: 'MCPB URL must end with .mcpb or .dxt',
+        message: 'MCPB URL 必须以 .mcpb 或 .dxt 结尾',
       })
       .describe('URL to MCPB file'),
   ]),
@@ -238,10 +238,10 @@ const MarketplaceNameSchema = lazySchema(() =>
     })
     .refine(name => name.toLowerCase() !== 'inline', {
       message:
-        'Marketplace name "inline" is reserved for --plugin-dir session plugins',
+        '插件市场名称 “inline” 已保留给 --plugin-dir 会话插件',
     })
     .refine(name => name.toLowerCase() !== 'builtin', {
-      message: 'Marketplace name "builtin" is reserved for built-in plugins',
+      message: '插件市场名称 “builtin” 已保留给内置插件',
     }),
 )
 
@@ -530,7 +530,7 @@ const fileExtension = lazySchema(() =>
     .string()
     .min(2)
     .refine(ext => ext.startsWith('.'), {
-      message: 'File extensions must start with dot (e.g., ".ts", not "ts")',
+      message: '文件扩展名必须以点开头（例如 “.ts”，不是 “ts”）',
     }),
 )
 

@@ -288,18 +288,18 @@ export function getClaudeAiUserDefaultModelDescription(
 ): string {
   if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
     if (isOpus1mMergeEnabled()) {
-      return `Opus 4.6 with 1M context · Most capable for complex work${fastMode ? getOpus46PricingSuffix(true) : ''}`
+      return `Opus 4.6，1M 上下文 · 适合复杂任务${fastMode ? getOpus46PricingSuffix(true) : ''}`
     }
-    return `Opus 4.6 · Most capable for complex work${fastMode ? getOpus46PricingSuffix(true) : ''}`
+    return `Opus 4.6 · 适合复杂任务${fastMode ? getOpus46PricingSuffix(true) : ''}`
   }
-  return 'Sonnet 4.6 · Best for everyday tasks'
+  return 'Sonnet 4.6 · 适合日常任务'
 }
 
 export function renderDefaultModelSetting(
   setting: ModelName | ModelAlias,
 ): string {
   if (setting === 'opusplan') {
-    return 'Opus 4.6 in plan mode, else Sonnet 4.6'
+    return '计划模式使用 Opus 4.6，其他情况使用 Sonnet 4.6'
   }
   return renderModelName(parseUserSpecifiedModel(setting))
 }
@@ -333,7 +333,7 @@ export function isOpus1mMergeEnabled(): boolean {
 
 export function renderModelSetting(setting: ModelName | ModelAlias): string {
   if (setting === 'opusplan') {
-    return 'Opus Plan'
+    return 'Opus 计划模式'
   }
   if (isModelAlias(setting)) {
     return capitalize(setting)
@@ -351,7 +351,7 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
     case getModelStrings().opus46:
       return 'Opus 4.6'
     case getModelStrings().opus46 + '[1m]':
-      return 'Opus 4.6 (1M context)'
+      return 'Opus 4.6（1M 上下文）'
     case getModelStrings().opus45:
       return 'Opus 4.5'
     case getModelStrings().opus41:
@@ -359,17 +359,17 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
     case getModelStrings().opus40:
       return 'Opus 4'
     case getModelStrings().sonnet46 + '[1m]':
-      return 'Sonnet 4.6 (1M context)'
+      return 'Sonnet 4.6（1M 上下文）'
     case getModelStrings().sonnet46:
       return 'Sonnet 4.6'
     case getModelStrings().sonnet45 + '[1m]':
-      return 'Sonnet 4.5 (1M context)'
+      return 'Sonnet 4.5（1M 上下文）'
     case getModelStrings().sonnet45:
       return 'Sonnet 4.5'
     case getModelStrings().sonnet40:
       return 'Sonnet 4'
     case getModelStrings().sonnet40 + '[1m]':
-      return 'Sonnet 4 (1M context)'
+      return 'Sonnet 4（1M 上下文）'
     case getModelStrings().sonnet37:
       return 'Sonnet 3.7'
     case getModelStrings().sonnet35:
@@ -407,7 +407,7 @@ export function renderModelName(model: ModelName): string {
       return masked + suffix
     }
     if (resolved !== model) {
-      return `${model} (${resolved})`
+      return `${model}（${resolved}）`
     }
     return resolved
   }
@@ -556,14 +556,14 @@ export function isLegacyModelRemapEnabled(): boolean {
 export function modelDisplayString(model: ModelSetting): string {
   if (model === null) {
     if (process.env.USER_TYPE === 'ant') {
-      return `Default for Ants (${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})`
+      return `默认模型（${renderDefaultModelSetting(getDefaultMainLoopModelSetting())}）`
     } else if (isClaudeAISubscriber()) {
-      return `Default (${getClaudeAiUserDefaultModelDescription()})`
+      return `默认模型（${getClaudeAiUserDefaultModelDescription()}）`
     }
-    return `Default (${getDefaultMainLoopModel()})`
+    return `默认模型（${getDefaultMainLoopModel()}）`
   }
   const resolvedModel = parseUserSpecifiedModel(model)
-  return model === resolvedModel ? resolvedModel : `${model} (${resolvedModel})`
+  return model === resolvedModel ? resolvedModel : `${model}（${resolvedModel}）`
 }
 
 // @[MODEL LAUNCH]: Add a marketing name mapping for the new model below.
@@ -577,7 +577,7 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   const canonical = getCanonicalName(modelId)
 
   if (canonical.includes('claude-opus-4-6')) {
-    return has1m ? 'Opus 4.6 (with 1M context)' : 'Opus 4.6'
+    return has1m ? 'Opus 4.6（1M 上下文）' : 'Opus 4.6'
   }
   if (canonical.includes('claude-opus-4-5')) {
     return 'Opus 4.5'
@@ -589,13 +589,13 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
     return 'Opus 4'
   }
   if (canonical.includes('claude-sonnet-4-6')) {
-    return has1m ? 'Sonnet 4.6 (with 1M context)' : 'Sonnet 4.6'
+    return has1m ? 'Sonnet 4.6（1M 上下文）' : 'Sonnet 4.6'
   }
   if (canonical.includes('claude-sonnet-4-5')) {
-    return has1m ? 'Sonnet 4.5 (with 1M context)' : 'Sonnet 4.5'
+    return has1m ? 'Sonnet 4.5（1M 上下文）' : 'Sonnet 4.5'
   }
   if (canonical.includes('claude-sonnet-4')) {
-    return has1m ? 'Sonnet 4 (with 1M context)' : 'Sonnet 4'
+    return has1m ? 'Sonnet 4（1M 上下文）' : 'Sonnet 4'
   }
   if (canonical.includes('claude-3-7-sonnet')) {
     return 'Claude 3.7 Sonnet'

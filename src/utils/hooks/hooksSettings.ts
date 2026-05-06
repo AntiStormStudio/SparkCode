@@ -170,20 +170,20 @@ export function getHooksForEvent(
 export function hookSourceDescriptionDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
-      return 'User settings (~/.claude/settings.json)'
+      return '用户设置（~/.claude/settings.json）'
     case 'projectSettings':
-      return 'Project settings (.claude/settings.json)'
+      return '项目设置（.claude/settings.json）'
     case 'localSettings':
-      return 'Local settings (.claude/settings.local.json)'
+      return '本地设置（.claude/settings.local.json）'
     case 'pluginHook':
       // TODO: Get the actual plugin hook file paths instead of using glob pattern
       // We should capture the specific plugin paths during hook registration and display them here
       // e.g., "Plugin hooks (~/.claude/plugins/repos/source/example-plugin/example-plugin/hooks/hooks.json)"
-      return 'Plugin hooks (~/.claude/plugins/*/hooks/hooks.json)'
+      return '插件 Hooks（~/.claude/plugins/*/hooks/hooks.json）'
     case 'sessionHook':
-      return 'Session hooks (in-memory, temporary)'
+      return '会话 Hooks（内存中，临时）'
     case 'builtinHook':
-      return 'Built-in hooks (registered internally by Spark Code)'
+      return '内置 Hooks（由 Spark Code 内部注册）'
     default:
       return source as string
   }
@@ -192,17 +192,17 @@ export function hookSourceDescriptionDisplayString(source: HookSource): string {
 export function hookSourceHeaderDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
-      return 'User Settings'
+      return '用户设置'
     case 'projectSettings':
-      return 'Project Settings'
+      return '项目设置'
     case 'localSettings':
-      return 'Local Settings'
+      return '本地设置'
     case 'pluginHook':
-      return 'Plugin Hooks'
+      return '插件 Hooks'
     case 'sessionHook':
-      return 'Session Hooks'
+      return '会话 Hooks'
     case 'builtinHook':
-      return 'Built-in Hooks'
+      return '内置 Hooks'
     default:
       return source as string
   }
@@ -211,17 +211,17 @@ export function hookSourceHeaderDisplayString(source: HookSource): string {
 export function hookSourceInlineDisplayString(source: HookSource): string {
   switch (source) {
     case 'userSettings':
-      return 'User'
+      return '用户'
     case 'projectSettings':
-      return 'Project'
+      return '项目'
     case 'localSettings':
-      return 'Local'
+      return '本地'
     case 'pluginHook':
-      return 'Plugin'
+      return '插件'
     case 'sessionHook':
-      return 'Session'
+      return '会话'
     case 'builtinHook':
-      return 'Built-in'
+      return '内置'
     default:
       return source as string
   }

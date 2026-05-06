@@ -113,10 +113,10 @@ export function computeShimmerSegments(
 /** Computed bridge status label and color from connection state. */
 export type BridgeStatusInfo = {
   label:
-    | 'Remote Control failed'
-    | 'Remote Control reconnecting'
-    | 'Remote Control active'
-    | 'Remote Control connecting\u2026'
+    | '远程控制失败'
+    | '远程控制重连中'
+    | '远程控制已激活'
+    | '远程控制连接中\u2026'
   color: 'error' | 'warning' | 'success'
 }
 
@@ -132,26 +132,26 @@ export function getBridgeStatus({
   sessionActive: boolean
   reconnecting: boolean
 }): BridgeStatusInfo {
-  if (error) return { label: 'Remote Control failed', color: 'error' }
+  if (error) return { label: '远程控制失败', color: 'error' }
   if (reconnecting)
-    return { label: 'Remote Control reconnecting', color: 'warning' }
+    return { label: '远程控制重连中', color: 'warning' }
   if (sessionActive || connected)
-    return { label: 'Remote Control active', color: 'success' }
-  return { label: 'Remote Control connecting\u2026', color: 'warning' }
+    return { label: '远程控制已激活', color: 'success' }
+  return { label: '远程控制连接中\u2026', color: 'warning' }
 }
 
 /** Footer text shown when bridge is idle (Ready state). */
 export function buildIdleFooterText(url: string): string {
-  return `Code everywhere with the Claude app or ${url}`
+  return `通过 Claude 应用或 ${url} 随时继续写代码`
 }
 
 /** Footer text shown when a session is active (Connected state). */
 export function buildActiveFooterText(url: string): string {
-  return `Continue coding in the Claude app or ${url}`
+  return `通过 Claude 应用或 ${url} 继续编码`
 }
 
 /** Footer text shown when the bridge has failed. */
-export const FAILED_FOOTER_TEXT = 'Something went wrong, please try again'
+export const FAILED_FOOTER_TEXT = '出了点问题，请重试'
 
 /**
  * Wrap text in an OSC 8 terminal hyperlink. Zero visual width for layout purposes.

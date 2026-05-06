@@ -40,33 +40,33 @@ type GenerateExplanationParams = {
   signal: AbortSignal
 }
 
-const SYSTEM_PROMPT = `Analyze shell commands and explain what they do, why you're running them, and potential risks.`
+const SYSTEM_PROMPT = `分析 shell 命令，并解释它们会做什么、为什么要运行，以及可能的风险。`
 
 // Tool definition for forced structured output (no beta required)
 const EXPLAIN_COMMAND_TOOL = {
   name: 'explain_command',
-  description: 'Provide an explanation of a shell command',
+  description: '提供 shell 命令说明',
   input_schema: {
     type: 'object' as const,
     properties: {
       explanation: {
         type: 'string',
-        description: 'What this command does (1-2 sentences)',
+        description: '这个命令会做什么（1 到 2 句话）',
       },
       reasoning: {
         type: 'string',
         description:
-          'Why YOU are running this command. Start with "I" - e.g. "I need to check the file contents"',
+          '你为什么要运行这个命令。用“我”开头，例如“我需要检查文件内容”',
       },
       risk: {
         type: 'string',
-        description: 'What could go wrong, under 15 words',
+        description: '可能出现什么问题，15 个词以内',
       },
       riskLevel: {
         type: 'string',
         enum: ['LOW', 'MEDIUM', 'HIGH'],
         description:
-          'LOW (safe dev workflows), MEDIUM (recoverable changes), HIGH (dangerous/irreversible)',
+          'LOW（安全的开发流程）、MEDIUM（可恢复的更改）、HIGH（危险或不可逆）',
       },
     },
     required: ['explanation', 'reasoning', 'risk', 'riskLevel'],

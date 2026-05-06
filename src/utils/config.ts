@@ -173,6 +173,13 @@ export type AccountInfo = {
   subscriptionCreatedAt?: string
 }
 
+export type AgentWizardDefaults = {
+  location?: 'projectSettings' | 'userSettings'
+  selectedModel?: string
+  selectedMemory?: 'user' | 'project' | 'local' | 'none'
+  selectedTools?: string[]
+}
+
 // TODO: 'emacs' is kept for backward compatibility - remove after a few releases
 export type EditorMode = 'emacs' | (typeof EDITOR_MODES)[number]
 
@@ -527,6 +534,9 @@ export type GlobalConfig = {
   // Model for new teammates when the tool call doesn't pass one.
   // undefined = hardcoded Opus (backward-compat); null = leader's model; string = model alias/ID.
   teammateDefaultModel?: string | null
+
+  // Remember last choices in "Create new agent" wizard.
+  lastAgentWizardDefaults?: AgentWizardDefaults
 
   // PR status footer configuration (feature-flagged via GrowthBook)
   prStatusFooterEnabled?: boolean // Show PR review status in footer (default: true)

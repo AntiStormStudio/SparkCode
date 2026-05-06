@@ -136,22 +136,22 @@ export function getAgentModelOptions(): AgentModelOption[] {
     {
       value: 'sonnet',
       label: 'Sonnet',
-      description: 'Balanced performance - best for most agents',
+      description: '性能均衡，适合大多数 Agent',
     },
     {
       value: 'opus',
       label: 'Opus',
-      description: 'Most capable for complex reasoning tasks',
+      description: '能力最强，适合复杂推理任务',
     },
     {
       value: 'haiku',
       label: 'Haiku',
-      description: 'Fast and efficient for simple tasks',
+      description: '快速高效，适合简单任务',
     },
     {
       value: 'inherit',
-      label: 'Inherit from parent',
-      description: 'Use the same model as the main conversation',
+      label: '继承主会话',
+      description: '使用与主会话相同的模型',
     },
   ]
 }

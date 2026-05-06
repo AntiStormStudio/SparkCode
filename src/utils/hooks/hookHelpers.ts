@@ -47,11 +47,11 @@ export function createStructuredOutputTool(): Tool {
       properties: {
         ok: {
           type: 'boolean',
-          description: 'Whether the condition was met',
+          description: '条件是否满足',
         },
         reason: {
           type: 'string',
-          description: 'Reason, if the condition was not met',
+          description: '条件不满足时的原因',
         },
       },
       required: ['ok'],

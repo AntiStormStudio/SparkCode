@@ -139,7 +139,7 @@ function handleInteractivePermission(
       if (bridgeCallbacks && bridgeRequestId) {
         bridgeCallbacks.sendResponse(bridgeRequestId, {
           behavior: 'deny',
-          message: 'User aborted',
+          message: '用户已中止',
         })
         bridgeCallbacks.cancelRequest(bridgeRequestId)
       }

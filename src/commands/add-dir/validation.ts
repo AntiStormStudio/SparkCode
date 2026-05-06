@@ -95,9 +95,9 @@ export async function validateDirectoryForWorkspace(
 export function addDirHelpMessage(result: AddDirectoryResult): string {
   switch (result.resultType) {
     case 'emptyPath':
-      return 'Please provide a directory path.'
+      return '请提供目录路径。'
     case 'pathNotFound':
-      return `Path ${chalk.bold(result.absolutePath)} was not found.`
+      return `未找到路径 ${chalk.bold(result.absolutePath)}。`
     case 'notADirectory': {
       const parentDir = dirname(result.absolutePath)
       return `${chalk.bold(result.directoryPath)} is not a directory. Did you mean to add the parent directory ${chalk.bold(parentDir)}?`

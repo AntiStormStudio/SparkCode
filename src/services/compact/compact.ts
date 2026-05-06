@@ -223,7 +223,7 @@ export function stripReinjectedAttachments(messages: Message[]): Message[] {
 }
 
 export const ERROR_MESSAGE_NOT_ENOUGH_MESSAGES =
-  'Not enough messages to compact.'
+  '没有足够的消息可压缩。'
 const MAX_PTL_RETRIES = 3
 const PTL_RETRY_MARKER = '[earlier conversation truncated for compaction retry]'
 
@@ -291,10 +291,10 @@ export function truncateHeadForPTLRetry(
 }
 
 export const ERROR_MESSAGE_PROMPT_TOO_LONG =
-  'Conversation too long. Press esc twice to go up a few messages and try again.'
-export const ERROR_MESSAGE_USER_ABORT = 'API Error: Request was aborted.'
+  '对话太长。按两次 Esc 回到前几条消息后再试。'
+export const ERROR_MESSAGE_USER_ABORT = 'API 错误：请求已中止。'
 export const ERROR_MESSAGE_INCOMPLETE_RESPONSE =
-  'Compaction interrupted · This may be due to network issues — please try again.'
+  '压缩已中断 · 可能是网络问题，请重试。'
 
 export interface CompactionResult {
   boundaryMarker: SystemMessage
@@ -1115,7 +1115,7 @@ function addErrorNotificationIfNeeded(
   ) {
     context.addNotification?.({
       key: 'error-compacting-conversation',
-      text: 'Error compacting conversation',
+      text: '压缩对话时出错',
       priority: 'immediate',
       color: 'error',
     })
@@ -1125,7 +1125,7 @@ function addErrorNotificationIfNeeded(
 export function createCompactCanUseTool(): CanUseToolFn {
   return async () => ({
     behavior: 'deny' as const,
-    message: 'Tool use is not allowed during compaction',
+    message: '压缩过程中不允许使用工具',
     decisionReason: {
       type: 'other' as const,
       reason: 'compaction agent should only produce text summary',

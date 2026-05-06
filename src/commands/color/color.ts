@@ -33,7 +33,7 @@ export async function call(
 
   if (!args || args.trim() === '') {
     const colorList = AGENT_COLORS.join(', ')
-    onDone(`Please provide a color. Available colors: ${colorList}, default`, {
+    onDone(`请提供颜色。可用颜色：${colorList}, default`, {
       display: 'system',
     })
     return null

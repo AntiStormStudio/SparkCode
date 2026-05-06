@@ -130,7 +130,7 @@ export function useTextInput({
       }
       addNotification({
         key: 'escape-again-to-clear',
-        text: 'Esc again to clear',
+        text: '再按一次 Esc 清空输入',
         priority: 'immediate',
         timeoutMs: 1000,
       })

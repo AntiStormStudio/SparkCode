@@ -80,6 +80,9 @@ import { clearToolSchemaCache } from './toolSchemaCache.js'
 /** Default TTL for API key helper cache in milliseconds (5 minutes) */
 const DEFAULT_API_KEY_HELPER_TTL = 5 * 60 * 1000
 const BASE_URL_ENV_KEY = 'ANTHROPIC_BASE_URL'
+const AUTH_TOKEN_ENV_KEY = 'ANTHROPIC_AUTH_TOKEN'
+const AUTH_REFRESH_TOKEN_ENV_KEY = 'SPARK_ANDROID_REFRESH_TOKEN'
+const SPARK_ANDROID_AUTH_STORAGE_KEY = 'sparkAndroidAuth'
 
 /**
  * CCR and Claude Desktop spawn the CLI with OAuth and should never fall back
@@ -215,7 +218,7 @@ export type ApiKeySource =
 export function normalizeApiBaseUrl(baseUrlInput: string): string {
   const trimmed = baseUrlInput.trim()
   if (!trimmed) {
-    throw new Error('BASEURL 不能为空')
+    throw new Error('后端地址不能为空')
   }
 
   const withProtocol = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)
@@ -226,19 +229,19 @@ export function normalizeApiBaseUrl(baseUrlInput: string): string {
   try {
     parsed = new URL(withProtocol)
   } catch {
-    throw new Error('BASEURL 格式无效，请填写类似 https://api.example.com')
+    throw new Error('后端地址格式无效，请填写类似 https://api.example.com')
   }
 
   if (parsed.search || parsed.hash) {
-    throw new Error('BASEURL 不能包含查询参数或哈希')
+    throw new Error('后端地址不能包含查询参数或哈希')
   }
 
   const normalizedPath = parsed.pathname.replace(/\/+$/g, '')
   if (normalizedPath === '/v1') {
-    throw new Error('BASEURL 不要包含 /v1，请仅填写根地址')
+    throw new Error('后端地址不要包含 /v1，请仅填写根地址')
   }
   if (normalizedPath.length > 0) {
-    throw new Error('BASEURL 不能包含路径，请仅填写协议和域名（可带端口）')
+    throw new Error('后端地址不能包含路径，请仅填写协议和域名（可带端口）')
   }
 
   return parsed.origin
@@ -251,6 +254,40 @@ export function getConfiguredApiBaseUrl(): string | null {
   }
   const configBaseUrl = getGlobalConfig().env?.[BASE_URL_ENV_KEY]
   return configBaseUrl || null
+}
+
+export function getConfiguredAuthToken(): string | null {
+  const authTokenFromEnv = process.env[AUTH_TOKEN_ENV_KEY]?.trim()
+  if (authTokenFromEnv) {
+    return authTokenFromEnv
+  }
+  const configAuthToken = getGlobalConfig().env?.[AUTH_TOKEN_ENV_KEY]?.trim()
+  return configAuthToken || null
+}
+
+export function getConfiguredAuthRefreshToken(): string | null {
+  const refreshTokenFromEnv = process.env[AUTH_REFRESH_TOKEN_ENV_KEY]?.trim()
+  if (refreshTokenFromEnv) {
+    return refreshTokenFromEnv
+  }
+
+  const storageData = getSecureStorage().read() || {}
+  const storedAuth = storageData[SPARK_ANDROID_AUTH_STORAGE_KEY]
+  if (storedAuth && typeof storedAuth === 'object') {
+    const refreshToken = (storedAuth as Record<string, unknown>).refreshToken
+    if (typeof refreshToken === 'string' && refreshToken.trim()) {
+      return refreshToken.trim()
+    }
+  }
+
+  const legacyConfigRefreshToken =
+    getGlobalConfig().env?.[AUTH_REFRESH_TOKEN_ENV_KEY]?.trim()
+  if (legacyConfigRefreshToken) {
+    saveConfiguredAuthRefreshToken(legacyConfigRefreshToken)
+    return legacyConfigRefreshToken
+  }
+
+  return null
 }
 
 export function saveConfiguredApiBaseUrl(baseUrl: string): string {
@@ -268,6 +305,60 @@ export function saveConfiguredApiBaseUrl(baseUrl: string): string {
   return normalized
 }
 
+export function saveConfiguredAuthToken(authToken: string): string {
+  const normalized = authToken.trim()
+  if (!normalized) {
+    throw new Error('登录令牌不能为空')
+  }
+
+  saveGlobalConfig(current => ({
+    ...current,
+    env: {
+      ...(current.env ?? {}),
+      [AUTH_TOKEN_ENV_KEY]: normalized,
+    },
+  }))
+
+  process.env[AUTH_TOKEN_ENV_KEY] = normalized
+  return normalized
+}
+
+export function saveConfiguredAuthRefreshToken(refreshToken: string): string {
+  const normalized = refreshToken.trim()
+  if (!normalized) {
+    throw new Error('刷新令牌不能为空')
+  }
+
+  const secureStorage = getSecureStorage()
+  const storageData = secureStorage.read() || {}
+  storageData[SPARK_ANDROID_AUTH_STORAGE_KEY] = {
+    ...(typeof storageData[SPARK_ANDROID_AUTH_STORAGE_KEY] === 'object' &&
+    storageData[SPARK_ANDROID_AUTH_STORAGE_KEY] !== null
+      ? (storageData[SPARK_ANDROID_AUTH_STORAGE_KEY] as Record<string, unknown>)
+      : {}),
+    refreshToken: normalized,
+    updatedAt: Date.now(),
+  }
+  const updateStatus = secureStorage.update(storageData)
+  if (!updateStatus.success) {
+    throw new Error('长效令牌本地加密保存失败')
+  }
+
+  saveGlobalConfig(current => ({
+    ...current,
+    env: {
+      ...Object.fromEntries(
+        Object.entries(current.env ?? {}).filter(
+          ([key]) => key !== AUTH_REFRESH_TOKEN_ENV_KEY,
+        ),
+      ),
+    },
+  }))
+
+  process.env[AUTH_REFRESH_TOKEN_ENV_KEY] = normalized
+  return normalized
+}
+
 export function clearConfiguredApiBaseUrl(): void {
   saveGlobalConfig(current => {
     if (!current.env || !(BASE_URL_ENV_KEY in current.env)) {
@@ -281,6 +372,43 @@ export function clearConfiguredApiBaseUrl(): void {
   })
 
   delete process.env[BASE_URL_ENV_KEY]
+}
+
+export function clearConfiguredAuthToken(): void {
+  saveGlobalConfig(current => {
+    if (!current.env || !(AUTH_TOKEN_ENV_KEY in current.env)) {
+      return current
+    }
+    const { [AUTH_TOKEN_ENV_KEY]: _, ...restEnv } = current.env
+    return {
+      ...current,
+      env: restEnv,
+    }
+  })
+
+  delete process.env[AUTH_TOKEN_ENV_KEY]
+}
+
+export function clearConfiguredAuthRefreshToken(): void {
+  const secureStorage = getSecureStorage()
+  const storageData = secureStorage.read() || {}
+  if (SPARK_ANDROID_AUTH_STORAGE_KEY in storageData) {
+    const { [SPARK_ANDROID_AUTH_STORAGE_KEY]: _, ...rest } = storageData
+    secureStorage.update(rest)
+  }
+
+  saveGlobalConfig(current => {
+    if (!current.env || !(AUTH_REFRESH_TOKEN_ENV_KEY in current.env)) {
+      return current
+    }
+    const { [AUTH_REFRESH_TOKEN_ENV_KEY]: _, ...restEnv } = current.env
+    return {
+      ...current,
+      env: restEnv,
+    }
+  })
+
+  delete process.env[AUTH_REFRESH_TOKEN_ENV_KEY]
 }
 
 export function getAnthropicApiKey(): null | string {
@@ -1136,9 +1264,10 @@ export const getApiKeyFromConfigOrMacOSKeychain = memoize(
         // Prefetch completed with no key — fall through to config, not keychain.
       } else {
         const storageServiceName = getMacOsKeychainStorageServiceName()
+        const username = getUsername()
         try {
           const result = execSyncWithDefaults_DEPRECATED(
-            `security find-generic-password -a $USER -w -s "${storageServiceName}"`,
+            `security find-generic-password -a "${username}" -w -s "${storageServiceName}"`,
           )
           if (result) {
             return { key: result, source: '/login managed key' }
@@ -1187,10 +1316,13 @@ export async function saveApiKey(apiKey: string): Promise<void> {
       // Process monitors only see "security -i", not the password
       const command = `add-generic-password -U -a "${username}" -s "${storageServiceName}" -X "${hexValue}"\n`
 
-      await execa('security', ['-i'], {
+      const result = await execa('security', ['-i'], {
         input: command,
         reject: false,
       })
+      if (result.exitCode !== 0) {
+        throw new Error('保存 API 密钥到 macOS 钥匙串失败')
+      }
 
       logEvent('tengu_api_key_saved_to_keychain', {})
       savedToKeychain = true
@@ -1320,7 +1452,7 @@ export function saveOAuthTokensIfNeeded(tokens: OAuthTokens): {
         error,
       ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
-    return { success: false, warning: 'Failed to save OAuth tokens' }
+    return { success: false, warning: '保存 OAuth 令牌失败' }
   }
 }
 

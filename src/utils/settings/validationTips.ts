@@ -31,7 +31,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path === 'permissions.defaultMode' && ctx.code === 'invalid_value',
     tip: {
       suggestion:
-        'Valid modes: "acceptEdits" (ask before file changes), "plan" (analysis only), "bypassPermissions" (auto-accept all), or "default" (standard behavior)',
+        '有效模式："acceptEdits"（修改文件前询问）、"plan"（仅分析）、"bypassPermissions"（自动接受全部）、"default"（标准行为）',
       docLink: `${DOCUMENTATION_BASE}/iam#permission-modes`,
     },
   },
@@ -40,7 +40,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path === 'apiKeyHelper' && ctx.code === 'invalid_type',
     tip: {
       suggestion:
-        'Provide a shell command that outputs your API key to stdout. The script should output only the API key. Example: "/bin/generate_temp_api_key.sh"',
+        '请提供一个会把 API Key 输出到 stdout 的 shell 命令。脚本应只输出 API Key。示例："/bin/generate_temp_api_key.sh"',
     },
   },
   {
@@ -50,7 +50,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.expected === '0',
     tip: {
       suggestion:
-        'Must be 0 or greater. Set a positive number for days to retain transcripts (default is 30). Setting 0 disables session persistence entirely: no transcripts are written and existing transcripts are deleted at startup.',
+        '必须大于等于 0。填正数表示保留对话记录的天数（默认 30）。填 0 会完全关闭会话持久化：不写入新记录，并在启动时删除已有记录。',
     },
   },
   {
@@ -58,7 +58,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path.startsWith('env.') && ctx.code === 'invalid_type',
     tip: {
       suggestion:
-        'Environment variables must be strings. Wrap numbers and booleans in quotes. Example: "DEBUG": "true", "PORT": "3000"',
+        '环境变量必须是字符串。数字和布尔值请加引号。示例："DEBUG": "true", "PORT": "3000"',
       docLink: `${DOCUMENTATION_BASE}/settings#environment-variables`,
     },
   },
@@ -69,7 +69,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.expected === 'array',
     tip: {
       suggestion:
-        'Permission rules must be in an array. Format: ["Tool(specifier)"]. Examples: ["Bash(npm run build)", "Edit(docs/**)", "Read(~/.zshrc)"]. Use * for wildcards.',
+        '权限规则必须写在数组里。格式：["Tool(specifier)"]。示例：["Bash(npm run build)", "Edit(docs/**)", "Read(~/.zshrc)"]。可用 * 表示通配。',
     },
   },
   {
@@ -82,7 +82,7 @@ const TIP_MATCHERS: TipMatcher[] = [
         // always has been). Users copied the tip's example and got the same validation
         // error again. See matchesPattern() in hooks.ts: matcher is exact-match,
         // pipe-separated ("Edit|Write"), or regex. Empty/"*" matches all.
-        'Hooks use a matcher + hooks array. The matcher is a string: a tool name ("Bash"), pipe-separated list ("Edit|Write"), or empty to match all. Example: {"PostToolUse": [{"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "echo Done"}]}]}',
+        'Hooks 使用 matcher + hooks 数组。matcher 是字符串：可以是工具名（"Bash"）、竖线分隔列表（"Edit|Write"），留空则匹配全部。示例：{"PostToolUse": [{"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "echo Done"}]}]}',
     },
   },
   {
@@ -90,14 +90,14 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.code === 'invalid_type' && ctx.expected === 'boolean',
     tip: {
       suggestion:
-        'Use true or false without quotes. Example: "includeCoAuthoredBy": true',
+        '请使用不带引号的 true 或 false。示例："includeCoAuthoredBy": true',
     },
   },
   {
     matches: (ctx): boolean => ctx.code === 'unrecognized_keys',
     tip: {
       suggestion:
-        'Check for typos or refer to the documentation for valid fields',
+        '请检查拼写，或参考文档确认有效字段',
       docLink: `${DOCUMENTATION_BASE}/settings`,
     },
   },
@@ -116,7 +116,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path === '',
     tip: {
       suggestion:
-        'Check for missing commas, unmatched brackets, or trailing commas. Use a JSON validator to identify the exact syntax error.',
+        '请检查是否缺少逗号、括号不匹配或存在尾随逗号。可用 JSON 校验器定位具体语法错误。',
     },
   },
   {
@@ -125,7 +125,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.code === 'invalid_type',
     tip: {
       suggestion:
-        'Must be an array of directory paths. Example: ["~/projects", "/tmp/workspace"]. You can also use --add-dir flag or /add-dir command',
+        '必须是目录路径数组。示例：["~/projects", "/tmp/workspace"]。也可以使用 --add-dir 参数或 /add-dir 命令。',
       docLink: `${DOCUMENTATION_BASE}/iam#working-directories`,
     },
   },

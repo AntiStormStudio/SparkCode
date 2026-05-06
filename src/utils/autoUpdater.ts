@@ -61,7 +61,7 @@ export type MaxVersionConfig = {
  *
  * Versioning approach:
  * 1. For version requirements/compatibility (assertMinVersion), we use semver comparison that ignores build metadata
- * 2. For updates ('claude update'), we use exact string comparison to detect any change, including SHA
+ * 2. For updates ('sparkc update'), we use exact string comparison to detect any change, including SHA
  *    - This ensures users always get the latest build, even when only the SHA changes
  *    - The UI clearly shows both versions including build metadata
  *
@@ -69,6 +69,15 @@ export type MaxVersionConfig = {
  */
 export async function assertMinVersion(): Promise<void> {
   if (process.env.NODE_ENV === 'test') {
+    return
+  }
+
+  // Local insider builds are intentionally version-pinned and should not be
+  // blocked by server-side minimum-version gates.
+  if (
+    MACRO.VERSION.includes('-insider') ||
+    process.env.SPARK_DISABLE_MIN_VERSION_CHECK === '1'
+  ) {
     return
   }
 
@@ -87,7 +96,7 @@ It looks like your version of Spark Code (${MACRO.VERSION}) needs an update.
 A newer version (${versionConfig.minVersion} or higher) is required to continue.
 
 To update, please run:
-    claude update
+    sparkc update
 
 This will ensure you have access to the latest features and improvements.
 `)
@@ -480,15 +489,15 @@ export async function installGlobalPackage(
       })
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`
-Error: Windows NPM detected in WSL
+错误：在 WSL 中检测到 Windows NPM
 
-You're running Spark Code in WSL but using the Windows NPM installation from /mnt/c/.
-This configuration is not supported for updates.
+你正在 WSL 中运行 Spark Code，但使用的是 /mnt/c/ 下的 Windows NPM。
+此配置不支持更新。
 
-To fix this issue:
-  1. Install Node.js within your Linux distribution: e.g. sudo apt install nodejs npm
-  2. Make sure Linux NPM is in your PATH before the Windows version
-  3. Try updating again with 'claude update'
+修复方法：
+  1. 在 Linux 发行版内安装 Node.js，例如 sudo apt install nodejs npm
+  2. 确认 Linux NPM 在 PATH 中排在 Windows 版本前面
+  3. 再次运行 'sparkc update'
 `)
       return 'install_failed'
     }
@@ -513,7 +522,7 @@ To fix this issue:
     )
     if (installResult.code !== 0) {
       const error = new AutoUpdaterError(
-        `Failed to install new version of claude: ${installResult.stdout} ${installResult.stderr}`,
+        `Failed to install new version of sparkc: ${installResult.stdout} ${installResult.stderr}`,
       )
       logError(error)
       return 'install_failed'

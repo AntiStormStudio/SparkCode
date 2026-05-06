@@ -245,7 +245,7 @@ export async function launchRemoteReview(
       return [
         {
           type: 'text',
-          text: `Could not find merge-base with ${baseBranch}. Make sure you're in a git repo with a ${baseBranch} branch.`,
+          text: `找不到与 ${baseBranch} 的 merge-base。请确认当前位于 git 仓库中，且存在 ${baseBranch} 分支。`,
         },
       ]
     }
@@ -283,7 +283,7 @@ export async function launchRemoteReview(
       return [
         {
           type: 'text',
-          text: 'Repo is too large. Push a PR and use `/ultrareview <PR#>` instead.',
+          text: '仓库太大。请先推送 PR，然后改用 `/ultrareview <PR#>`。',
         },
       ]
     }

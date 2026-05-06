@@ -366,7 +366,7 @@ export function useRemoteSession({
           onAbort() {
             const response: RemotePermissionResponse = {
               behavior: 'deny',
-              message: 'User aborted',
+              message: '用户已中止',
             }
             manager.respondToPermissionRequest(requestId, response)
             setToolUseConfirmQueue(queue =>

@@ -12,6 +12,7 @@ import desktop from './commands/desktop/index.js'
 import commitPushPr from './commands/commit-push-pr.js'
 import compact from './commands/compact/index.js'
 import config from './commands/config/index.js'
+import configServer from './commands/config-server/index.js'
 import { context, contextNonInteractive } from './commands/context/index.js'
 import cost from './commands/cost/index.js'
 import diff from './commands/diff/index.js'
@@ -111,6 +112,8 @@ import env from './commands/env/index.js'
 import exit from './commands/exit/index.js'
 import exportCommand from './commands/export/index.js'
 import model from './commands/model/index.js'
+import defaultModel from './commands/default-model/index.js'
+import modelList from './commands/model-list/index.js'
 import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
 import remoteEnv from './commands/remote-env/index.js'
@@ -130,7 +133,7 @@ const usageReport: Command = {
   name: 'insights',
   description: '生成 Spark Code 会话分析报告',
   contentLength: 0,
-  progressMessage: 'analyzing your sessions',
+  progressMessage: '正在分析会话',
   source: 'builtin',
   async getPromptForCommand(args, context) {
     const real = (await import('./commands/insights.js')).default
@@ -189,6 +192,7 @@ const COMMANDS = memoize((): Command[] => [
   color,
   compact,
   config,
+  configServer,
   copy,
   desktop,
   context,
@@ -211,6 +215,8 @@ const COMMANDS = memoize((): Command[] => [
   memory,
   mobile,
   model,
+  defaultModel,
+  modelList,
   outputStyle,
   remoteEnv,
   plugin,

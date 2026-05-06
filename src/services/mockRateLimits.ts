@@ -758,45 +758,45 @@ export function getCurrentMockScenario(): MockScenario | null {
 export function getScenarioDescription(scenario: MockScenario): string {
   switch (scenario) {
     case 'normal':
-      return 'Normal usage, no limits'
+      return '正常使用，无限制'
     case 'session-limit-reached':
-      return 'Session rate limit exceeded'
+      return '已超出会话速率限制'
     case 'approaching-weekly-limit':
-      return 'Approaching weekly aggregate limit'
+      return '接近周汇总限制'
     case 'weekly-limit-reached':
-      return 'Weekly aggregate limit exceeded'
+      return '已超出周汇总限制'
     case 'overage-active':
-      return 'Using extra usage (overage active)'
+      return '正在使用额外用量'
     case 'overage-warning':
-      return 'Approaching extra usage limit'
+      return '接近额外用量限制'
     case 'overage-exhausted':
-      return 'Both subscription and extra usage limits exhausted'
+      return '订阅与额外用量限制均已耗尽'
     case 'out-of-credits':
-      return 'Out of extra usage credits (wallet empty)'
+      return '额外用量额度已用尽'
     case 'org-zero-credit-limit':
-      return 'Org spend cap is zero (no extra usage budget)'
+      return '组织支出上限为 0（没有额外用量预算）'
     case 'org-spend-cap-hit':
-      return 'Org spend cap hit for the month'
+      return '已达到本月组织支出上限'
     case 'member-zero-credit-limit':
-      return 'Member limit is zero (admin can allocate more)'
+      return '成员额度为 0（管理员可分配更多额度）'
     case 'seat-tier-zero-credit-limit':
-      return 'Seat tier limit is zero (admin can allocate more)'
+      return '席位层级额度为 0（管理员可分配更多额度）'
     case 'opus-limit':
-      return 'Opus limit reached'
+      return '已达到 Opus 限制'
     case 'opus-warning':
-      return 'Approaching Opus limit'
+      return '接近 Opus 限制'
     case 'sonnet-limit':
-      return 'Sonnet limit reached'
+      return '已达到 Sonnet 限制'
     case 'sonnet-warning':
-      return 'Approaching Sonnet limit'
+      return '接近 Sonnet 限制'
     case 'fast-mode-limit':
-      return 'Fast mode rate limit'
+      return '快速模式速率限制'
     case 'fast-mode-short-limit':
-      return 'Fast mode rate limit (short)'
+      return '快速模式速率限制（短时）'
     case 'extra-usage-required':
-      return 'Headerless 429: Extra usage required for 1M context'
+      return '无响应头 429：1M 上下文需要额外用量'
     case 'clear':
-      return 'Clear mock headers (use real limits)'
+      return '清除模拟响应头（使用真实限制）'
     default:
       return 'Unknown scenario'
   }

@@ -56,14 +56,22 @@ function handlePluginCommandError(
   plugin?: string,
 ): never {
   logError(error)
+  const commandLabels: Record<PluginCliCommand, string> = {
+    install: '安装',
+    uninstall: '卸载',
+    enable: '启用',
+    disable: '停用',
+    'disable-all': '停用所有',
+    update: '更新',
+  }
   const operation = plugin
-    ? `${command} plugin "${plugin}"`
+    ? `${commandLabels[command]}插件 "${plugin}"`
     : command === 'disable-all'
-      ? 'disable all plugins'
-      : `${command} plugins`
+      ? '停用所有插件'
+      : `${commandLabels[command]}插件`
   // biome-ignore lint/suspicious/noConsole:: intentional console output
   console.error(
-    `${figures.cross} Failed to ${operation}: ${errorMessage(error)}`,
+    `${figures.cross} 执行 ${operation} 失败：${errorMessage(error)}`,
   )
   const telemetryFields = plugin
     ? (() => {
@@ -106,7 +114,7 @@ export async function installPlugin(
 ): Promise<void> {
   try {
     // biome-ignore lint/suspicious/noConsole:: intentional console output
-    console.log(`Installing plugin "${plugin}"...`)
+    console.log(`正在安装插件 "${plugin}"...`)
 
     const result = await installPluginOp(plugin, scope)
 
@@ -303,7 +311,7 @@ export async function updatePluginCli(
 ): Promise<void> {
   try {
     writeToStdout(
-      `Checking for updates for plugin "${plugin}" at ${scope} scope…\n`,
+      `正在检查 ${scope} 作用域下插件 "${plugin}" 的更新…\n`,
     )
 
     const result = await updatePluginOp(plugin, scope)

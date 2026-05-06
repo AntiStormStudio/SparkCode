@@ -289,7 +289,7 @@ export function getEnabledPluginIdsForScope(
 export function formatDependencyCountSuffix(installedDeps: string[]): string {
   if (installedDeps.length === 0) return ''
   const n = installedDeps.length
-  return ` (+ ${n} ${n === 1 ? 'dependency' : 'dependencies'})`
+  return ` (+ ${n} ${n === 1 ? '个依赖' : '个依赖'})`
 }
 
 /**

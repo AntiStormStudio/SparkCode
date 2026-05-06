@@ -82,6 +82,14 @@ export function getAuthHeaders(): AuthHeaders {
       },
     }
   }
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN?.trim()
+  if (authToken) {
+    return {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    }
+  }
   // TODO: this will fail if the API key is being set to an LLM Gateway key
   // should we try to query keychain / credentials for a valid Anthropic key?
   const apiKey = getAnthropicApiKey()

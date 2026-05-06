@@ -26,7 +26,7 @@ export async function call(
   // Prevent teammates from renaming - their names are set by team leader
   if (isTeammate()) {
     onDone(
-      'Cannot rename: This session is a swarm teammate. Teammate names are set by the team leader.',
+      '无法重命名：这个会话是团队成员，名称由团队负责人设置。',
       { display: 'system' },
     )
     return null
@@ -40,7 +40,7 @@ export async function call(
     )
     if (!generated) {
       onDone(
-        'Could not generate a name: no conversation context yet. Usage: /rename <name>',
+        '无法生成名称：当前还没有对话上下文。用法：/rename <名称>',
         { display: 'system' },
       )
       return null
@@ -82,6 +82,6 @@ export async function call(
     },
   }))
 
-  onDone(`Session renamed to: ${newName}`, { display: 'system' })
+  onDone(`会话已重命名为：${newName}`, { display: 'system' })
   return null
 }

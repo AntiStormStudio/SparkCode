@@ -72,7 +72,7 @@ export async function setup(
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.error(
       chalk.bold.red(
-        'Error: Spark Code requires Node.js version 18 or higher.',
+        '错误：Spark Code 需要 Node.js 18 或更高版本。',
       ),
     )
     process.exit(1)
@@ -120,14 +120,14 @@ export async function setup(
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(
           chalk.yellow(
-            'Detected an interrupted iTerm2 setup. Your original settings have been restored. You may need to restart iTerm2 for the changes to take effect.',
+            '检测到上次 iTerm2 设置被中断。原始设置已恢复，你可能需要重启 iTerm2 才能生效。',
           ),
         )
       } else if (restoredIterm2Backup.status === 'failed') {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(
           chalk.red(
-            `Failed to restore iTerm2 settings. Please manually restore your original settings with: defaults import com.googlecode.iterm2 ${restoredIterm2Backup.backupPath}.`,
+            `恢复 iTerm2 设置失败。请手动恢复原始设置：defaults import com.googlecode.iterm2 ${restoredIterm2Backup.backupPath}。`,
           ),
         )
       }
@@ -140,14 +140,14 @@ export async function setup(
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(
           chalk.yellow(
-            'Detected an interrupted Terminal.app setup. Your original settings have been restored. You may need to restart Terminal.app for the changes to take effect.',
+            '检测到上次 Terminal.app 设置被中断。原始设置已恢复，你可能需要重启 Terminal.app 才能生效。',
           ),
         )
       } else if (restoredTerminalBackup.status === 'failed') {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(
           chalk.red(
-            `Failed to restore Terminal.app settings. Please manually restore your original settings with: defaults import com.apple.Terminal ${restoredTerminalBackup.backupPath}.`,
+            `恢复 Terminal.app 设置失败。请手动恢复原始设置：defaults import com.apple.Terminal ${restoredTerminalBackup.backupPath}。`,
           ),
         )
       }
@@ -181,8 +181,8 @@ export async function setup(
     if (!hasHook && !inGit) {
       process.stderr.write(
         chalk.red(
-          `Error: Can only use --worktree in a git repository, but ${chalk.bold(cwd)} is not a git repository. ` +
-            `Configure a WorktreeCreate hook in settings.json to use --worktree with other VCS systems.\n`,
+          `错误：--worktree 只能在 git 仓库中使用，但 ${chalk.bold(cwd)} 不是 git 仓库。` +
+            `如需在其他 VCS 中使用 --worktree，请在 settings.json 中配置 WorktreeCreate hook。\n`,
         ),
       )
       process.exit(1)
@@ -204,7 +204,7 @@ export async function setup(
       if (!mainRepoRoot) {
         process.stderr.write(
           chalk.red(
-            `Error: Could not determine the main git repository root.\n`,
+            `错误：无法确定主 git 仓库根目录。\n`,
           ),
         )
         process.exit(1)
@@ -238,7 +238,7 @@ export async function setup(
       )
     } catch (error) {
       process.stderr.write(
-        chalk.red(`Error creating worktree: ${errorMessage(error)}\n`),
+        chalk.red(`创建 worktree 失败：${errorMessage(error)}\n`),
       )
       process.exit(1)
     }
@@ -255,14 +255,14 @@ export async function setup(
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(
           chalk.green(
-            `Created tmux session: ${chalk.bold(tmuxSessionName)}\nTo attach: ${chalk.bold(`tmux attach -t ${tmuxSessionName}`)}`,
+            `已创建 tmux 会话：${chalk.bold(tmuxSessionName)}\n连接方式：${chalk.bold(`tmux attach -t ${tmuxSessionName}`)}`,
           ),
         )
       } else {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(
           chalk.yellow(
-            `Warning: Failed to create tmux session: ${tmuxResult.error}`,
+            `警告：创建 tmux 会话失败：${tmuxResult.error}`,
           ),
         )
       }
@@ -408,7 +408,7 @@ export async function setup(
     ) {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(
-        `--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons`,
+        `出于安全原因，--dangerously-skip-permissions 不能在 root/sudo 权限下使用`,
       )
       process.exit(1)
     }
@@ -434,7 +434,7 @@ export async function setup(
       if (!isSandboxed || hasInternet) {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(
-          `--dangerously-skip-permissions can only be used in Docker/sandbox containers with no internet access but got Docker: ${isDocker}, Bubblewrap: ${isBubblewrap}, IS_SANDBOX: ${isSandbox}, hasInternet: ${hasInternet}`,
+          `--dangerously-skip-permissions 只能在无网络访问的 Docker/沙箱容器中使用。当前状态：Docker=${isDocker}，Bubblewrap=${isBubblewrap}，IS_SANDBOX=${isSandbox}，hasInternet=${hasInternet}`,
         )
         process.exit(1)
       }

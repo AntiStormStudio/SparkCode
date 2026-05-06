@@ -238,7 +238,7 @@ async function fetchTeamMemoryOnce(
       })
       return {
         success: false,
-        error: 'Invalid team memory response format',
+        error: '团队记忆响应格式无效',
         skipRetry: true,
         errorType: 'parse',
       }
@@ -277,7 +277,7 @@ async function fetchTeamMemoryOnce(
       case 'auth':
         return {
           success: false,
-          error: `Not authorized for team memory sync: ${body}`,
+          error: `没有团队记忆同步权限：${body}`,
           skipRetry: true,
           errorType: 'auth',
           httpStatus: status,
@@ -285,13 +285,13 @@ async function fetchTeamMemoryOnce(
       case 'timeout':
         return {
           success: false,
-          error: 'Team memory sync request timeout',
+          error: '团队记忆同步请求超时',
           errorType: 'timeout',
         }
       case 'network':
         return {
           success: false,
-          error: 'Cannot connect to server',
+          error: '无法连接服务器',
           errorType: 'network',
         }
       default:
@@ -345,7 +345,7 @@ async function fetchTeamMemoryHashes(
       return {
         success: false,
         error:
-          'Server did not return entryChecksums (?view=hashes unsupported)',
+          '服务器没有返回 entryChecksums（可能不支持 ?view=hashes）',
         errorType: 'parse',
       }
     }
@@ -365,14 +365,14 @@ async function fetchTeamMemoryHashes(
       case 'auth':
         return {
           success: false,
-          error: 'Not authorized',
+          error: '没有权限',
           errorType: 'auth',
           httpStatus: status,
         }
       case 'timeout':
-        return { success: false, error: 'Timeout', errorType: 'timeout' }
+        return { success: false, error: '请求超时', errorType: 'timeout' }
       case 'network':
-        return { success: false, error: 'Network error', errorType: 'network' }
+        return { success: false, error: '网络错误', errorType: 'network' }
       default:
         return {
           success: false,
@@ -496,7 +496,7 @@ async function uploadTeamMemory(
       logForDebugging('team-memory-sync: conflict (412 Precondition Failed)', {
         level: 'info',
       })
-      return { success: false, conflict: true, error: 'ETag mismatch' }
+      return { success: false, conflict: true, error: 'ETag 不匹配' }
     }
 
     const responseChecksum = response.data?.checksum
@@ -798,7 +798,7 @@ export async function pullTeamMemory(
       success: false,
       filesWritten: 0,
       entryCount: 0,
-      error: 'No git remote found',
+      error: '未找到 Git 远程仓库',
     }
   }
 
@@ -908,7 +908,7 @@ export async function pushTeamMemory(
     return {
       success: false,
       filesUploaded: 0,
-      error: 'No git remote found',
+      error: '未找到 Git 远程仓库',
       errorType: 'no_repo',
     }
   }
@@ -1100,7 +1100,7 @@ export async function pushTeamMemory(
         success: false,
         filesUploaded: 0,
         conflict: true,
-        error: 'Conflict resolution failed after retries',
+        error: '多次重试后仍无法解决冲突',
       }
     }
 
@@ -1128,7 +1128,7 @@ export async function pushTeamMemory(
         success: false,
         filesUploaded: 0,
         conflict: true,
-        error: `Conflict resolution hashes probe failed: ${probe.error}`,
+        error: `冲突解决的哈希探测失败：${probe.error}`,
       }
     }
     state.serverChecksums.clear()
@@ -1141,7 +1141,7 @@ export async function pushTeamMemory(
   return {
     success: false,
     filesUploaded: 0,
-    error: 'Unexpected end of conflict resolution loop',
+    error: '冲突解决流程意外结束',
   }
 }
 

@@ -419,7 +419,7 @@ export async function validateMarketplaceManifest(
     if (!marketplace.plugins || marketplace.plugins.length === 0) {
       warnings.push({
         path: 'plugins',
-        message: 'Marketplace has no plugins defined',
+        message: '插件市场未定义任何插件',
       })
     }
 

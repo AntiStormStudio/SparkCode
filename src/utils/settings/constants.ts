@@ -26,15 +26,15 @@ export type SettingSource = (typeof SETTING_SOURCES)[number]
 export function getSettingSourceName(source: SettingSource): string {
   switch (source) {
     case 'userSettings':
-      return 'user'
+      return '用户'
     case 'projectSettings':
-      return 'project'
+      return '项目'
     case 'localSettings':
-      return 'project, gitignored'
+      return '项目本地（git 忽略）'
     case 'flagSettings':
-      return 'cli flag'
+      return '命令行标志'
     case 'policySettings':
-      return 'managed'
+      return '托管'
   }
 }
 
@@ -48,19 +48,19 @@ export function getSourceDisplayName(
 ): string {
   switch (source) {
     case 'userSettings':
-      return 'User'
+      return '用户'
     case 'projectSettings':
-      return 'Project'
+      return '项目'
     case 'localSettings':
-      return 'Local'
+      return '本地'
     case 'flagSettings':
-      return 'Flag'
+      return '标志'
     case 'policySettings':
-      return 'Managed'
+      return '托管'
     case 'plugin':
-      return 'Plugin'
+      return '插件'
     case 'built-in':
-      return 'Built-in'
+      return '内置'
   }
 }
 
@@ -74,21 +74,21 @@ export function getSettingSourceDisplayNameLowercase(
 ): string {
   switch (source) {
     case 'userSettings':
-      return 'user settings'
+      return '用户设置'
     case 'projectSettings':
-      return 'shared project settings'
+      return '共享项目设置'
     case 'localSettings':
-      return 'project local settings'
+      return '项目本地设置'
     case 'flagSettings':
-      return 'command line arguments'
+      return '命令行参数'
     case 'policySettings':
-      return 'enterprise managed settings'
+      return '企业托管设置'
     case 'cliArg':
-      return 'CLI argument'
+      return 'CLI 参数'
     case 'command':
-      return 'command configuration'
+      return '命令配置'
     case 'session':
-      return 'current session'
+      return '当前会话'
   }
 }
 
@@ -102,21 +102,21 @@ export function getSettingSourceDisplayNameCapitalized(
 ): string {
   switch (source) {
     case 'userSettings':
-      return 'User settings'
+      return '用户设置'
     case 'projectSettings':
-      return 'Shared project settings'
+      return '共享项目设置'
     case 'localSettings':
-      return 'Project local settings'
+      return '项目本地设置'
     case 'flagSettings':
-      return 'Command line arguments'
+      return '命令行参数'
     case 'policySettings':
-      return 'Enterprise managed settings'
+      return '企业托管设置'
     case 'cliArg':
-      return 'CLI argument'
+      return 'CLI 参数'
     case 'command':
-      return 'Command configuration'
+      return '命令配置'
     case 'session':
-      return 'Current session'
+      return '当前会话'
   }
 }
 

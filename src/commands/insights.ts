@@ -351,67 +351,67 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
 // Label map for cleaning up category names (matching Python reference)
 const LABEL_MAP: Record<string, string> = {
   // Goal categories
-  debug_investigate: 'Debug/Investigate',
-  implement_feature: 'Implement Feature',
-  fix_bug: 'Fix Bug',
-  write_script_tool: 'Write Script/Tool',
-  refactor_code: 'Refactor Code',
-  configure_system: 'Configure System',
-  create_pr_commit: 'Create PR/Commit',
-  analyze_data: 'Analyze Data',
-  understand_codebase: 'Understand Codebase',
-  write_tests: 'Write Tests',
-  write_docs: 'Write Docs',
-  deploy_infra: 'Deploy/Infra',
-  warmup_minimal: 'Cache Warmup',
+  debug_investigate: '调试/排查',
+  implement_feature: '实现功能',
+  fix_bug: '修复 Bug',
+  write_script_tool: '编写脚本/工具',
+  refactor_code: '重构代码',
+  configure_system: '配置系统',
+  create_pr_commit: '创建 PR/提交',
+  analyze_data: '分析数据',
+  understand_codebase: '理解代码库',
+  write_tests: '编写测试',
+  write_docs: '编写文档',
+  deploy_infra: '部署/基础设施',
+  warmup_minimal: '缓存预热',
   // Success factors
-  fast_accurate_search: 'Fast/Accurate Search',
-  correct_code_edits: 'Correct Code Edits',
-  good_explanations: 'Good Explanations',
-  proactive_help: 'Proactive Help',
-  multi_file_changes: 'Multi-file Changes',
-  handled_complexity: 'Multi-file Changes',
-  good_debugging: 'Good Debugging',
+  fast_accurate_search: '快速准确搜索',
+  correct_code_edits: '正确修改代码',
+  good_explanations: '解释清楚',
+  proactive_help: '主动帮忙',
+  multi_file_changes: '多文件修改',
+  handled_complexity: '处理复杂问题',
+  good_debugging: '调试有效',
   // Friction types
-  misunderstood_request: 'Misunderstood Request',
-  wrong_approach: 'Wrong Approach',
-  buggy_code: 'Buggy Code',
-  user_rejected_action: 'User Rejected Action',
-  claude_got_blocked: 'Claude Got Blocked',
-  user_stopped_early: 'User Stopped Early',
-  wrong_file_or_location: 'Wrong File/Location',
-  excessive_changes: 'Excessive Changes',
-  slow_or_verbose: 'Slow/Verbose',
-  tool_failed: 'Tool Failed',
-  user_unclear: 'User Unclear',
-  external_issue: 'External Issue',
+  misunderstood_request: '误解需求',
+  wrong_approach: '方案不对',
+  buggy_code: '代码有问题',
+  user_rejected_action: '用户拒绝操作',
+  claude_got_blocked: '执行受阻',
+  user_stopped_early: '用户提前停止',
+  wrong_file_or_location: '文件/位置不对',
+  excessive_changes: '改动过多',
+  slow_or_verbose: '太慢/太啰嗦',
+  tool_failed: '工具失败',
+  user_unclear: '需求不清',
+  external_issue: '外部问题',
   // Satisfaction labels
-  frustrated: 'Frustrated',
-  dissatisfied: 'Dissatisfied',
-  likely_satisfied: 'Likely Satisfied',
-  satisfied: 'Satisfied',
-  happy: 'Happy',
-  unsure: 'Unsure',
-  neutral: 'Neutral',
-  delighted: 'Delighted',
+  frustrated: '很不满意',
+  dissatisfied: '不满意',
+  likely_satisfied: '可能满意',
+  satisfied: '满意',
+  happy: '开心',
+  unsure: '不确定',
+  neutral: '中性',
+  delighted: '非常满意',
   // Session types
-  single_task: 'Single Task',
-  multi_task: 'Multi Task',
-  iterative_refinement: 'Iterative Refinement',
-  exploration: 'Exploration',
-  quick_question: 'Quick Question',
+  single_task: '单任务',
+  multi_task: '多任务',
+  iterative_refinement: '反复调整',
+  exploration: '探索',
+  quick_question: '快速提问',
   // Outcomes
-  fully_achieved: 'Fully Achieved',
-  mostly_achieved: 'Mostly Achieved',
-  partially_achieved: 'Partially Achieved',
-  not_achieved: 'Not Achieved',
-  unclear_from_transcript: 'Unclear',
+  fully_achieved: '完全达成',
+  mostly_achieved: '基本达成',
+  partially_achieved: '部分达成',
+  not_achieved: '未达成',
+  unclear_from_transcript: '不清楚',
   // Helpfulness
-  unhelpful: 'Unhelpful',
-  slightly_helpful: 'Slightly Helpful',
-  moderately_helpful: 'Moderately Helpful',
-  very_helpful: 'Very Helpful',
-  essential: 'Essential',
+  unhelpful: '没帮上忙',
+  slightly_helpful: '有一点帮助',
+  moderately_helpful: '有帮助',
+  very_helpful: '很有帮助',
+  essential: '关键帮助',
 }
 
 // Lazy getters: getClaudeConfigHomeDir() is memoized and reads process.env.
@@ -427,30 +427,30 @@ function getSessionMetaDir(): string {
   return join(getDataDir(), 'session-meta')
 }
 
-const FACET_EXTRACTION_PROMPT = `Analyze this Spark Code session and extract structured facets.
+const FACET_EXTRACTION_PROMPT = `分析这个 Spark Code 会话，并提取结构化维度。
 
-CRITICAL GUIDELINES:
+重要规则：
 
-1. **goal_categories**: Count ONLY what the USER explicitly asked for.
-   - DO NOT count Claude's autonomous codebase exploration
-   - DO NOT count work Claude decided to do on its own
-   - ONLY count when user says "can you...", "please...", "I need...", "let's..."
+1. **goal_categories**：只统计用户明确提出的目标。
+   - 不要统计 Claude 自己做的代码库探索
+   - 不要统计 Claude 自己决定做的工作
+   - 只在用户明确提出“能不能...”“请...”“我需要...”“我们...”时统计
 
-2. **user_satisfaction_counts**: Base ONLY on explicit user signals.
+2. **user_satisfaction_counts**：只基于用户明确表达的反馈。
    - "Yay!", "great!", "perfect!" → happy
    - "thanks", "looks good", "that works" → satisfied
    - "ok, now let's..." (continuing without complaint) → likely_satisfied
    - "that's not right", "try again" → dissatisfied
    - "this is broken", "I give up" → frustrated
 
-3. **friction_counts**: Be specific about what went wrong.
-   - misunderstood_request: Claude interpreted incorrectly
-   - wrong_approach: Right goal, wrong solution method
-   - buggy_code: Code didn't work correctly
-   - user_rejected_action: User said no/stop to a tool call
-   - excessive_changes: Over-engineered or changed too much
+3. **friction_counts**：具体说明哪里出了问题。
+   - misunderstood_request：Claude 理解错了
+   - wrong_approach：目标对，但方案不对
+   - buggy_code：代码没有正常工作
+   - user_rejected_action：用户拒绝或停止了工具调用
+   - excessive_changes：过度设计或改动太大
 
-4. If very short or just warmup, use warmup_minimal for goal_category
+4. 如果会话很短，或只是预热缓存，goal_category 使用 warmup_minimal。
 
 SESSION:
 `
@@ -842,11 +842,11 @@ function formatTranscriptForFacets(log: LogOption): string {
     if (msg.type === 'user' && msg.message) {
       const content = msg.message.content
       if (typeof content === 'string') {
-        lines.push(`[User]: ${content.slice(0, 500)}`)
+        lines.push(`[用户]: ${content.slice(0, 500)}`)
       } else if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === 'text' && 'text' in block) {
-            lines.push(`[User]: ${(block.text as string).slice(0, 500)}`)
+            lines.push(`[用户]: ${(block.text as string).slice(0, 500)}`)
           }
         }
       }
@@ -855,9 +855,9 @@ function formatTranscriptForFacets(log: LogOption): string {
       if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === 'text' && 'text' in block) {
-            lines.push(`[Assistant]: ${(block.text as string).slice(0, 300)}`)
+            lines.push(`[助手]: ${(block.text as string).slice(0, 300)}`)
           } else if (block.type === 'tool_use' && 'name' in block) {
-            lines.push(`[Tool: ${block.name}]`)
+            lines.push(`[工具: ${block.name}]`)
           }
         }
       }
@@ -867,15 +867,15 @@ function formatTranscriptForFacets(log: LogOption): string {
   return lines.join('\n')
 }
 
-const SUMMARIZE_CHUNK_PROMPT = `Summarize this portion of a Spark Code session transcript. Focus on:
-1. What the user asked for
-2. What Claude did (tools used, files modified)
-3. Any friction or issues
-4. The outcome
+const SUMMARIZE_CHUNK_PROMPT = `总结这段 Spark Code 会话记录。重点关注：
+1. 用户提出了什么需求
+2. Claude 做了什么（使用的工具、修改的文件）
+3. 任何阻塞或问题
+4. 最终结果
 
-Keep it concise - 3-5 sentences. Preserve specific details like file names, error messages, and user feedback.
+保持简洁，用 3-5 句中文。保留文件名、错误消息、用户反馈等具体细节。
 
-TRANSCRIPT CHUNK:
+会话片段：
 `
 
 async function summarizeTranscriptChunk(chunk: string): Promise<string> {
@@ -1009,18 +1009,18 @@ async function extractFacetsFromAPI(
     // Build prompt asking for JSON directly (no tool use)
     const jsonPrompt = `${FACET_EXTRACTION_PROMPT}${transcript}
 
-RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
+只返回符合以下结构的合法 JSON 对象：
 {
-  "underlying_goal": "What the user fundamentally wanted to achieve",
+  "underlying_goal": "用户真正想完成的事情，请用简体中文",
   "goal_categories": {"category_name": count, ...},
   "outcome": "fully_achieved|mostly_achieved|partially_achieved|not_achieved|unclear_from_transcript",
   "user_satisfaction_counts": {"level": count, ...},
   "claude_helpfulness": "unhelpful|slightly_helpful|moderately_helpful|very_helpful|essential",
   "session_type": "single_task|multi_task|iterative_refinement|exploration|quick_question",
   "friction_counts": {"friction_type": count, ...},
-  "friction_detail": "One sentence describing friction or empty",
+  "friction_detail": "一句中文描述阻塞点，没有就留空",
   "primary_success": "none|fast_accurate_search|correct_code_edits|good_explanations|proactive_help|multi_file_changes|good_debugging",
-  "brief_summary": "One sentence: what user wanted and whether they got it"
+  "brief_summary": "一句中文总结用户想要什么，以及是否达成"
 }`
 
     const result = await queryWithModel({
@@ -1336,160 +1336,160 @@ type InsightSection = {
 const INSIGHT_SECTIONS: InsightSection[] = [
   {
     name: 'project_areas',
-    prompt: `Analyze this Spark Code usage data and identify project areas.
+    prompt: `分析这份 Spark Code 使用数据，识别用户主要投入的项目领域。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
   "areas": [
-    {"name": "Area name", "session_count": N, "description": "2-3 sentences about what was worked on and how Spark Code was used."}
+    {"name": "领域名称", "session_count": N, "description": "2-3 句说明做了什么，以及 Spark Code 是怎么被使用的。"}
   ]
 }
 
-Include 4-5 areas. Skip internal CC operations.`,
+包含 4-5 个领域。跳过内部 CC 操作。`,
     maxTokens: 8192,
   },
   {
     name: 'interaction_style',
-    prompt: `Analyze this Spark Code usage data and describe the user's interaction style.
+    prompt: `分析这份 Spark Code 使用数据，描述用户的交互方式。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
-  "narrative": "2-3 paragraphs analyzing HOW the user interacts with Spark Code. Use second person 'you'. Describe patterns: iterate quickly vs detailed upfront specs? Interrupt often or let Claude run? Include specific examples. Use **bold** for key insights.",
-  "key_pattern": "One sentence summary of most distinctive interaction style"
+  "narrative": "2-3 段分析用户如何与 Spark Code 互动。用第二人称“你”。描述模式：是快速迭代，还是先给详细规格？经常打断，还是让 Claude 跑完？包含具体例子。关键洞察用 **加粗**。",
+  "key_pattern": "一句话总结最明显的交互模式"
 }`,
     maxTokens: 8192,
   },
   {
     name: 'what_works',
-    prompt: `Analyze this Spark Code usage data and identify what's working well for this user. Use second person ("you").
+    prompt: `分析这份 Spark Code 使用数据，找出对用户来说运行良好的地方。用第二人称“你”。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
-  "intro": "1 sentence of context",
+  "intro": "一句上下文说明",
   "impressive_workflows": [
-    {"title": "Short title (3-6 words)", "description": "2-3 sentences describing the impressive workflow or approach. Use 'you' not 'the user'."}
+    {"title": "简短标题（3-6 个词）", "description": "2-3 句说明值得保留的工作流或方法。用“你”，不要用“用户”。"}
   ]
 }
 
-Include 3 impressive workflows.`,
+包含 3 个工作流。`,
     maxTokens: 8192,
   },
   {
     name: 'friction_analysis',
-    prompt: `Analyze this Spark Code usage data and identify friction points for this user. Use second person ("you").
+    prompt: `分析这份 Spark Code 使用数据，识别用户遇到的阻塞点。用第二人称“你”。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
-  "intro": "1 sentence summarizing friction patterns",
+  "intro": "一句话总结阻塞模式",
   "categories": [
-    {"category": "Concrete category name", "description": "1-2 sentences explaining this category and what could be done differently. Use 'you' not 'the user'.", "examples": ["Specific example with consequence", "Another example"]}
+    {"category": "具体分类名称", "description": "1-2 句解释这个分类，以及之后可以怎么做得不同。用“你”，不要用“用户”。", "examples": ["带结果的具体例子", "另一个例子"]}
   ]
 }
 
-Include 3 friction categories with 2 examples each.`,
+包含 3 个阻塞分类，每类 2 个例子。`,
     maxTokens: 8192,
   },
   {
     name: 'suggestions',
-    prompt: `Analyze this Spark Code usage data and suggest improvements.
+    prompt: `分析这份 Spark Code 使用数据，并给出改进建议。
 
-## CC FEATURES REFERENCE (pick from these for features_to_try):
-1. **MCP Servers**: Connect Claude to external tools, databases, and APIs via Model Context Protocol.
-   - How to use: Run \`claude mcp add <server-name> -- <command>\`
-   - Good for: database queries, Slack integration, GitHub issue lookup, connecting to internal APIs
+## CC 功能参考（features_to_try 从这里挑）：
+1. **MCP Servers**：通过 Model Context Protocol 连接 Claude 与外部工具、数据库和 API。
+   - 使用方式：运行 \`claude mcp add <server-name> -- <command>\`
+   - 适合：数据库查询、Slack 集成、GitHub issue 查询、连接内部 API
 
-2. **Custom Skills**: Reusable prompts you define as markdown files that run with a single /command.
-   - How to use: Create \`.claude/skills/commit/SKILL.md\` with instructions. Then type \`/commit\` to run it.
-   - Good for: repetitive workflows - /commit, /review, /test, /deploy, /pr, or complex multi-step workflows
+2. **Custom Skills**：把可复用提示写成 markdown 文件，然后通过一个 /command 运行。
+   - 使用方式：创建 \`.claude/skills/commit/SKILL.md\` 写入说明，然后输入 \`/commit\` 运行。
+   - 适合：重复工作流，例如 /commit、/review、/test、/deploy、/pr，或复杂多步骤流程
 
-3. **Hooks**: Shell commands that auto-run at specific lifecycle events.
-   - How to use: Add to \`.claude/settings.json\` under "hooks" key.
-   - Good for: auto-formatting code, running type checks, enforcing conventions
+3. **Hooks**：在特定生命周期事件自动运行 shell 命令。
+   - 使用方式：加入 \`.claude/settings.json\` 的 "hooks" 字段。
+   - 适合：自动格式化代码、运行类型检查、强制执行规范
 
-4. **Headless Mode**: Run Claude non-interactively from scripts and CI/CD.
-   - How to use: \`claude -p "fix lint errors" --allowedTools "Edit,Read,Bash"\`
-   - Good for: CI/CD integration, batch code fixes, automated reviews
+4. **Headless Mode**：从脚本和 CI/CD 非交互式运行 Claude。
+   - 使用方式：\`claude -p "fix lint errors" --allowedTools "Edit,Read,Bash"\`
+   - 适合：CI/CD 集成、批量修复代码、自动审查
 
-5. **Task Agents**: Claude spawns focused sub-agents for complex exploration or parallel work.
-   - How to use: Claude auto-invokes when helpful, or ask "use an agent to explore X"
-   - Good for: codebase exploration, understanding complex systems
+5. **Task Agents**：Claude 为复杂探索或并行工作启动专门的子 agent。
+   - 使用方式：Claude 会在有帮助时自动调用，也可以直接说“用一个 agent 探索 X”。
+   - 适合：探索代码库、理解复杂系统
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
   "claude_md_additions": [
-    {"addition": "A specific line or block to add to CLAUDE.md based on workflow patterns. E.g., 'Always run tests after modifying auth-related files'", "why": "1 sentence explaining why this would help based on actual sessions", "prompt_scaffold": "Instructions for where to add this in CLAUDE.md. E.g., 'Add under ## Testing section'"}
+    {"addition": "基于工作流模式建议加入 CLAUDE.md 的具体行或段落。例如：修改认证相关文件后总是运行测试。", "why": "一句话说明为什么这对实际会话有帮助", "prompt_scaffold": "说明应该加到 CLAUDE.md 哪里。例如：加入 ## 测试 部分"}
   ],
   "features_to_try": [
-    {"feature": "Feature name from CC FEATURES REFERENCE above", "one_liner": "What it does", "why_for_you": "Why this would help YOU based on your sessions", "example_code": "Actual command or config to copy"}
+    {"feature": "上面 CC 功能参考中的功能名", "one_liner": "它能做什么", "why_for_you": "基于你的会话说明为什么它会帮到你", "example_code": "可复制的实际命令或配置"}
   ],
   "usage_patterns": [
-    {"title": "Short title", "suggestion": "1-2 sentence summary", "detail": "3-4 sentences explaining how this applies to YOUR work", "copyable_prompt": "A specific prompt to copy and try"}
+    {"title": "简短标题", "suggestion": "1-2 句总结", "detail": "3-4 句说明它如何适用于你的工作", "copyable_prompt": "可复制尝试的具体提示"}
   ]
 }
 
-IMPORTANT for claude_md_additions: PRIORITIZE instructions that appear MULTIPLE TIMES in the user data. If user told Claude the same thing in 2+ sessions (e.g., 'always run tests', 'use TypeScript'), that's a PRIME candidate - they shouldn't have to repeat themselves.
+claude_md_additions 的重点：优先选择在用户数据中多次出现的指令。如果用户在 2 个以上会话里告诉 Claude 同一件事（例如“总是运行测试”“使用 TypeScript”），这就是强候选项，用户不应该反复说。
 
-IMPORTANT for features_to_try: Pick 2-3 from the CC FEATURES REFERENCE above. Include 2-3 items for each category.`,
+features_to_try 的重点：从上面的 CC 功能参考里挑 2-3 个。每个分类包含 2-3 项。`,
     maxTokens: 8192,
   },
   {
     name: 'on_the_horizon',
-    prompt: `Analyze this Spark Code usage data and identify future opportunities.
+    prompt: `分析这份 Spark Code 使用数据，识别未来可以尝试的机会。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
-  "intro": "1 sentence about evolving AI-assisted development",
+  "intro": "一句话说明 AI 辅助开发正在如何演进",
   "opportunities": [
-    {"title": "Short title (4-8 words)", "whats_possible": "2-3 ambitious sentences about autonomous workflows", "how_to_try": "1-2 sentences mentioning relevant tooling", "copyable_prompt": "Detailed prompt to try"}
+    {"title": "简短标题（4-8 个词）", "whats_possible": "2-3 句有野心但具体的自主工作流描述", "how_to_try": "1-2 句提到相关工具", "copyable_prompt": "可尝试的详细提示"}
   ]
 }
 
-Include 3 opportunities. Think BIG - autonomous workflows, parallel agents, iterating against tests.`,
+包含 3 个机会。可以更大胆：自主工作流、并行 agents、围绕测试迭代。`,
     maxTokens: 8192,
   },
   ...(process.env.USER_TYPE === 'ant'
     ? [
         {
           name: 'cc_team_improvements',
-          prompt: `Analyze this Spark Code usage data and suggest product improvements for the CC team.
+          prompt: `分析这份 Spark Code 使用数据，并给 CC 团队提出产品改进建议。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
   "improvements": [
-    {"title": "Product/tooling improvement", "detail": "3-4 sentences describing the improvement", "evidence": "3-4 sentences with specific session examples"}
+    {"title": "产品/工具改进", "detail": "3-4 句描述改进内容", "evidence": "3-4 句具体会话例证"}
   ]
 }
 
-Include 2-3 improvements based on friction patterns observed.`,
+基于观察到的阻塞模式，包含 2-3 条改进建议。`,
           maxTokens: 8192,
         },
         {
           name: 'model_behavior_improvements',
-          prompt: `Analyze this Spark Code usage data and suggest model behavior improvements.
+          prompt: `分析这份 Spark Code 使用数据，并提出模型行为改进建议。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
   "improvements": [
-    {"title": "Model behavior change", "detail": "3-4 sentences describing what the model should do differently", "evidence": "3-4 sentences with specific examples"}
+    {"title": "模型行为调整", "detail": "3-4 句说明模型应该如何做得不同", "evidence": "3-4 句具体例证"}
   ]
 }
 
-Include 2-3 improvements based on friction patterns observed.`,
+基于观察到的阻塞模式，包含 2-3 条改进建议。`,
           maxTokens: 8192,
         },
       ]
     : []),
   {
     name: 'fun_ending',
-    prompt: `Analyze this Spark Code usage data and find a memorable moment.
+    prompt: `分析这份 Spark Code 使用数据，找出一个让人有印象的时刻。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
-  "headline": "A memorable QUALITATIVE moment from the transcripts - not a statistic. Something human, funny, or surprising.",
-  "detail": "Brief context about when/where this happened"
+  "headline": "从对话记录中提炼一个有记忆点的定性时刻，不要写统计数据。可以是有人味、有趣或让人意外的事情。",
+  "detail": "简要说明这个时刻发生在什么时候/哪里"
 }
 
-Find something genuinely interesting or amusing from the session summaries.`,
+从会话摘要中找一个真正有意思或有趣的点。`,
     maxTokens: 8192,
   },
 ]
@@ -1734,48 +1734,48 @@ async function generateParallelInsights(
       ?.map(o => `- ${o.title}: ${o.whats_possible}`)
       .join('\n') || ''
 
-  // Now generate "At a Glance" with access to other sections' outputs
-  const atAGlancePrompt = `You're writing an "At a Glance" summary for a Spark Code usage insights report for Spark Code users. The goal is to help them understand their usage and improve how they can use Claude better, especially as models improve.
+  // Now generate the overview with access to other sections' outputs
+  const atAGlancePrompt = `你正在为 Spark Code 用户编写“快速概览”总结。目标是帮助用户理解自己的使用方式，并改进和 Claude 协作的方式，尤其是随着模型能力增强后如何更好地使用。
 
-Use this 4-part structure:
+使用下面 4 部分结构：
 
-1. **What's working** - What is the user's unique style of interacting with Claude and what are some impactful things they've done? You can include one or two details, but keep it high level since things might not be fresh in the user's memory. Don't be fluffy or overly complimentary. Also, don't focus on the tool calls they use.
+1. **有效的地方**：用户与 Claude 互动的独特风格是什么？他们做过哪些有影响的事？可以包含一两个细节，但保持高层次，因为用户可能已经不记得具体细节。不要空泛夸奖，也不要把重点放在工具调用上。
 
-2. **What's hindering you** - Split into (a) Claude's fault (misunderstandings, wrong approaches, bugs) and (b) user-side friction (not providing enough context, environment issues -- ideally more general than just one project). Be honest but constructive.
+2. **卡住你的地方**：拆成两类：(a) Claude 的问题（误解、方案不对、bug），(b) 用户侧阻塞（上下文不足、环境问题，尽量总结成跨项目的通用问题）。要诚实但有建设性。
 
-3. **Quick wins to try** - Specific Spark Code features they could try from the examples below, or a workflow technique if you think it's really compelling. (Avoid stuff like "Ask Claude to confirm before taking actions" or "Type out more context up front" which are less compelling.)
+3. **可以马上试的改进**：从下面例子中挑具体的 Spark Code 功能，或提出你认为确实有价值的工作流技巧。避免“让 Claude 操作前确认”或“提前多写上下文”这种不够有力的建议。
 
-4. **Ambitious workflows for better models** - As we move to much more capable models over the next 3-6 months, what should they prepare for? What workflows that seem impossible now will become possible? Draw from the appropriate section below.
+4. **更进一步的工作流**：未来 3-6 个月模型能力继续增强后，用户应该准备什么？现在看起来不太可能的哪些工作流会变得可行？从下面对应章节中提炼。
 
-Keep each section to 2-3 not-too-long sentences. Don't overwhelm the user. Don't mention specific numerical stats or underlined_categories from the session data below. Use a coaching tone.
+每部分控制在 2-3 句，不要太长。不要给用户太多信息。不要提具体数字统计，也不要提下面数据里的 underlined_categories。语气像教练，直接、实用。
 
-RESPOND WITH ONLY A VALID JSON OBJECT:
+只返回合法 JSON 对象，所有值都用简体中文：
 {
-  "whats_working": "(refer to instructions above)",
-  "whats_hindering": "(refer to instructions above)",
-  "quick_wins": "(refer to instructions above)",
-  "ambitious_workflows": "(refer to instructions above)"
+  "whats_working": "按上面的说明填写",
+  "whats_hindering": "按上面的说明填写",
+  "quick_wins": "按上面的说明填写",
+  "ambitious_workflows": "按上面的说明填写"
 }
 
-SESSION DATA:
+会话数据：
 ${fullContext}
 
-## Project Areas (what user works on)
+## 项目领域（用户主要做什么）
 ${projectAreasText}
 
-## Big Wins (impressive accomplishments)
+## 做得不错的事
 ${bigWinsText}
 
-## Friction Categories (where things go wrong)
+## 阻塞分类（哪里容易出问题）
 ${frictionText}
 
-## Features to Try
+## 可以尝试的功能
 ${featuresText}
 
-## Usage Patterns to Adopt
+## 可以采用的使用模式
 ${patternsText}
 
-## On the Horizon (ambitious workflows for better models)
+## 接下来可以尝试（更强模型下的进阶工作流）
 ${horizonText}`
 
   const atAGlanceSection: InsightSection = {
@@ -1841,7 +1841,7 @@ function generateBarChart(
       .slice(0, maxItems)
   }
 
-  if (entries.length === 0) return '<p class="empty">No data</p>'
+  if (entries.length === 0) return '<p class="empty">暂无数据</p>'
 
   const maxVal = Math.max(...entries.map(e => e[1]))
   return entries
@@ -1861,7 +1861,7 @@ function generateBarChart(
 }
 
 function generateResponseTimeHistogram(times: number[]): string {
-  if (times.length === 0) return '<p class="empty">No response time data</p>'
+  if (times.length === 0) return '<p class="empty">暂无响应时间数据</p>'
 
   // Create buckets (matching Python reference)
   const buckets: Record<string, number> = {
@@ -1885,7 +1885,7 @@ function generateResponseTimeHistogram(times: number[]): string {
   }
 
   const maxVal = Math.max(...Object.values(buckets))
-  if (maxVal === 0) return '<p class="empty">No response time data</p>'
+  if (maxVal === 0) return '<p class="empty">暂无响应时间数据</p>'
 
   return Object.entries(buckets)
     .map(([label, count]) => {
@@ -1900,7 +1900,7 @@ function generateResponseTimeHistogram(times: number[]): string {
 }
 
 function generateTimeOfDayChart(messageHours: number[]): string {
-  if (messageHours.length === 0) return '<p class="empty">No time data</p>'
+  if (messageHours.length === 0) return '<p class="empty">暂无时间数据</p>'
 
   // Group into time periods
   const periods = [
@@ -1967,12 +1967,12 @@ function generateHtmlReport(
   const atAGlanceHtml = atAGlance
     ? `
     <div class="at-a-glance">
-      <div class="glance-title">At a Glance</div>
+      <div class="glance-title">快速概览</div>
       <div class="glance-sections">
-        ${atAGlance.whats_working ? `<div class="glance-section"><strong>What's working:</strong> ${escapeHtmlWithBold(atAGlance.whats_working)} <a href="#section-wins" class="see-more">Impressive Things You Did →</a></div>` : ''}
-        ${atAGlance.whats_hindering ? `<div class="glance-section"><strong>What's hindering you:</strong> ${escapeHtmlWithBold(atAGlance.whats_hindering)} <a href="#section-friction" class="see-more">Where Things Go Wrong →</a></div>` : ''}
-        ${atAGlance.quick_wins ? `<div class="glance-section"><strong>Quick wins to try:</strong> ${escapeHtmlWithBold(atAGlance.quick_wins)} <a href="#section-features" class="see-more">Features to Try →</a></div>` : ''}
-        ${atAGlance.ambitious_workflows ? `<div class="glance-section"><strong>Ambitious workflows:</strong> ${escapeHtmlWithBold(atAGlance.ambitious_workflows)} <a href="#section-horizon" class="see-more">On the Horizon →</a></div>` : ''}
+        ${atAGlance.whats_working ? `<div class="glance-section"><strong>有效的地方：</strong> ${escapeHtmlWithBold(atAGlance.whats_working)} <a href="#section-wins" class="see-more">做得不错的事 →</a></div>` : ''}
+        ${atAGlance.whats_hindering ? `<div class="glance-section"><strong>卡住你的地方：</strong> ${escapeHtmlWithBold(atAGlance.whats_hindering)} <a href="#section-friction" class="see-more">哪里容易出问题 →</a></div>` : ''}
+        ${atAGlance.quick_wins ? `<div class="glance-section"><strong>可以马上试的改进：</strong> ${escapeHtmlWithBold(atAGlance.quick_wins)} <a href="#section-features" class="see-more">可以试的功能 →</a></div>` : ''}
+        ${atAGlance.ambitious_workflows ? `<div class="glance-section"><strong>更进一步的工作流：</strong> ${escapeHtmlWithBold(atAGlance.ambitious_workflows)} <a href="#section-horizon" class="see-more">接下来可以尝试 →</a></div>` : ''}
       </div>
     </div>
     `
@@ -1983,7 +1983,7 @@ function generateHtmlReport(
   const projectAreasHtml =
     projectAreas.length > 0
       ? `
-    <h2 id="section-work">What You Work On</h2>
+    <h2 id="section-work">你主要在做什么</h2>
     <div class="project-areas">
       ${projectAreas
         .map(
@@ -1991,7 +1991,7 @@ function generateHtmlReport(
         <div class="project-area">
           <div class="area-header">
             <span class="area-name">${escapeHtml(area.name)}</span>
-            <span class="area-count">~${area.session_count} sessions</span>
+            <span class="area-count">约 ${area.session_count} 次会话</span>
           </div>
           <div class="area-desc">${escapeHtml(area.description)}</div>
         </div>
@@ -2006,10 +2006,10 @@ function generateHtmlReport(
   const interactionStyle = insights.interaction_style
   const interactionHtml = interactionStyle?.narrative
     ? `
-    <h2 id="section-usage">How You Use Spark Code</h2>
+    <h2 id="section-usage">你怎么使用 Spark Code</h2>
     <div class="narrative">
       ${markdownToHtml(interactionStyle.narrative)}
-      ${interactionStyle.key_pattern ? `<div class="key-insight"><strong>Key pattern:</strong> ${escapeHtml(interactionStyle.key_pattern)}</div>` : ''}
+      ${interactionStyle.key_pattern ? `<div class="key-insight"><strong>关键模式：</strong> ${escapeHtml(interactionStyle.key_pattern)}</div>` : ''}
     </div>
     `
     : ''
@@ -2019,7 +2019,7 @@ function generateHtmlReport(
   const whatWorksHtml =
     whatWorks?.impressive_workflows && whatWorks.impressive_workflows.length > 0
       ? `
-    <h2 id="section-wins">Impressive Things You Did</h2>
+    <h2 id="section-wins">做得不错的事</h2>
     ${whatWorks.intro ? `<p class="section-intro">${escapeHtml(whatWorks.intro)}</p>` : ''}
     <div class="big-wins">
       ${whatWorks.impressive_workflows
@@ -2041,7 +2041,7 @@ function generateHtmlReport(
   const frictionHtml =
     frictionAnalysis?.categories && frictionAnalysis.categories.length > 0
       ? `
-    <h2 id="section-friction">Where Things Go Wrong</h2>
+    <h2 id="section-friction">哪里容易出问题</h2>
     ${frictionAnalysis.intro ? `<p class="section-intro">${escapeHtml(frictionAnalysis.intro)}</p>` : ''}
     <div class="friction-categories">
       ${frictionAnalysis.categories
@@ -2067,12 +2067,12 @@ function generateHtmlReport(
       suggestions.claude_md_additions &&
       suggestions.claude_md_additions.length > 0
         ? `
-    <h2 id="section-features">Existing CC Features to Try</h2>
+    <h2 id="section-features">可以试试的现有功能</h2>
     <div class="claude-md-section">
-      <h3>Suggested CLAUDE.md Additions</h3>
-      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Just copy this into Spark Code to add it to your CLAUDE.md.</p>
+      <h3>建议加入 CLAUDE.md 的内容</h3>
+      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">复制到 Spark Code 后即可加入你的 CLAUDE.md。</p>
       <div class="claude-md-actions">
-        <button class="copy-all-btn" onclick="copyAllCheckedClaudeMd()">Copy All Checked</button>
+        <button class="copy-all-btn" onclick="copyAllCheckedClaudeMd()">复制已勾选</button>
       </div>
       ${suggestions.claude_md_additions
         .map(
@@ -2081,7 +2081,7 @@ function generateHtmlReport(
           <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || 'Add to CLAUDE.md')}\\n\\n${escapeHtml(add.addition)}">
           <label for="cmd-${i}">
             <code class="cmd-code">${escapeHtml(add.addition)}</code>
-            <button class="copy-btn" onclick="copyCmdItem(${i})">Copy</button>
+            <button class="copy-btn" onclick="copyCmdItem(${i})">复制</button>
           </label>
           <div class="cmd-why">${escapeHtml(add.why)}</div>
         </div>
@@ -2095,7 +2095,7 @@ function generateHtmlReport(
     ${
       suggestions.features_to_try && suggestions.features_to_try.length > 0
         ? `
-    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Just copy this into Spark Code and it'll set it up for you.</p>
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">复制到 Spark Code，它会帮你配置好。</p>
     <div class="features-section">
       ${suggestions.features_to_try
         .map(
@@ -2103,7 +2103,7 @@ function generateHtmlReport(
         <div class="feature-card">
           <div class="feature-title">${escapeHtml(feat.feature || '')}</div>
           <div class="feature-oneliner">${escapeHtml(feat.one_liner || '')}</div>
-          <div class="feature-why"><strong>Why for you:</strong> ${escapeHtml(feat.why_for_you || '')}</div>
+          <div class="feature-why"><strong>为什么适合你：</strong> ${escapeHtml(feat.why_for_you || '')}</div>
           ${
             feat.example_code
               ? `
@@ -2111,7 +2111,7 @@ function generateHtmlReport(
             <div class="feature-example">
               <div class="example-code-row">
                 <code class="example-code">${escapeHtml(feat.example_code)}</code>
-                <button class="copy-btn" onclick="copyText(this)">Copy</button>
+                <button class="copy-btn" onclick="copyText(this)">复制</button>
               </div>
             </div>
           </div>
@@ -2129,8 +2129,8 @@ function generateHtmlReport(
     ${
       suggestions.usage_patterns && suggestions.usage_patterns.length > 0
         ? `
-    <h2 id="section-patterns">New Ways to Use Spark Code</h2>
-    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Just copy this into Spark Code and it'll walk you through it.</p>
+    <h2 id="section-patterns">新的使用方式</h2>
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">复制到 Spark Code，它会带你完成。</p>
     <div class="patterns-section">
       ${suggestions.usage_patterns
         .map(
@@ -2143,10 +2143,10 @@ function generateHtmlReport(
             pat.copyable_prompt
               ? `
           <div class="copyable-prompt-section">
-            <div class="prompt-label">Paste into Spark Code:</div>
+            <div class="prompt-label">粘贴到 Spark Code：</div>
             <div class="copyable-prompt-row">
               <code class="copyable-prompt">${escapeHtml(pat.copyable_prompt)}</code>
-              <button class="copy-btn" onclick="copyText(this)">Copy</button>
+              <button class="copy-btn" onclick="copyText(this)">复制</button>
             </div>
           </div>
           `
@@ -2168,7 +2168,7 @@ function generateHtmlReport(
   const horizonHtml =
     horizonData?.opportunities && horizonData.opportunities.length > 0
       ? `
-    <h2 id="section-horizon">On the Horizon</h2>
+    <h2 id="section-horizon">接下来可以尝试</h2>
     ${horizonData.intro ? `<p class="section-intro">${escapeHtml(horizonData.intro)}</p>` : ''}
     <div class="horizon-section">
       ${horizonData.opportunities
@@ -2177,8 +2177,8 @@ function generateHtmlReport(
         <div class="horizon-card">
           <div class="horizon-title">${escapeHtml(opp.title || '')}</div>
           <div class="horizon-possible">${escapeHtml(opp.whats_possible || '')}</div>
-          ${opp.how_to_try ? `<div class="horizon-tip"><strong>Getting started:</strong> ${escapeHtml(opp.how_to_try)}</div>` : ''}
-          ${opp.copyable_prompt ? `<div class="pattern-prompt"><div class="prompt-label">Paste into Spark Code:</div><code>${escapeHtml(opp.copyable_prompt)}</code><button class="copy-btn" onclick="copyText(this)">Copy</button></div>` : ''}
+          ${opp.how_to_try ? `<div class="horizon-tip"><strong>怎么开始：</strong> ${escapeHtml(opp.how_to_try)}</div>` : ''}
+          ${opp.copyable_prompt ? `<div class="pattern-prompt"><div class="prompt-label">粘贴到 Spark Code：</div><code>${escapeHtml(opp.copyable_prompt)}</code><button class="copy-btn" onclick="copyText(this)">复制</button></div>` : ''}
         </div>
       `,
         )
@@ -2199,15 +2199,15 @@ function generateHtmlReport(
   const teamFeedbackHtml =
     ccImprovements.length > 0 || modelImprovements.length > 0
       ? `
-    <h2 id="section-feedback" class="feedback-header">Closing the Loop: Feedback for Other Teams</h2>
-    <p class="feedback-intro">Suggestions for the CC product and model teams based on your usage patterns. Click to expand.</p>
+    <h2 id="section-feedback" class="feedback-header">给产品和模型团队的反馈</h2>
+    <p class="feedback-intro">基于你的使用模式整理的建议，点击可展开。</p>
     ${
       ccImprovements.length > 0
         ? `
     <div class="collapsible-section">
       <div class="collapsible-header" onclick="toggleCollapsible(this)">
         <span class="collapsible-arrow">▶</span>
-        <h3>Product Improvements for CC Team</h3>
+        <h3>给产品团队的改进建议</h3>
       </div>
       <div class="collapsible-content">
         <div class="suggestions-section">
@@ -2217,7 +2217,7 @@ function generateHtmlReport(
             <div class="feedback-card team-card">
               <div class="feedback-title">${escapeHtml(imp.title || '')}</div>
               <div class="feedback-detail">${escapeHtml(imp.detail || '')}</div>
-              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ''}
+              ${imp.evidence ? `<div class="feedback-evidence"><em>依据：</em> ${escapeHtml(imp.evidence)}</div>` : ''}
             </div>
           `,
             )
@@ -2234,7 +2234,7 @@ function generateHtmlReport(
     <div class="collapsible-section">
       <div class="collapsible-header" onclick="toggleCollapsible(this)">
         <span class="collapsible-arrow">▶</span>
-        <h3>Model Behavior Improvements</h3>
+        <h3>给模型行为的改进建议</h3>
       </div>
       <div class="collapsible-content">
         <div class="suggestions-section">
@@ -2244,7 +2244,7 @@ function generateHtmlReport(
             <div class="feedback-card model-card">
               <div class="feedback-title">${escapeHtml(imp.title || '')}</div>
               <div class="feedback-detail">${escapeHtml(imp.detail || '')}</div>
-              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ''}
+              ${imp.evidence ? `<div class="feedback-evidence"><em>依据：</em> ${escapeHtml(imp.evidence)}</div>` : ''}
             </div>
           `,
             )
@@ -2392,8 +2392,8 @@ function generateHtmlReport(
     function copyText(btn) {
       const code = btn.previousElementSibling;
       navigator.clipboard.writeText(code.textContent).then(() => {
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        btn.textContent = '已复制';
+        setTimeout(() => { btn.textContent = '复制'; }, 2000);
       });
     }
     function copyCmdItem(idx) {
@@ -2402,7 +2402,7 @@ function generateHtmlReport(
         const text = checkbox.dataset.text;
         navigator.clipboard.writeText(text).then(() => {
           const btn = checkbox.nextElementSibling.querySelector('.copy-btn');
-          if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+          if (btn) { btn.textContent = '已复制'; setTimeout(() => { btn.textContent = '复制'; }, 2000); }
         });
       }
     }
@@ -2416,9 +2416,9 @@ function generateHtmlReport(
       const btn = document.querySelector('.copy-all-btn');
       if (btn) {
         navigator.clipboard.writeText(combined).then(() => {
-          btn.textContent = 'Copied ' + texts.length + ' items!';
+          btn.textContent = '已复制 ' + texts.length + ' 项';
           btn.classList.add('copied');
-          setTimeout(() => { btn.textContent = 'Copy All Checked'; btn.classList.remove('copied'); }, 2000);
+          setTimeout(() => { btn.textContent = '复制所有已选项'; btn.classList.remove('copied'); }, 2000);
         });
       }
     }
@@ -2426,10 +2426,10 @@ function generateHtmlReport(
     const rawHourCounts = ${hourCountsJson};
     function updateHourHistogram(offsetFromPT) {
       const periods = [
-        { label: "Morning (6-12)", range: [6,7,8,9,10,11] },
-        { label: "Afternoon (12-18)", range: [12,13,14,15,16,17] },
-        { label: "Evening (18-24)", range: [18,19,20,21,22,23] },
-        { label: "Night (0-6)", range: [0,1,2,3,4,5] }
+        { label: "早晨（6-12）", range: [6,7,8,9,10,11] },
+        { label: "下午（12-18）", range: [12,13,14,15,16,17] },
+        { label: "晚上（18-24）", range: [18,19,20,21,22,23] },
+        { label: "深夜（0-6）", range: [0,1,2,3,4,5] }
       ];
       const adjustedCounts = {};
       for (const [hour, count] of Object.entries(rawHourCounts)) {
@@ -2485,56 +2485,56 @@ function generateHtmlReport(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Spark Code Insights</title>
+  <title>Spark Code 使用洞察</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>${css}</style>
 </head>
 <body>
   <div class="container">
-    <h1>Spark Code Insights</h1>
-    <p class="subtitle">${data.total_messages.toLocaleString()} messages across ${data.total_sessions} sessions${data.total_sessions_scanned && data.total_sessions_scanned > data.total_sessions ? ` (${data.total_sessions_scanned.toLocaleString()} total)` : ''} | ${data.date_range.start} to ${data.date_range.end}</p>
+    <h1>Spark Code 使用洞察</h1>
+    <p class="subtitle">${data.total_messages.toLocaleString()} 条消息，来自 ${data.total_sessions} 次会话${data.total_sessions_scanned && data.total_sessions_scanned > data.total_sessions ? `（共扫描 ${data.total_sessions_scanned.toLocaleString()} 次）` : ''} | ${data.date_range.start} 至 ${data.date_range.end}</p>
 
     ${atAGlanceHtml}
 
     <nav class="nav-toc">
-      <a href="#section-work">What You Work On</a>
-      <a href="#section-usage">How You Use CC</a>
-      <a href="#section-wins">Impressive Things</a>
-      <a href="#section-friction">Where Things Go Wrong</a>
-      <a href="#section-features">Features to Try</a>
-      <a href="#section-patterns">New Usage Patterns</a>
-      <a href="#section-horizon">On the Horizon</a>
-      <a href="#section-feedback">Team Feedback</a>
+      <a href="#section-work">你主要做什么</a>
+      <a href="#section-usage">怎么使用</a>
+      <a href="#section-wins">做得不错的事</a>
+      <a href="#section-friction">容易出问题的地方</a>
+      <a href="#section-features">可以试的功能</a>
+      <a href="#section-patterns">新的使用方式</a>
+      <a href="#section-horizon">接下来尝试</a>
+      <a href="#section-feedback">团队反馈</a>
     </nav>
 
     <div class="stats-row">
-      <div class="stat"><div class="stat-value">${data.total_messages.toLocaleString()}</div><div class="stat-label">Messages</div></div>
-      <div class="stat"><div class="stat-value">+${data.total_lines_added.toLocaleString()}/-${data.total_lines_removed.toLocaleString()}</div><div class="stat-label">Lines</div></div>
-      <div class="stat"><div class="stat-value">${data.total_files_modified}</div><div class="stat-label">Files</div></div>
-      <div class="stat"><div class="stat-value">${data.days_active}</div><div class="stat-label">Days</div></div>
-      <div class="stat"><div class="stat-value">${data.messages_per_day}</div><div class="stat-label">Msgs/Day</div></div>
+      <div class="stat"><div class="stat-value">${data.total_messages.toLocaleString()}</div><div class="stat-label">消息</div></div>
+      <div class="stat"><div class="stat-value">+${data.total_lines_added.toLocaleString()}/-${data.total_lines_removed.toLocaleString()}</div><div class="stat-label">行数</div></div>
+      <div class="stat"><div class="stat-value">${data.total_files_modified}</div><div class="stat-label">文件</div></div>
+      <div class="stat"><div class="stat-value">${data.days_active}</div><div class="stat-label">天数</div></div>
+      <div class="stat"><div class="stat-value">${data.messages_per_day}</div><div class="stat-label">消息/天</div></div>
     </div>
 
     ${projectAreasHtml}
 
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">What You Wanted</div>
+        <div class="chart-title">你想完成什么</div>
         ${generateBarChart(data.goal_categories, '#2563eb')}
       </div>
       <div class="chart-card">
-        <div class="chart-title">Top Tools Used</div>
+        <div class="chart-title">最常用工具</div>
         ${generateBarChart(data.tool_counts, '#0891b2')}
       </div>
     </div>
 
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">Languages</div>
+        <div class="chart-title">语言</div>
         ${generateBarChart(data.languages, '#10b981')}
       </div>
       <div class="chart-card">
-        <div class="chart-title">Session Types</div>
+        <div class="chart-title">会话类型</div>
         ${generateBarChart(data.session_types || {}, '#8b5cf6')}
       </div>
     </div>
@@ -2543,41 +2543,40 @@ function generateHtmlReport(
 
     <!-- Response Time Distribution -->
     <div class="chart-card" style="margin: 24px 0;">
-      <div class="chart-title">User Response Time Distribution</div>
+      <div class="chart-title">用户响应时间分布</div>
       ${generateResponseTimeHistogram(data.user_response_times)}
       <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
-        Median: ${data.median_response_time.toFixed(1)}s &bull; Average: ${data.avg_response_time.toFixed(1)}s
+        中位数：${data.median_response_time.toFixed(1)} 秒 &bull; 平均：${data.avg_response_time.toFixed(1)} 秒
       </div>
     </div>
 
     <!-- Multi-clauding Section (matching Python reference) -->
     <div class="chart-card" style="margin: 24px 0;">
-      <div class="chart-title">Multi-Clauding (Parallel Sessions)</div>
+      <div class="chart-title">多会话并行</div>
       ${
         data.multi_clauding.overlap_events === 0
           ? `
         <p style="font-size: 14px; color: #64748b; padding: 8px 0;">
-          No parallel session usage detected. You typically work with one Spark Code session at a time.
+          未检测到并行会话。你通常一次只使用一个 Spark Code 会话。
         </p>
       `
           : `
         <div style="display: flex; gap: 24px; margin: 12px 0;">
           <div style="text-align: center;">
             <div style="font-size: 24px; font-weight: 700; color: #7c3aed;">${data.multi_clauding.overlap_events}</div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Overlap Events</div>
+            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">重叠事件</div>
           </div>
           <div style="text-align: center;">
             <div style="font-size: 24px; font-weight: 700; color: #7c3aed;">${data.multi_clauding.sessions_involved}</div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Sessions Involved</div>
+            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">涉及会话</div>
           </div>
           <div style="text-align: center;">
             <div style="font-size: 24px; font-weight: 700; color: #7c3aed;">${data.total_messages > 0 ? Math.round((100 * data.multi_clauding.user_messages_during) / data.total_messages) : 0}%</div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Of Messages</div>
+            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">消息占比</div>
           </div>
         </div>
         <p style="font-size: 13px; color: #475569; margin-top: 12px;">
-          You run multiple Spark Code sessions simultaneously. Multi-clauding is detected when sessions
-          overlap in time, suggesting parallel workflows.
+          你会同时运行多个 Spark Code 会话。当会话时间重叠时，会被识别为并行工作流。
         </p>
       `
       }
@@ -2587,22 +2586,22 @@ function generateHtmlReport(
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title" style="display: flex; align-items: center; gap: 12px;">
-          User Messages by Time of Day
+          按时间段统计的用户消息
           <select id="timezone-select" style="font-size: 12px; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
             <option value="0">PT (UTC-8)</option>
             <option value="3">ET (UTC-5)</option>
-            <option value="8">London (UTC)</option>
+            <option value="8">伦敦 (UTC)</option>
             <option value="9">CET (UTC+1)</option>
-            <option value="17">Tokyo (UTC+9)</option>
-            <option value="custom">Custom offset...</option>
+            <option value="17">东京 (UTC+9)</option>
+            <option value="custom">自定义偏移...</option>
           </select>
-          <input type="number" id="custom-offset" placeholder="UTC offset" style="display: none; width: 80px; font-size: 12px; padding: 4px; border-radius: 4px; border: 1px solid #e2e8f0;">
+          <input type="number" id="custom-offset" placeholder="UTC 偏移" style="display: none; width: 80px; font-size: 12px; padding: 4px; border-radius: 4px; border: 1px solid #e2e8f0;">
         </div>
         ${generateTimeOfDayChart(data.message_hours)}
       </div>
       <div class="chart-card">
-        <div class="chart-title">Tool Errors Encountered</div>
-        ${Object.keys(data.tool_error_categories).length > 0 ? generateBarChart(data.tool_error_categories, '#dc2626') : '<p class="empty">No tool errors</p>'}
+        <div class="chart-title">遇到的工具错误</div>
+        ${Object.keys(data.tool_error_categories).length > 0 ? generateBarChart(data.tool_error_categories, '#dc2626') : '<p class="empty">没有工具错误</p>'}
       </div>
     </div>
 
@@ -2610,11 +2609,11 @@ function generateHtmlReport(
 
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">What Helped Most (Claude's Capabilities)</div>
+        <div class="chart-title">最有帮助的能力</div>
         ${generateBarChart(data.success, '#16a34a')}
       </div>
       <div class="chart-card">
-        <div class="chart-title">Outcomes</div>
+        <div class="chart-title">完成结果</div>
         ${generateBarChart(data.outcomes, '#8b5cf6', 6, OUTCOME_ORDER)}
       </div>
     </div>
@@ -2623,11 +2622,11 @@ function generateHtmlReport(
 
     <div class="charts-row">
       <div class="chart-card">
-        <div class="chart-title">Primary Friction Types</div>
+        <div class="chart-title">主要阻塞类型</div>
         ${generateBarChart(data.friction, '#dc2626')}
       </div>
       <div class="chart-card">
-        <div class="chart-title">Inferred Satisfaction (model-estimated)</div>
+        <div class="chart-title">推断满意度（模型估算）</div>
         ${generateBarChart(data.satisfaction, '#eab308', 6, SATISFACTION_ORDER)}
       </div>
     </div>
@@ -3060,7 +3059,7 @@ const usageReport: Command = {
       if (collectRemote && hasRemoteHosts) {
         // biome-ignore lint/suspicious/noConsole: intentional
         console.error(
-          `Collecting sessions from ${remoteHosts.length} homespace(s): ${remoteHosts.join(', ')}...`,
+          `正在从 ${remoteHosts.length} 个 homespace 收集会话：${remoteHosts.join(', ')}...`,
         )
       }
     }
@@ -3093,9 +3092,9 @@ const usageReport: Command = {
       } catch {
         // Upload failed - fall back to local file and show upload command
         reportUrl = `file://${htmlPath}`
-        uploadHint = `\nAutomatic upload failed. Are you on the boron namespace? Try \`use-bo\` and ensure you've run \`sso\`.
-To share, run: ff cp ${htmlPath} ${s3Path}
-Then access at: ${s3Url}`
+        uploadHint = `\n自动上传失败。请确认你在 boron namespace，可尝试 \`use-bo\`，并确认已经运行过 \`sso\`。
+如需分享，请运行：ff cp ${htmlPath} ${s3Path}
+然后访问：${s3Url}`
       }
     }
 
@@ -3103,13 +3102,13 @@ Then access at: ${s3Url}`
     const sessionLabel =
       data.total_sessions_scanned &&
       data.total_sessions_scanned > data.total_sessions
-        ? `${data.total_sessions_scanned.toLocaleString()} sessions total · ${data.total_sessions} analyzed`
-        : `${data.total_sessions} sessions`
+        ? `共 ${data.total_sessions_scanned.toLocaleString()} 次会话 · 已分析 ${data.total_sessions} 次`
+        : `${data.total_sessions} 次会话`
     const stats = [
       sessionLabel,
-      `${data.total_messages.toLocaleString()} messages`,
-      `${Math.round(data.total_duration_hours)}h`,
-      `${data.git_commits} commits`,
+      `${data.total_messages.toLocaleString()} 条消息`,
+      `${Math.round(data.total_duration_hours)} 小时`,
+      `${data.git_commits} 次提交`,
     ].join(' · ')
 
     // Build remote host info (ant-only)
@@ -3120,61 +3119,61 @@ Then access at: ${s3Url}`
           .filter(h => h.sessionCount > 0)
           .map(h => h.name)
           .join(', ')
-        remoteInfo = `\n_Collected ${remoteStats.totalCopied} new sessions from: ${hsNames}_\n`
+        remoteInfo = `\n_已从这些 homespace 收集 ${remoteStats.totalCopied} 个新会话：${hsNames}_\n`
       } else if (!collectRemote && hasRemoteHosts) {
         // Suggest using --homespaces if they have remote hosts but didn't use the flag
-        remoteInfo = `\n_Tip: Run \`/insights --homespaces\` to include sessions from your ${remoteHosts.length} running homespace(s)_\n`
+        remoteInfo = `\n_提示：运行 \`/insights --homespaces\` 可包含 ${remoteHosts.length} 个正在运行的 homespace 会话_\n`
       }
     }
 
     // Build markdown summary from insights
     const atAGlance = insights.at_a_glance
     const summaryText = atAGlance
-      ? `## At a Glance
+      ? `## 快速概览
 
-${atAGlance.whats_working ? `**What's working:** ${atAGlance.whats_working} See _Impressive Things You Did_.` : ''}
+${atAGlance.whats_working ? `**有效的地方：**${atAGlance.whats_working} 见 _做得不错的事_。` : ''}
 
-${atAGlance.whats_hindering ? `**What's hindering you:** ${atAGlance.whats_hindering} See _Where Things Go Wrong_.` : ''}
+${atAGlance.whats_hindering ? `**卡住你的地方：**${atAGlance.whats_hindering} 见 _哪里容易出问题_。` : ''}
 
-${atAGlance.quick_wins ? `**Quick wins to try:** ${atAGlance.quick_wins} See _Features to Try_.` : ''}
+${atAGlance.quick_wins ? `**可以马上试的改进：**${atAGlance.quick_wins} 见 _可以试的功能_。` : ''}
 
-${atAGlance.ambitious_workflows ? `**Ambitious workflows:** ${atAGlance.ambitious_workflows} See _On the Horizon_.` : ''}`
-      : '_No insights generated_'
+${atAGlance.ambitious_workflows ? `**更进一步的工作流：**${atAGlance.ambitious_workflows} 见 _接下来可以尝试_。` : ''}`
+      : '_未生成洞察_'
 
-    const header = `# Spark Code Insights
+    const header = `# Spark Code 使用洞察
 
 ${stats}
-${data.date_range.start} to ${data.date_range.end}
+${data.date_range.start} 至 ${data.date_range.end}
 ${remoteInfo}
 `
 
     const userSummary = `${header}${summaryText}
 
-Your full shareable insights report is ready: ${reportUrl}${uploadHint}`
+可分享的完整洞察报告已生成：${reportUrl}${uploadHint}`
 
     // Return prompt for Claude to respond to
     return [
       {
         type: 'text',
-        text: `The user just ran /insights to generate a usage report analyzing their Spark Code sessions.
+        text: `用户刚刚运行 /insights，生成了一份分析 Spark Code 会话的使用报告。
 
-Here is the full insights data:
+以下是完整洞察数据：
 ${jsonStringify(insights, null, 2)}
 
-Report URL: ${reportUrl}
-HTML file: ${htmlPath}
-Facets directory: ${getFacetsDir()}
+报告 URL：${reportUrl}
+HTML 文件：${htmlPath}
+Facets 目录：${getFacetsDir()}
 
-Here is what the user sees:
+用户会看到：
 ${userSummary}
 
-Now output the following message exactly:
+现在严格输出下面这段消息：
 
 <message>
-Your shareable insights report is ready:
+可分享的洞察报告已生成：
 ${reportUrl}${uploadHint}
 
-Want to dig into any section or try one of the suggestions?
+要看某个章节，或者试试里面的某条建议吗？
 </message>`,
       },
     ]

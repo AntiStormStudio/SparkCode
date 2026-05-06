@@ -4,7 +4,7 @@ import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from './model/providers.js'
 import { getSettingsWithErrors } from './settings/settings.js'
 
 export type ThinkingConfig =
@@ -101,6 +101,12 @@ export function modelSupportsThinking(model: string): boolean {
   // launch DRI and research. This can greatly affect model quality and bashing.
   const canonical = getCanonicalName(model)
   const provider = getAPIProvider()
+  // Custom/proxy endpoints can host non-Claude models. Be conservative and
+  // only enable thinking for known Claude 4 families to avoid slow/incompatible
+  // requests caused by unknown defaults.
+  if (provider === 'firstParty' && !isFirstPartyAnthropicBaseUrl()) {
+    return canonical.includes('sonnet-4') || canonical.includes('opus-4')
+  }
   // 1P and Foundry: all Claude 4+ models (including Haiku 4.5)
   if (provider === 'foundry' || provider === 'firstParty') {
     return !canonical.includes('claude-3-')
@@ -140,6 +146,9 @@ export function modelSupportsAdaptiveThinking(model: string): boolean {
   // is a proxy). Do not default to true for other 3P as they have different formats
   // for their model strings.
   const provider = getAPIProvider()
+  if (provider === 'firstParty' && !isFirstPartyAnthropicBaseUrl()) {
+    return false
+  }
   return provider === 'firstParty' || provider === 'foundry'
 }
 
@@ -149,7 +158,16 @@ export function shouldEnableThinkingByDefault(): boolean {
   }
 
   const { settings } = getSettingsWithErrors()
+  if (settings.alwaysThinkingEnabled === true) {
+    return true
+  }
   if (settings.alwaysThinkingEnabled === false) {
+    return false
+  }
+
+  // For custom/proxy endpoints, prioritize lower latency unless the user
+  // explicitly opts in via alwaysThinkingEnabled=true.
+  if (!isFirstPartyAnthropicBaseUrl()) {
     return false
   }
 

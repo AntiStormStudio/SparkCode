@@ -1091,7 +1091,7 @@ export function checkReadPermissionForTool(
     if (denyRule) {
       return {
         behavior: 'deny',
-        message: `Permission to read ${path} has been denied.`,
+        message: `读取 ${path} 的权限已被拒绝。`,
         decisionReason: {
           type: 'rule',
           rule: denyRule,
@@ -1229,7 +1229,7 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     if (denyRule) {
       return {
         behavior: 'deny',
-        message: `Permission to edit ${path} has been denied.`,
+        message: `编辑 ${path} 的权限已被拒绝。`,
         decisionReason: {
           type: 'rule',
           rule: denyRule,

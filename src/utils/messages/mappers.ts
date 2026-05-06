@@ -55,7 +55,7 @@ export function toInternalMessages(
           return [
             {
               type: 'system',
-              content: 'Conversation compacted',
+              content: '对话已压缩',
               level: 'info',
               subtype: 'compact_boundary',
               compactMetadata: fromSDKCompactMetadata(

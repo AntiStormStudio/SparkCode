@@ -55,8 +55,8 @@ function convertStreamEvent(msg: SDKPartialAssistantMessage): StreamEvent {
 function convertResultMessage(msg: SDKResultMessage): SystemMessage {
   const isError = msg.subtype !== 'success'
   const content = isError
-    ? msg.errors?.join(', ') || 'Unknown error'
-    : 'Session completed successfully'
+    ? msg.errors?.join(', ') || '未知错误'
+    : '会话已成功完成'
 
   return {
     type: 'system',
@@ -75,7 +75,7 @@ function convertInitMessage(msg: SDKSystemMessage): SystemMessage {
   return {
     type: 'system',
     subtype: 'informational',
-    content: `Remote session initialized (model: ${msg.model})`,
+    content: `远程会话已初始化（模型：${msg.model}）`,
     level: 'info',
     uuid: msg.uuid,
     timestamp: new Date().toISOString(),
@@ -95,8 +95,8 @@ function convertStatusMessage(msg: SDKStatusMessage): SystemMessage | null {
     subtype: 'informational',
     content:
       msg.status === 'compacting'
-        ? 'Compacting conversation…'
-        : `Status: ${msg.status}`,
+        ? '正在压缩对话…'
+        : `状态：${msg.status}`,
     level: 'info',
     uuid: msg.uuid,
     timestamp: new Date().toISOString(),
@@ -114,7 +114,7 @@ function convertToolProgressMessage(
   return {
     type: 'system',
     subtype: 'informational',
-    content: `Tool ${msg.tool_name} running for ${msg.elapsed_time_seconds}s…`,
+    content: `工具 ${msg.tool_name} 已运行 ${msg.elapsed_time_seconds} 秒…`,
     level: 'info',
     uuid: msg.uuid,
     timestamp: new Date().toISOString(),
@@ -131,7 +131,7 @@ function convertCompactBoundaryMessage(
   return {
     type: 'system',
     subtype: 'compact_boundary',
-    content: 'Conversation compacted',
+    content: '对话已压缩',
     level: 'info',
     uuid: msg.uuid,
     timestamp: new Date().toISOString(),

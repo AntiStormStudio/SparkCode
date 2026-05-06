@@ -6,7 +6,6 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod/v4'
 import { jsonStringify } from '../slowOperations.js'
-import { plural } from '../stringUtils.js'
 import {
   looksLikeISO8601,
   parseNaturalLanguageDateTime,
@@ -20,7 +19,7 @@ export type ValidationResult = {
 
 const STRING_FORMATS = {
   email: {
-    description: 'email address',
+    description: '邮箱地址',
     example: 'user@example.com',
   },
   uri: {
@@ -28,11 +27,11 @@ const STRING_FORMATS = {
     example: 'https://example.com',
   },
   date: {
-    description: 'date',
+    description: '日期',
     example: '2024-03-15',
   },
   'date-time': {
-    description: 'date-time',
+    description: '日期时间',
     example: '2024-03-15T14:30:00Z',
   },
 }
@@ -144,35 +143,35 @@ function getZodSchema(schema: PrimitiveSchemaDefinition): z.ZodTypeAny {
     let stringSchema = z.string()
     if (schema.minLength !== undefined) {
       stringSchema = stringSchema.min(schema.minLength, {
-        message: `Must be at least ${schema.minLength} ${plural(schema.minLength, 'character')}`,
+        message: `至少需要 ${schema.minLength} 个字符`,
       })
     }
     if (schema.maxLength !== undefined) {
       stringSchema = stringSchema.max(schema.maxLength, {
-        message: `Must be at most ${schema.maxLength} ${plural(schema.maxLength, 'character')}`,
+        message: `最多允许 ${schema.maxLength} 个字符`,
       })
     }
     switch (schema.format) {
       case 'email':
         stringSchema = stringSchema.email({
-          message: 'Must be a valid email address, e.g. user@example.com',
+          message: '请输入有效邮箱，例如 user@example.com',
         })
         break
       case 'uri':
         stringSchema = stringSchema.url({
-          message: 'Must be a valid URI, e.g. https://example.com',
+          message: '请输入有效 URI，例如 https://example.com',
         })
         break
       case 'date':
         stringSchema = stringSchema.date(
-          'Must be a valid date, e.g. 2024-03-15, today, next Monday',
+          '请输入有效日期，例如 2024-03-15、今天、下周一',
         )
         break
       case 'date-time':
         stringSchema = stringSchema.datetime({
           offset: true,
           message:
-            'Must be a valid date-time, e.g. 2024-03-15T14:30:00Z, tomorrow at 3pm',
+            '请输入有效日期时间，例如 2024-03-15T14:30:00Z、明天下午 3 点',
         })
         break
       default:

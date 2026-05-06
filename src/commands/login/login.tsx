@@ -1,5 +1,7 @@
 import { feature } from 'bun:bundle'
-import { createServer, type IncomingMessage } from 'http'
+import axios from 'axios'
+import { randomUUID } from 'crypto'
+import { createServer, type ServerResponse } from 'http'
 import type { AddressInfo } from 'net'
 import * as React from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -12,7 +14,6 @@ import type { LocalJSXCommandContext } from '../../commands.js'
 import { ConfigurableShortcutHint } from '../../components/ConfigurableShortcutHint.js'
 import { Dialog } from '../../components/design-system/Dialog.js'
 import { Spinner } from '../../components/Spinner.js'
-import { useMainLoopModel } from '../../hooks/useMainLoopModel.js'
 import { Box, Link, Text } from '../../ink.js'
 import { refreshGrowthBookAfterAuthChange } from '../../services/analytics/growthbook.js'
 import { refreshPolicyLimits } from '../../services/policyLimits/index.js'
@@ -21,10 +22,12 @@ import type { LocalJSXCommandOnDone } from '../../types/command.js'
 import {
   getConfiguredApiBaseUrl,
   normalizeApiBaseUrl,
-  saveApiKey,
   saveConfiguredApiBaseUrl,
+  saveConfiguredAuthRefreshToken,
+  saveConfiguredAuthToken,
 } from '../../utils/auth.js'
 import { openBrowser } from '../../utils/browser.js'
+import { saveGlobalConfig } from '../../utils/config.js'
 import { stripSignatureBlocks } from '../../utils/messages.js'
 import {
   checkAndDisableAutoModeIfNeeded,
@@ -32,25 +35,39 @@ import {
   resetAutoModeGateCheck,
   resetBypassPermissionsCheck,
 } from '../../utils/permissions/bypassPermissionsKillswitch.js'
-import { updateSettingsForSource } from '../../utils/settings/settings.js'
+import {
+  getOrCreateSparkAndroidDevice,
+  type SparkAndroidDevice,
+} from '../../utils/sparkAndroidAuth.js'
 import { resetUserCache } from '../../utils/user.js'
 import { performLogout } from '../logout/logout.js'
 
 type SparkLoginFormProps = {
-  onDone: (success: boolean, defaultModel?: string) => void
+  onDone: (success: boolean) => void
 }
 
-type WebLoginSubmitPayload = {
+type SparkTokenPair = {
+  accessToken: string
+  refreshToken: string
+}
+
+type OAuthCallbackResult = {
   baseUrl: string
-  apiKey: string
-  defaultModel: string
+  tokenPair: SparkTokenPair
 }
 
-type WebLoginServer = {
-  url: string
-  waitForSubmit: () => Promise<WebLoginSubmitPayload>
+type LocalOAuthCallbackServer = {
+  callbackUrl: string
+  waitForCallback: () => Promise<OAuthCallbackResult>
   close: () => void
 }
+
+const OAUTH_TIMEOUT_MS = 10 * 60 * 1000
+const OAUTH_CALLBACK_PATH = '/spark/oauth/callback'
+const SPARK_OAUTH_AUTHORIZE_PATH = '/oauth/mobile/authorize'
+const SPARK_AUTH_REFRESH_PATH = '/api/v1/android/auth/refresh'
+
+class LoginCanceledError extends Error {}
 
 export async function call(
   onDone: LocalJSXCommandOnDone,
@@ -58,13 +75,11 @@ export async function call(
 ): Promise<React.ReactNode> {
   return (
     <SparkLoginForm
-      onDone={async (success, defaultModel) => {
+      onDone={async success => {
         context.onChangeAPIKey()
-        // Signature-bearing blocks are bound to API key; clear stale signatures.
         context.setMessages(stripSignatureBlocks)
 
         if (success) {
-          // Post-login refresh logic. Keep in sync with onboarding in src/interactiveHelpers.tsx
           resetCostState()
           void refreshRemoteManagedSettings()
           void refreshPolicyLimits()
@@ -91,7 +106,6 @@ export async function call(
 
           context.setAppState(prev => ({
             ...prev,
-            mainLoopModel: defaultModel?.trim() || prev.mainLoopModel,
             mainLoopModelForSession: null,
             authVersion: prev.authVersion + 1,
           }))
@@ -103,7 +117,96 @@ export async function call(
   )
 }
 
-const WEB_LOGIN_TIMEOUT_MS = 10 * 60 * 1000
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function describeHttpError(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : '请求失败'
+  }
+
+  const status = error.response?.status
+  const data = error.response?.data
+  let detail = ''
+  if (typeof data === 'string') {
+    detail = data
+  } else if (isRecord(data)) {
+    detail =
+      getString(data.detail) ??
+      getString(data.message) ??
+      getString(data.error) ??
+      ''
+  }
+
+  return status
+    ? `后端返回 ${status}${detail ? `：${detail}` : ''}`
+    : error.message
+}
+
+function parseAndroidTokenResponse(data: unknown): SparkTokenPair {
+  if (!isRecord(data)) {
+    throw new Error('后端返回的 Android 登录令牌数据无效')
+  }
+
+  const accessToken =
+    getString(data.access_token) ?? getString(data.accessToken)
+  const refreshToken =
+    getString(data.refresh_token) ?? getString(data.refreshToken)
+
+  if (!accessToken) {
+    throw new Error('后端没有返回访问令牌')
+  }
+  if (!refreshToken) {
+    throw new Error('后端没有返回刷新令牌')
+  }
+
+  return { accessToken, refreshToken }
+}
+
+function buildOAuthAuthorizeUrl(
+  baseUrl: string,
+  callbackUrl: string,
+  state: string,
+  device: SparkAndroidDevice,
+): string {
+  const url = new URL(SPARK_OAUTH_AUTHORIZE_PATH, baseUrl)
+  url.searchParams.set('redirect_uri', callbackUrl)
+  url.searchParams.set('response_mode', 'query')
+  url.searchParams.set('install_id', device.installId)
+  url.searchParams.set('device_id', device.deviceId)
+  url.searchParams.set('package_name', device.packageName)
+  url.searchParams.set('cert_sha256', device.certSha256)
+  url.searchParams.set('app_version', device.appVersion)
+  url.searchParams.set('state', state)
+  return url.toString()
+}
+
+function parseOAuthCallback(
+  params: URLSearchParams,
+  expectedState: string,
+): string {
+  const error = getString(params.get('error'))
+  if (error) {
+    throw new Error(getString(params.get('error_description')) ?? error)
+  }
+
+  const state = getString(params.get('state'))
+  if (state !== expectedState) {
+    throw new Error('授权状态校验失败，请重新运行 /login')
+  }
+
+  const refreshToken = getString(params.get('refresh_token'))
+  if (!refreshToken) {
+    throw new Error('授权回调里没有刷新令牌')
+  }
+
+  return refreshToken
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -114,336 +217,229 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;')
 }
 
-function renderLoginPage(opts: {
-  values: { baseUrl: string; defaultModel: string; apiKey: string }
-  error?: string
-}): string {
-  const errorBlock = opts.error
-    ? `<div class="error">${escapeHtml(opts.error)}</div>`
-    : ''
+async function refreshAndroidToken(
+  baseUrl: string,
+  refreshToken: string,
+  device: SparkAndroidDevice,
+): Promise<SparkTokenPair> {
+  try {
+    const response = await axios.post(
+      `${baseUrl}${SPARK_AUTH_REFRESH_PATH}`,
+      {
+        refresh_token: refreshToken,
+        install_id: device.installId,
+        device_id: device.deviceId,
+        package_name: device.packageName,
+        cert_sha256: device.certSha256,
+        app_version: device.appVersion,
+      },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 15_000,
+      },
+    )
+    return parseAndroidTokenResponse(response.data)
+  } catch (error) {
+    throw new Error(`换取登录令牌失败：${describeHttpError(error)}`)
+  }
+}
 
-  return `<!doctype html>
+function writeHtml(res: ServerResponse, title: string, body: string): void {
+  const safeTitle = escapeHtml(title)
+  const safeBody = escapeHtml(body)
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+  })
+  res.end(`<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SPARK 登录</title>
+  <title>${safeTitle}</title>
   <style>
-    :root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    body { margin: 0; background: #f5f7fb; color: #0f172a; }
-    .wrap { max-width: 560px; margin: 48px auto; padding: 24px; background: #fff; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
-    h1 { margin: 0 0 10px; font-size: 24px; }
-    p { margin: 0 0 18px; color: #475569; }
-    label { display: block; margin: 14px 0 6px; font-weight: 600; }
-    input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
-    input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
-    .tip { margin-top: 8px; color: #64748b; font-size: 12px; }
-    button { margin-top: 18px; width: 100%; border: 0; border-radius: 10px; padding: 11px 14px; background: #2563eb; color: #fff; font-size: 14px; cursor: pointer; }
-    button:hover { background: #1d4ed8; }
-    .error { margin: 12px 0 2px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f8fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(420px, calc(100vw - 32px)); background: white; border: 1px solid #d9e0ea; border-radius: 12px; padding: 26px; box-shadow: 0 18px 45px rgba(23, 32, 51, .10); }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0; color: #5d6a7c; line-height: 1.5; }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <h1>SPARK 登录</h1>
-    <p>请输入基础地址、API 密钥和默认模型。提交后将自动回到终端完成登录。</p>
-    ${errorBlock}
-    <form action="/submit" method="post" autocomplete="off">
-      <label for="baseurl">基础地址（BaseURL）</label>
-      <input id="baseurl" name="baseurl" type="text" required placeholder="https://api.example.com" value="${escapeHtml(opts.values.baseUrl)}" />
-      <div class="tip">不要带 /v1 或路径。</div>
-
-      <label for="apikey">API 密钥</label>
-      <input id="apikey" name="apikey" type="password" required autocomplete="off" value="${escapeHtml(opts.values.apiKey)}" />
-
-      <label for="defaultModel">默认模型</label>
-      <input id="defaultModel" name="defaultModel" type="text" required placeholder="sonnet / opus / haiku 或完整模型 ID" value="${escapeHtml(opts.values.defaultModel)}" />
-      <div class="tip">例如：sonnet、opus、haiku，或完整模型 ID。</div>
-
-      <button type="submit">保存并登录</button>
-    </form>
+  <main>
+    <h1>${safeTitle}</h1>
+    <p>${safeBody}</p>
   </main>
 </body>
-</html>`
+</html>`)
 }
 
-const MAX_LOGIN_BODY_SIZE = 16 * 1024
-
-async function readLoginRequestBody(req: IncomingMessage): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    let body = ''
-    let settled = false
-    req.setEncoding('utf8')
-    req.on('data', chunk => {
-      if (settled) {
-        return
-      }
-      body += chunk
-      if (body.length > MAX_LOGIN_BODY_SIZE) {
-        settled = true
-        reject(new Error('提交内容过大，请重试'))
-        req.destroy()
-      }
-    })
-    req.on('end', () => {
-      if (!settled) {
-        settled = true
-        resolve(body)
-      }
-    })
-    req.on('error', error => {
-      if (!settled) {
-        settled = true
-        reject(error)
-      }
-    })
-  })
-}
-
-function renderSuccessPage(): string {
-  return `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>登录成功</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0fdf4; color: #14532d; display: grid; place-items: center; min-height: 100vh; margin: 0; }
-    .card { background: #fff; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px 22px; max-width: 520px; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
-    h1 { margin: 0 0 8px; font-size: 20px; }
-    p { margin: 0; color: #166534; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>登录信息已提交</h1>
-    <p>请返回终端，继续完成登录。</p>
-  </div>
-</body>
-</html>`
-}
-
-async function startWebLoginServer(initialValues: {
-  baseUrl: string
-  defaultModel: string
-}): Promise<WebLoginServer> {
+async function startLocalOAuthCallbackServer(
+  baseUrl: string,
+  state: string,
+  device: SparkAndroidDevice,
+): Promise<LocalOAuthCallbackServer> {
   return new Promise((resolve, reject) => {
-    let finished = false
-    let resolveSubmit: ((value: WebLoginSubmitPayload) => void) | null = null
-    let rejectSubmit: ((reason?: unknown) => void) | null = null
+    let settled = false
+    let resolveCallback: ((value: OAuthCallbackResult) => void) | null = null
+    let rejectCallback: ((reason?: unknown) => void) | null = null
 
-    const submitPromise = new Promise<WebLoginSubmitPayload>(
+    const callbackPromise = new Promise<OAuthCallbackResult>(
       (resolvePromise, rejectPromise) => {
-        resolveSubmit = resolvePromise
-        rejectSubmit = rejectPromise
+        resolveCallback = resolvePromise
+        rejectCallback = rejectPromise
       },
     )
 
+    function resolveOnce(value: OAuthCallbackResult): void {
+      if (settled) return
+      settled = true
+      resolveCallback?.(value)
+    }
+
+    function rejectOnce(error: unknown): void {
+      if (settled) return
+      settled = true
+      rejectCallback?.(error)
+    }
+
     const server = createServer((req, res) => {
       void (async () => {
-      const requestUrl = new URL(
-        req.url ?? '/',
-        `http://${req.headers.host ?? '127.0.0.1'}`,
-      )
+        const requestUrl = new URL(
+          req.url ?? '/',
+          `http://${req.headers.host ?? '127.0.0.1'}`,
+        )
 
-      if (requestUrl.pathname === '/favicon.ico') {
-        res.writeHead(204)
-        res.end()
-        return
-      }
-      let formData = requestUrl.searchParams
-      if (requestUrl.pathname === '/submit') {
-        if (req.method !== 'POST') {
-          res.writeHead(405, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-store',
-          })
-          res.end(
-            renderLoginPage({
-              values: {
-                baseUrl: initialValues.baseUrl,
-                apiKey: '',
-                defaultModel: initialValues.defaultModel,
-              },
-              error: '提交方式无效，请刷新页面后重试',
-            }),
-          )
+        if (requestUrl.pathname === '/favicon.ico') {
+          res.writeHead(204)
+          res.end()
           return
         }
-        const rawBody = await readLoginRequestBody(req)
-        formData = new URLSearchParams(rawBody)
-      }
 
-      const baseUrlRaw = (formData.get('baseurl') ?? '').trim()
-      const apiKeyRaw = (formData.get('apikey') ?? '').trim()
-      const modelRaw = (formData.get('defaultModel') ?? '').trim()
-
-      if (requestUrl.pathname === '/submit') {
-        try {
-          if (!baseUrlRaw) {
-            throw new Error('BaseURL 不能为空')
-          }
-          if (!apiKeyRaw) {
-            throw new Error('API Key 不能为空')
-          }
-          if (!modelRaw) {
-            throw new Error('默认模型不能为空')
-          }
-
-          const normalizedBaseUrl = normalizeApiBaseUrl(baseUrlRaw)
-          res.writeHead(200, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-store',
-          })
-          res.end(renderSuccessPage())
-          resolveSubmit?.({
-            baseUrl: normalizedBaseUrl,
-            apiKey: apiKeyRaw,
-            defaultModel: modelRaw,
-          })
-          return
-        } catch (error) {
-          res.writeHead(400, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-store',
-          })
-          res.end(
-            renderLoginPage({
-              values: {
-                baseUrl: baseUrlRaw,
-                apiKey: '',
-                defaultModel: modelRaw || initialValues.defaultModel,
-              },
-              error: error instanceof Error ? error.message : '输入格式无效',
-            }),
-          )
+        if (requestUrl.pathname !== OAUTH_CALLBACK_PATH) {
+          writeHtml(res, '等待 OAuth 回调', '请在后端授权页面完成登录。')
           return
         }
-      }
 
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-      })
-      res.end(
-        renderLoginPage({
-          values: {
-            baseUrl: initialValues.baseUrl,
-            apiKey: '',
-            defaultModel: initialValues.defaultModel,
-          },
-        }),
-      )
+        const callbackRefreshToken = parseOAuthCallback(
+          requestUrl.searchParams,
+          state,
+        )
+        const tokenPair = await refreshAndroidToken(
+          baseUrl,
+          callbackRefreshToken,
+          device,
+        )
+
+        resolveOnce({ baseUrl, tokenPair })
+        writeHtml(res, '登录成功', '可以关闭这个页面，回到终端继续使用。')
       })().catch(error => {
-        res.writeHead(500, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-        })
-        res.end(
-          renderLoginPage({
-            values: {
-              baseUrl: initialValues.baseUrl,
-              apiKey: '',
-              defaultModel: initialValues.defaultModel,
-            },
-            error: error instanceof Error ? error.message : '服务端处理失败',
-          }),
+        rejectOnce(error)
+        writeHtml(
+          res,
+          '登录失败',
+          error instanceof Error ? error.message : 'OAuth 回调处理失败',
         )
       })
     })
 
     const timeout = setTimeout(() => {
-      rejectSubmit?.(new Error('等待网页提交超时，请重新运行 /login'))
-    }, WEB_LOGIN_TIMEOUT_MS)
+      rejectOnce(new Error('等待 OAuth 回调超时，请重新运行 /login'))
+    }, OAUTH_TIMEOUT_MS)
 
-    const closeServer = (): void => {
-      if (finished) {
-        return
-      }
-      finished = true
+    function closeServer(): void {
       clearTimeout(timeout)
       server.close()
     }
 
-    server.once('error', err => {
-      closeServer()
-      reject(err)
-    })
+    callbackPromise.finally(closeServer).catch(() => {})
 
-    submitPromise.finally(closeServer).catch(() => {})
+    server.once('error', error => {
+      closeServer()
+      reject(error)
+    })
 
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo
-      const url = `http://127.0.0.1:${address.port}/`
       resolve({
-        url,
-        waitForSubmit: () => submitPromise,
-        close: () => {
-          closeServer()
-          rejectSubmit?.(new Error('登录流程已取消'))
-        },
+        callbackUrl: `http://localhost:${address.port}${OAUTH_CALLBACK_PATH}`,
+        waitForCallback: () => callbackPromise,
+        close: () => rejectOnce(new LoginCanceledError('登录已取消')),
       })
     })
   })
 }
 
 export function SparkLoginForm({ onDone }: SparkLoginFormProps): React.ReactNode {
-  const mainLoopModel = useMainLoopModel()
-  const defaultModelRef = useRef(mainLoopModel)
-  const [step, setStep] = useState<
-    'starting' | 'waiting' | 'saving' | 'error'
-  >('starting')
-  const [webUrl, setWebUrl] = useState('')
+  const [step, setStep] = useState<'starting' | 'waiting' | 'saving' | 'error'>(
+    'starting',
+  )
+  const [authUrl, setAuthUrl] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
   const [openBrowserWarning, setOpenBrowserWarning] = useState('')
   const [error, setError] = useState<string>('')
-  const webServerRef = useRef<WebLoginServer | null>(null)
+  const serverRef = useRef<LocalOAuthCallbackServer | null>(null)
+  const doneRef = useRef(false)
 
   useEffect(() => {
     let active = true
 
     async function run(): Promise<void> {
       try {
-        const server = await startWebLoginServer({
-          baseUrl: getConfiguredApiBaseUrl() ?? '',
-          defaultModel: defaultModelRef.current,
-        })
+        const configuredBaseUrl = getConfiguredApiBaseUrl()
+        if (!configuredBaseUrl) {
+          throw new Error('请先运行 /config-server <后端地址> 配置项目后端')
+        }
+
+        const normalizedBaseUrl = normalizeApiBaseUrl(configuredBaseUrl)
+        const device = getOrCreateSparkAndroidDevice()
+        const state = randomUUID()
+        const server = await startLocalOAuthCallbackServer(
+          normalizedBaseUrl,
+          state,
+          device,
+        )
+        const nextAuthUrl = buildOAuthAuthorizeUrl(
+          normalizedBaseUrl,
+          server.callbackUrl,
+          state,
+          device,
+        )
 
         if (!active) {
           server.close()
           return
         }
 
-        webServerRef.current = server
-        setWebUrl(server.url)
+        serverRef.current = server
+        setBaseUrl(normalizedBaseUrl)
+        setAuthUrl(nextAuthUrl)
         setStep('waiting')
 
-        const opened = await openBrowser(server.url)
+        const opened = await openBrowser(nextAuthUrl)
         if (!opened) {
           setOpenBrowserWarning('未能自动打开浏览器，请手动访问下方链接')
         }
 
-        const form = await server.waitForSubmit()
-        if (!active) {
-          return
-        }
+        const result = await server.waitForCallback()
+        if (!active) return
 
         setStep('saving')
-
-        // Clear OAuth/session artifacts so login is API-key only.
         await performLogout({ clearOnboarding: false })
-        saveConfiguredApiBaseUrl(form.baseUrl)
-        await saveApiKey(form.apiKey)
+        saveConfiguredApiBaseUrl(result.baseUrl)
+        saveConfiguredAuthToken(result.tokenPair.accessToken)
+        saveConfiguredAuthRefreshToken(result.tokenPair.refreshToken)
+        saveGlobalConfig(current => ({
+          ...current,
+          hasCompletedOnboarding: true,
+        }))
 
-        const updateResult = updateSettingsForSource('userSettings', {
-          model: form.defaultModel,
-        })
-        if (updateResult.error) {
-          throw updateResult.error
-        }
-
-        onDone(true, form.defaultModel)
+        doneRef.current = true
+        onDone(true)
       } catch (err) {
-        if (!active) {
+        if (!active) return
+        if (err instanceof LoginCanceledError) {
+          doneRef.current = true
+          onDone(false)
           return
         }
         setError(err instanceof Error ? err.message : '登录失败')
@@ -455,8 +451,10 @@ export function SparkLoginForm({ onDone }: SparkLoginFormProps): React.ReactNode
 
     return () => {
       active = false
-      webServerRef.current?.close()
-      webServerRef.current = null
+      if (!doneRef.current) {
+        serverRef.current?.close()
+      }
+      serverRef.current = null
     }
     // onDone is stable for this command lifecycle; run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -464,10 +462,11 @@ export function SparkLoginForm({ onDone }: SparkLoginFormProps): React.ReactNode
 
   return (
     <Dialog
-      title="SPARK 登录"
-      subtitle="已打开网页，请在浏览器输入基础地址、API 密钥、默认模型"
+      title="SparkCode 登录"
+      subtitle="OAuth 授权"
       onCancel={() => {
-        webServerRef.current?.close()
+        doneRef.current = true
+        serverRef.current?.close()
         onDone(false)
       }}
       color="permission"
@@ -489,19 +488,22 @@ export function SparkLoginForm({ onDone }: SparkLoginFormProps): React.ReactNode
         {step === 'starting' && (
           <Box>
             <Spinner />
-            <Text>正在启动网页登录...</Text>
+            <Text>正在启动 OAuth 登录…</Text>
           </Box>
         )}
 
         {step === 'waiting' && (
           <>
-            <Text>请在浏览器页面完成输入并提交：</Text>
-            {webUrl && (
-              <Link url={webUrl}>
-                <Text>{webUrl}</Text>
+            <Text>请在浏览器中完成后端 OAuth 授权：</Text>
+            {authUrl && (
+              <Link url={authUrl}>
+                <Text>{authUrl}</Text>
               </Link>
             )}
-            {openBrowserWarning && <Text color="warning">{openBrowserWarning}</Text>}
+            {baseUrl && <Text dimColor>后端：{baseUrl}</Text>}
+            {openBrowserWarning && (
+              <Text color="warning">{openBrowserWarning}</Text>
+            )}
           </>
         )}
 

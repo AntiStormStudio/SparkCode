@@ -987,7 +987,7 @@ export const connectToServer = memoize(
           name: 'claude-code',
           title: 'Spark Code',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: 'Spark Code 代码助手',
           websiteUrl: PRODUCT_URL,
         },
         {
@@ -1814,7 +1814,7 @@ export const fetchToolsForClient = memoizeWithLRU(
             async checkPermissions() {
               return {
                 behavior: 'passthrough' as const,
-                message: 'MCPTool requires permission.',
+                message: 'MCP 工具需要权限。',
                 suggestions: [
                   {
                     type: 'addRules' as const,
@@ -3282,7 +3282,7 @@ export async function setupSdkMcpClients(
           name: 'claude-code',
           title: 'Spark Code',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: 'Spark Code 代码助手',
           websiteUrl: PRODUCT_URL,
         },
         {

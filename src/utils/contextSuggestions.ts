@@ -59,10 +59,10 @@ function checkNearCapacity(
   if (data.percentage >= NEAR_CAPACITY_PERCENT) {
     suggestions.push({
       severity: 'warning',
-      title: `Context is ${data.percentage}% full`,
+      title: `上下文已使用 ${data.percentage}%`,
       detail: data.isAutoCompactEnabled
-        ? 'Autocompact will trigger soon, which discards older messages. Use /compact now to control what gets kept.'
-        : 'Autocompact is disabled. Use /compact to free space, or enable autocompact in /config.',
+        ? '自动压缩即将触发，较早的消息会被丢弃。现在运行 /compact 可以控制保留内容。'
+        : '自动压缩已关闭。可以用 /compact 释放空间，或在 /config 中开启自动压缩。',
     })
   }
 }
@@ -106,41 +106,41 @@ function getLargeToolSuggestion(
     case BASH_TOOL_NAME:
       return {
         severity: 'warning',
-        title: `Bash results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
+        title: `Bash 结果占用 ${tokenStr} token（${percent.toFixed(0)}%）`,
         detail:
-          'Pipe output through head, tail, or grep to reduce result size. Avoid cat on large files \u2014 use Read with offset/limit instead.',
+          '可以把输出通过 head、tail 或 grep 过滤后再查看。大文件不要直接 cat，改用 Read 的 offset/limit。',
         savingsTokens: Math.floor(tokens * 0.5),
       }
     case FILE_READ_TOOL_NAME:
       return {
         severity: 'info',
-        title: `Read results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
+        title: `Read 结果占用 ${tokenStr} token（${percent.toFixed(0)}%）`,
         detail:
-          'Use offset and limit parameters to read only the sections you need. Avoid re-reading entire files when you only need a few lines.',
+          '使用 offset 和 limit 只读取需要的部分。只看几行时不要重复读取整文件。',
         savingsTokens: Math.floor(tokens * 0.3),
       }
     case GREP_TOOL_NAME:
       return {
         severity: 'info',
-        title: `Grep results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
+        title: `Grep 结果占用 ${tokenStr} token（${percent.toFixed(0)}%）`,
         detail:
-          'Add more specific patterns or use the glob or type parameter to narrow file types. Consider Glob for file discovery instead of Grep.',
+          '把模式写得更具体，或者用 glob / type 参数缩小文件范围。找文件时优先考虑 Glob，不要只依赖 Grep。',
         savingsTokens: Math.floor(tokens * 0.3),
       }
     case WEB_FETCH_TOOL_NAME:
       return {
         severity: 'info',
-        title: `WebFetch results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
+        title: `WebFetch 结果占用 ${tokenStr} token（${percent.toFixed(0)}%）`,
         detail:
-          'Web page content can be very large. Consider extracting only the specific information needed.',
+          '网页内容可能很大，尽量只提取需要的具体信息。',
         savingsTokens: Math.floor(tokens * 0.4),
       }
     default:
       if (percent >= 20) {
         return {
           severity: 'info',
-          title: `${toolName} using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
-          detail: `This tool is consuming a significant portion of context.`,
+          title: `${toolName} 占用 ${tokenStr} token（${percent.toFixed(0)}%）`,
+          detail: `这个工具正在消耗相当一部分上下文。`,
           savingsTokens: Math.floor(tokens * 0.2),
         }
       }
@@ -176,9 +176,9 @@ function checkReadResultBloat(
   ) {
     suggestions.push({
       severity: 'info',
-      title: `File reads using ${formatTokens(readTool.resultTokens)} tokens (${readPercent.toFixed(0)}%)`,
+      title: `文件读取占用 ${formatTokens(readTool.resultTokens)} token（${readPercent.toFixed(0)}%）`,
       detail:
-        'If you are re-reading files, consider referencing earlier reads. Use offset/limit for large files.',
+        '如果你在重复读取文件，尽量引用前面的结果。大文件继续用 offset/limit。',
       savingsTokens: Math.floor(readTool.resultTokens * 0.3),
     })
   }
@@ -209,8 +209,8 @@ function checkMemoryBloat(
 
     suggestions.push({
       severity: 'info',
-      title: `Memory files using ${formatTokens(totalMemoryTokens)} tokens (${memoryPercent.toFixed(0)}%)`,
-      detail: `Largest: ${largestFiles}. Use /memory to review and prune stale entries.`,
+      title: `Memory 文件占用 ${formatTokens(totalMemoryTokens)} token（${memoryPercent.toFixed(0)}%）`,
+      detail: `占用最多的是：${largestFiles}。可以用 /memory 查看并清理过期内容。`,
       savingsTokens: Math.floor(totalMemoryTokens * 0.3),
     })
   }
@@ -227,9 +227,9 @@ function checkAutoCompactDisabled(
   ) {
     suggestions.push({
       severity: 'info',
-      title: 'Autocompact is disabled',
+      title: '自动压缩已关闭',
       detail:
-        'Without autocompact, you will hit context limits and lose the conversation. Enable it in /config or use /compact manually.',
+        '不启用自动压缩时，很容易碰到上下文上限并丢失对话。可以在 /config 中开启，或手动运行 /compact。',
     })
   }
 }

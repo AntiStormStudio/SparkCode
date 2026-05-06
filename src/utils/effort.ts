@@ -3,7 +3,7 @@ import { isUltrathinkEnabled } from './thinking.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from './model/providers.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
 import { isEnvTruthy } from './envUtils.js'
 import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
@@ -45,7 +45,7 @@ export function modelSupportsEffort(model: string): boolean {
   // Default to true for unknown model strings on 1P.
   // Do not default to true for 3P as they have different formats for their
   // model strings (ex. anthropics/claude-code#30795)
-  return getAPIProvider() === 'firstParty'
+  return getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
 }
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
@@ -192,7 +192,7 @@ export function getEffortSuffix(
   if (effortValue === undefined) return ''
   const resolved = resolveAppliedEffort(model, effortValue)
   if (resolved === undefined) return ''
-  return ` with ${convertEffortValueToLevel(resolved)} effort`
+  return `（推理强度：${convertEffortValueToLevel(resolved)}）`
 }
 
 export function isValidNumericEffort(value: number): boolean {
@@ -224,13 +224,13 @@ export function convertEffortValueToLevel(value: EffortValue): EffortLevel {
 export function getEffortLevelDescription(level: EffortLevel): string {
   switch (level) {
     case 'low':
-      return 'Quick, straightforward implementation with minimal overhead'
+      return '快速直接的实现，额外开销最小'
     case 'medium':
-      return 'Balanced approach with standard implementation and testing'
+      return '速度与质量平衡，包含常规实现与测试'
     case 'high':
-      return 'Comprehensive implementation with extensive testing and documentation'
+      return '更全面的实现，包含更充分的测试与文档'
     case 'max':
-      return 'Maximum capability with deepest reasoning (Opus 4.6 only)'
+      return '最强能力与最深层推理（仅 Opus 4.6）'
   }
 }
 
@@ -242,13 +242,13 @@ export function getEffortLevelDescription(level: EffortLevel): string {
  */
 export function getEffortValueDescription(value: EffortValue): string {
   if (process.env.USER_TYPE === 'ant' && typeof value === 'number') {
-    return `[ANT-ONLY] Numeric effort value of ${value}`
+    return `[ANT-ONLY] 数值推理强度：${value}`
   }
 
   if (typeof value === 'string') {
     return getEffortLevelDescription(value)
   }
-  return 'Balanced approach with standard implementation and testing'
+  return '速度与质量平衡，包含常规实现与测试'
 }
 
 export type OpusDefaultEffortConfig = {
@@ -259,9 +259,9 @@ export type OpusDefaultEffortConfig = {
 
 const OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT: OpusDefaultEffortConfig = {
   enabled: true,
-  dialogTitle: 'We recommend medium effort for Opus',
+  dialogTitle: '建议在 Opus 上使用 medium 强度',
   dialogDescription:
-    'Effort determines how long Claude thinks for when completing your task. We recommend medium effort for most tasks to balance speed and intelligence and maximize rate limits. Use ultrathink to trigger high effort when needed.',
+    '推理强度决定 Claude 完成任务前思考的深度与时长。大多数任务建议使用 medium，以平衡速度和效果，并更充分利用额度；需要时可用 ultrathink 临时提升到 high。',
 }
 
 export function getOpusDefaultEffortConfig(): OpusDefaultEffortConfig {
@@ -298,6 +298,12 @@ export function getDefaultEffortForModel(
     }
     // Always default ants to undefined/high
     return undefined
+  }
+
+  // Custom/proxy endpoints prioritize latency by default. Users can still
+  // override via /effort or settings.
+  if (!isFirstPartyAnthropicBaseUrl()) {
+    return 'low'
   }
 
   // IMPORTANT: Do not change the default effort level without notifying

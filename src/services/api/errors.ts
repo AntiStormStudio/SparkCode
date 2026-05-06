@@ -539,10 +539,10 @@ export function getAssistantMessageFromError(
     // (e.g. 1M context without Extra Usage) and infra capacity 429s land here.
     if (error.message.includes('Extra usage is required for long context')) {
       const hint = getIsNonInteractiveSession()
-        ? 'enable extra usage at spark-ai.top/settings/usage, or use --model to switch to standard context'
-        : 'run /extra-usage to enable, or /model to switch to standard context'
+        ? '请在 spark-ai.top/settings/usage 启用额外用量，或用 --model 切换到标准上下文'
+        : '请运行 /extra-usage 启用，或用 /model 切换到标准上下文'
       return createAssistantAPIErrorMessage({
-        content: `${API_ERROR_MESSAGE_PREFIX}: Extra usage is required for 1M context · ${hint}`,
+        content: `${API_ERROR_MESSAGE_PREFIX}: 1M 上下文需要额外用量 · ${hint}`,
         error: 'rate_limit',
       })
     }

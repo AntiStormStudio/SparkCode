@@ -28,6 +28,7 @@ import {
   getVertexRegionForModel,
   isEnvTruthy,
 } from '../../utils/envUtils.js'
+import { maybeHandleSparkAndroidChatFetch } from './sparkAndroidChat.js'
 
 /**
  * Environment variables for different client types:
@@ -365,7 +366,7 @@ function buildFetch(
   // and unknown headers risk rejection by strict proxies (inc-4029 class).
   const injectClientRequestId =
     getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
-  return (input, init) => {
+  return async (input, init) => {
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
     const headers = new Headers(init?.headers)
     // Generate a client-side request ID so timeouts (which return no server
@@ -384,6 +385,15 @@ function buildFetch(
     } catch {
       // never let logging crash the fetch
     }
-    return inner(input, { ...init, headers })
+    const nextInit = { ...init, headers }
+    const sparkAndroidResponse = await maybeHandleSparkAndroidChatFetch(
+      input,
+      nextInit,
+    )
+    if (sparkAndroidResponse) {
+      return sparkAndroidResponse
+    }
+
+    return inner(input, nextInit)
   }
 }

@@ -21,13 +21,13 @@ export function formatFailureDetails(
   const details = failures
     .slice(0, maxShow)
     .map(f => {
-      const reason = f.reason || f.error || 'unknown error'
+      const reason = f.reason || f.error || '未知错误'
       return includeReasons ? `${f.name} (${reason})` : f.name
     })
     .join(includeReasons ? '; ' : ', ')
 
   const remaining = failures.length - maxShow
-  const moreText = remaining > 0 ? ` and ${remaining} more` : ''
+  const moreText = remaining > 0 ? ` 以及另外 ${remaining} 个` : ''
 
   return `${details}${moreText}`
 }
@@ -50,7 +50,7 @@ export function getMarketplaceSourceDisplay(source: MarketplaceSource): string {
     case 'settings':
       return `settings:${source.name}`
     default:
-      return 'Unknown source'
+      return '未知来源'
   }
 }
 
@@ -128,15 +128,15 @@ export function formatMarketplaceLoadingErrors(
   if (successCount > 0) {
     const message =
       failures.length === 1
-        ? `Warning: Failed to load marketplace '${failures[0]!.name}': ${failures[0]!.error}`
-        : `Warning: Failed to load ${failures.length} marketplaces: ${formatFailureNames(failures)}`
+        ? `警告：加载插件市场“${failures[0]!.name}”失败：${failures[0]!.error}`
+        : `警告：加载 ${failures.length} 个插件市场失败：${formatFailureNames(failures)}`
     return { type: 'warning', message }
   }
 
   // All marketplaces failed - this is a critical error
   return {
     type: 'error',
-    message: `Failed to load all marketplaces. Errors: ${formatFailureErrors(failures)}`,
+    message: `加载所有插件市场失败。错误：${formatFailureErrors(failures)}`,
   }
 }
 

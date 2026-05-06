@@ -212,8 +212,8 @@ export async function processUserInput({
     // prompt in context.
     if (hookResult.preventContinuation) {
       const message = hookResult.stopReason
-        ? `Operation stopped by hook: ${hookResult.stopReason}`
-        : 'Operation stopped by hook'
+        ? `操作已被 Hook 停止：${hookResult.stopReason}`
+        : '操作已被 Hook 停止'
       result.messages.push(
         createUserMessage({
           content: message,
@@ -435,7 +435,7 @@ async function processUserInputBase(
       if (isBridgeSafeCommand(cmd)) {
         effectiveSkipSlash = false
       } else {
-        const msg = `/${getCommandName(cmd)} isn't available over Remote Control.`
+        const msg = `/${getCommandName(cmd)} 无法通过远程控制使用。`
         return {
           messages: [
             createUserMessage({ content: inputString, uuid }),

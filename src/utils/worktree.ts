@@ -731,8 +731,8 @@ export async function createWorktreeForSession(
     const gitRoot = findGitRoot(getCwd())
     if (!gitRoot) {
       throw new Error(
-        'Cannot create a worktree: not in a git repository and no WorktreeCreate hooks are configured. ' +
-          'Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.',
+        '无法创建工作树：当前不在 git 仓库中，也没有配置 WorktreeCreate hook。' +
+          '如需在其他版本控制系统中使用工作树隔离，请在 settings.json 中配置 WorktreeCreate/WorktreeRemove hook。',
       )
     }
 
@@ -926,8 +926,8 @@ export async function createAgentWorktree(slug: string): Promise<{
   const gitRoot = findCanonicalGitRoot(getCwd())
   if (!gitRoot) {
     throw new Error(
-      'Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured. ' +
-        'Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.',
+      '无法创建 Agent 工作树：当前不在 git 仓库中，也没有配置 WorktreeCreate hook。' +
+        '如需在其他版本控制系统中使用工作树隔离，请在 settings.json 中配置 WorktreeCreate/WorktreeRemove hook。',
     )
   }
 

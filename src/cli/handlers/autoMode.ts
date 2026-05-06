@@ -47,28 +47,25 @@ export function autoModeConfigHandler(): void {
 }
 
 const CRITIQUE_SYSTEM_PROMPT =
-  'You are an expert reviewer of auto mode classifier rules for Spark Code.\n' +
+  '你是 Spark Code 自动模式分类规则的专家评审。\n' +
   '\n' +
-  'Spark Code has an "auto mode" that uses an AI classifier to decide whether ' +
-  'tool calls should be auto-approved or require user confirmation. Users can ' +
-  'write custom rules in three categories:\n' +
+  'Spark Code 的“自动模式”会使用 AI 分类器判断工具调用应该自动批准，' +
+  '还是需要用户确认。用户可以在三类规则中编写自定义内容：\n' +
   '\n' +
-  '- **allow**: Actions the classifier should auto-approve\n' +
-  '- **soft_deny**: Actions the classifier should block (require user confirmation)\n' +
-  "- **environment**: Context about the user's setup that helps the classifier make decisions\n" +
+  '- **allow**：分类器应自动批准的操作\n' +
+  '- **soft_deny**：分类器应阻止并要求用户确认的操作\n' +
+  '- **environment**：关于用户环境的上下文，用于帮助分类器决策\n' +
   '\n' +
-  "Your job is to critique the user's custom rules for clarity, completeness, " +
-  'and potential issues. The classifier is an LLM that reads these rules as ' +
-  'part of its system prompt.\n' +
+  '你的任务是从清晰度、完整性和潜在问题角度评审用户的自定义规则。' +
+  '分类器是一个 LLM，会把这些规则作为系统提示的一部分读取。\n' +
   '\n' +
-  'For each rule, evaluate:\n' +
-  '1. **Clarity**: Is the rule unambiguous? Could the classifier misinterpret it?\n' +
-  "2. **Completeness**: Are there gaps or edge cases the rule doesn't cover?\n" +
-  '3. **Conflicts**: Do any of the rules conflict with each other?\n' +
-  '4. **Actionability**: Is the rule specific enough for the classifier to act on?\n' +
+  '请逐条评估：\n' +
+  '1. **清晰度**：规则是否明确？分类器是否可能误解？\n' +
+  '2. **完整性**：是否遗漏场景或边界情况？\n' +
+  '3. **冲突**：规则之间是否互相冲突？\n' +
+  '4. **可执行性**：规则是否足够具体，分类器能否据此行动？\n' +
   '\n' +
-  'Be concise and constructive. Only comment on rules that could be improved. ' +
-  'If all rules look good, say so.'
+  '请保持简洁、建设性。只评论需要改进的规则；如果所有规则都没问题，请直接说明。'
 
 export async function autoModeCritiqueHandler(options: {
   model?: string
@@ -81,9 +78,9 @@ export async function autoModeCritiqueHandler(options: {
 
   if (!hasCustomRules) {
     process.stdout.write(
-      'No custom auto mode rules found.\n\n' +
-        'Add rules to your settings file under autoMode.{allow, soft_deny, environment}.\n' +
-        'Run `claude auto-mode defaults` to see the default rules for reference.\n',
+      '未找到自定义自动模式规则。\n\n' +
+        '请在设置文件的 autoMode.{allow, soft_deny, environment} 下添加规则。\n' +
+        '可运行 `sparkc auto-mode defaults` 查看默认规则作为参考。\n',
     )
     return
   }
@@ -108,7 +105,7 @@ export async function autoModeCritiqueHandler(options: {
       defaults.environment,
     )
 
-  process.stdout.write('Analyzing your auto mode rules…\n\n')
+  process.stdout.write('正在分析你的自动模式规则…\n\n')
 
   let response
   try {
@@ -122,19 +119,19 @@ export async function autoModeCritiqueHandler(options: {
         {
           role: 'user',
           content:
-            'Here is the full classifier system prompt that the auto mode classifier receives:\n\n' +
+            '以下是自动模式分类器收到的完整系统提示：\n\n' +
             '<classifier_system_prompt>\n' +
             classifierPrompt +
             '\n</classifier_system_prompt>\n\n' +
-            "Here are the user's custom rules that REPLACE the corresponding default sections:\n\n" +
+            '以下是用户自定义规则，它们会替换对应的默认部分：\n\n' +
             userRulesSummary +
-            '\nPlease critique these custom rules.',
+            '\n请评审这些自定义规则。',
         },
       ],
     })
   } catch (error) {
     process.stderr.write(
-      'Failed to analyze rules: ' + errorMessage(error) + '\n',
+      '分析规则失败：' + errorMessage(error) + '\n',
     )
     process.exitCode = 1
     return
@@ -144,7 +141,7 @@ export async function autoModeCritiqueHandler(options: {
   if (textBlock?.type === 'text') {
     process.stdout.write(textBlock.text + '\n')
   } else {
-    process.stdout.write('No critique was generated. Please try again.\n')
+    process.stdout.write('没有生成评审结果，请重试。\n')
   }
 }
 
@@ -159,11 +156,11 @@ function formatRulesForCritique(
   return (
     '## ' +
     section +
-    ' (custom rules replacing defaults)\n' +
-    'Custom:\n' +
+    '（自定义规则，将替换默认规则）\n' +
+    '自定义：\n' +
     customLines +
     '\n\n' +
-    'Defaults being replaced:\n' +
+    '被替换的默认规则：\n' +
     defaultLines +
     '\n\n'
   )

@@ -262,22 +262,22 @@ export const YOLO_CLASSIFIER_TOOL_NAME = 'classify_result'
 const YOLO_CLASSIFIER_TOOL_SCHEMA: BetaToolUnion = {
   type: 'custom',
   name: YOLO_CLASSIFIER_TOOL_NAME,
-  description: 'Report the security classification result for the agent action',
+  description: '报告 Agent 操作的安全分类结果',
   input_schema: {
     type: 'object',
     properties: {
       thinking: {
         type: 'string',
-        description: 'Brief step-by-step reasoning.',
+        description: '简短的分步推理。',
       },
       shouldBlock: {
         type: 'boolean',
         description:
-          'Whether the action should be blocked (true) or allowed (false)',
+          '该操作是否应被阻止（true）或允许（false）',
       },
       reason: {
         type: 'string',
-        description: 'Brief explanation of the classification decision',
+        description: '简要说明分类决定',
       },
     },
     required: ['thinking', 'shouldBlock', 'reason'],

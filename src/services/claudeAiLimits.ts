@@ -77,11 +77,11 @@ const EARLY_WARNING_CLAIM_MAP: Record<string, RateLimitType> = {
 }
 
 const RATE_LIMIT_DISPLAY_NAMES: Record<RateLimitType, string> = {
-  five_hour: 'session limit',
-  seven_day: 'weekly limit',
-  seven_day_opus: 'Opus limit',
-  seven_day_sonnet: 'Sonnet limit',
-  overage: 'extra usage limit',
+  five_hour: '会话限制',
+  seven_day: '周用量限制',
+  seven_day_opus: 'Opus 限制',
+  seven_day_sonnet: 'Sonnet 限制',
+  overage: '额外用量限制',
 }
 
 export function getRateLimitDisplayName(type: RateLimitType): string {

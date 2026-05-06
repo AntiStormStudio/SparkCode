@@ -10,9 +10,9 @@ export default {
   get description() {
     const reward = getCachedReferrerReward()
     if (reward) {
-      return 'Share a free week of Spark Code with friends and earn extra usage'
+      return '给朋友分享一周免费 Spark Code 并赚取额外用量'
     }
-    return 'Share a free week of Spark Code with friends'
+    return '给朋友分享一周免费 Spark Code'
   },
   get isHidden() {
     const { eligible, hasCache } = checkCachedPassesEligibility()

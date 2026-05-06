@@ -21,6 +21,7 @@ import {
   clearOAuthTokenCache,
   getConfiguredApiBaseUrl,
   getAnthropicApiKeyWithSource,
+  getAuthTokenSource,
   isUsing3PServices,
   saveApiKey,
   saveConfiguredApiBaseUrl,
@@ -144,6 +145,7 @@ export async function authStatus(opts: {
   text?: boolean
 }): Promise<void> {
   const { source: apiKeySource } = getAnthropicApiKeyWithSource()
+  const { source: authTokenSource, hasToken } = getAuthTokenSource()
   const hasApiKeyEnvVar =
     !!process.env.ANTHROPIC_API_KEY && !isRunningOnHomespace()
   const using3P = isUsing3PServices()
@@ -154,12 +156,17 @@ export async function authStatus(opts: {
       : hasApiKeyEnvVar
         ? 'ANTHROPIC_API_KEY'
         : null
-  const loggedIn = using3P || resolvedApiKeySource !== null
+  const resolvedAuthTokenSource =
+    hasToken && authTokenSource !== 'apiKeyHelper' ? authTokenSource : null
+  const loggedIn =
+    using3P || resolvedApiKeySource !== null || resolvedAuthTokenSource !== null
 
   // Determine auth method
   let authMethod: string = 'none'
   if (using3P) {
     authMethod = 'third_party'
+  } else if (resolvedAuthTokenSource !== null) {
+    authMethod = 'bearer_token'
   } else if (resolvedApiKeySource === 'apiKeyHelper') {
     authMethod = 'api_key_helper'
   } else if (resolvedApiKeySource !== null) {
@@ -172,6 +179,9 @@ export async function authStatus(opts: {
     process.stdout.write(`API 提供方: ${getAPIProvider()}\n`)
     if (resolvedApiKeySource) {
       process.stdout.write(`API Key 来源: ${resolvedApiKeySource}\n`)
+    }
+    if (resolvedAuthTokenSource) {
+      process.stdout.write(`Token 来源: ${resolvedAuthTokenSource}\n`)
     }
     if (configuredBaseUrl) {
       process.stdout.write(`BASEURL: ${configuredBaseUrl}\n`)
@@ -191,6 +201,9 @@ export async function authStatus(opts: {
     }
     if (resolvedApiKeySource) {
       output.apiKeySource = resolvedApiKeySource
+    }
+    if (resolvedAuthTokenSource) {
+      output.authTokenSource = resolvedAuthTokenSource
     }
 
     process.stdout.write(jsonStringify(output, null, 2) + '\n')
