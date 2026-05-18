@@ -17,9 +17,9 @@ export type Step = {
 }
 
 export function getSteps(): Step[] {
-  const hasProjectInstructionFile =
-    getFsImplementation().existsSync(join(getCwd(), 'SPARK.md')) ||
-    getFsImplementation().existsSync(join(getCwd(), 'CLAUDE.md'))
+  const hasProjectInstructionFile = getFsImplementation().existsSync(
+    join(getCwd(), 'SPARK.md'),
+  )
   const isWorkspaceDirEmpty = isDirEmpty(getCwd())
 
   return [

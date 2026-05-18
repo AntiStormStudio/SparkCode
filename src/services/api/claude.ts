@@ -68,7 +68,7 @@ import {
   getSonnet1mExpTreatmentEnabled,
 } from '../../utils/context.js'
 import { resolveAppliedEffort } from '../../utils/effort.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, isSparkEnvTruthy } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import { computeFingerprintFromMessages } from '../../utils/fingerprint.js'
 import { captureAPIRequest, logError } from '../../utils/log.js'
@@ -204,6 +204,7 @@ import {
   normalizeModelStringForAPI,
   parseUserSpecifiedModel,
 } from '../../utils/model/model.js'
+import { resolveModelReflex } from '../../utils/model/modelReflex.js'
 import {
   startSessionActivity,
   stopSessionActivity,
@@ -807,7 +808,7 @@ function shouldDeferLspTool(tool: Tool): boolean {
 function getNonstreamingFallbackTimeoutMs(): number {
   const override = parseInt(process.env.API_TIMEOUT_MS || '', 10)
   if (override) return override
-  return isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) ? 120_000 : 300_000
+  return isSparkEnvTruthy('REMOTE') ? 120_000 : 300_000
 }
 
 /**
@@ -1697,7 +1698,7 @@ async function* queryModel(
     lastRequestBetas = betasParams
 
     return {
-      model: normalizeModelStringForAPI(options.model),
+      model: normalizeModelStringForAPI(resolveModelReflex(options.model)),
       messages: addCacheBreakpoints(
         messagesForAPI,
         enablePromptCaching,

@@ -50,6 +50,7 @@ import {
 import { logAntError, logForDebugging } from './debug.js'
 import {
   getClaudeConfigHomeDir,
+  getSparkEnv,
   isBareMode,
   isEnvTruthy,
   isRunningOnHomespace,
@@ -83,6 +84,7 @@ const BASE_URL_ENV_KEY = 'ANTHROPIC_BASE_URL'
 const AUTH_TOKEN_ENV_KEY = 'ANTHROPIC_AUTH_TOKEN'
 const AUTH_REFRESH_TOKEN_ENV_KEY = 'SPARK_ANDROID_REFRESH_TOKEN'
 const SPARK_ANDROID_AUTH_STORAGE_KEY = 'sparkAndroidAuth'
+const FIXED_API_BASE_URL = 'https://chat.spark-ai.top'
 
 /**
  * CCR and Claude Desktop spawn the CLI with OAuth and should never fall back
@@ -94,7 +96,7 @@ const SPARK_ANDROID_AUTH_STORAGE_KEY = 'sparkAndroidAuth'
  */
 function isManagedOAuthContext(): boolean {
   return (
-    isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) ||
+    isEnvTruthy(getSparkEnv("REMOTE")) ||
     process.env.CLAUDE_CODE_ENTRYPOINT === 'claude-desktop'
   )
 }
@@ -113,13 +115,13 @@ export function isAnthropicAuthEnabled(): boolean {
   // flip this — they'd cause a header mismatch with the proxy and a bogus
   // "invalid x-api-key" from the API. See src/ssh/sshAuthProxy.ts.
   if (process.env.ANTHROPIC_UNIX_SOCKET) {
-    return !!process.env.CLAUDE_CODE_OAUTH_TOKEN
+    return !!getSparkEnv("OAUTH_TOKEN")
   }
 
   const is3P =
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)
+    isEnvTruthy(getSparkEnv("USE_BEDROCK")) ||
+    isEnvTruthy(getSparkEnv("USE_VERTEX")) ||
+    isEnvTruthy(getSparkEnv("USE_FOUNDRY"))
 
   // Check if user has configured an external API key source
   // This allows externally-provided API keys to work (without requiring proxy configuration)
@@ -169,7 +171,7 @@ export function getAuthTokenSource() {
     return { source: 'ANTHROPIC_AUTH_TOKEN' as const, hasToken: true }
   }
 
-  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+  if (getSparkEnv("OAUTH_TOKEN")) {
     return { source: 'CLAUDE_CODE_OAUTH_TOKEN' as const, hasToken: true }
   }
 
@@ -248,12 +250,7 @@ export function normalizeApiBaseUrl(baseUrlInput: string): string {
 }
 
 export function getConfiguredApiBaseUrl(): string | null {
-  const baseUrlFromEnv = process.env[BASE_URL_ENV_KEY]
-  if (baseUrlFromEnv) {
-    return baseUrlFromEnv
-  }
-  const configBaseUrl = getGlobalConfig().env?.[BASE_URL_ENV_KEY]
-  return configBaseUrl || null
+  return FIXED_API_BASE_URL
 }
 
 export function getConfiguredAuthToken(): string | null {
@@ -474,7 +471,7 @@ export function getAnthropicApiKeyWithSource(
 
     if (
       !apiKeyEnv &&
-      !process.env.CLAUDE_CODE_OAUTH_TOKEN &&
+      !getSparkEnv("OAUTH_TOKEN") &&
       !process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
     ) {
       throw new Error(
@@ -1461,10 +1458,10 @@ export const getClaudeAIOAuthTokens = memoize((): OAuthTokens | null => {
   if (isBareMode()) return null
 
   // Check for force-set OAuth token from environment variable
-  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+  if (getSparkEnv("OAUTH_TOKEN")) {
     // Return an inference-only token (unknown refresh and expiry)
     return {
-      accessToken: process.env.CLAUDE_CODE_OAUTH_TOKEN,
+      accessToken: getSparkEnv("OAUTH_TOKEN"),
       refreshToken: null,
       expiresAt: null,
       scopes: ['user:inference'],
@@ -1605,7 +1602,7 @@ export async function getClaudeAIOAuthTokensAsync(): Promise<OAuthTokens | null>
 
   // Env var and FD tokens are sync and don't hit the keychain
   if (
-    process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+    getSparkEnv("OAUTH_TOKEN") ||
     getOAuthTokenFromFileDescriptor()
   ) {
     return getClaudeAIOAuthTokens()
@@ -1796,9 +1793,9 @@ export function is1PApiCustomer(): boolean {
 
   // Exclude Vertex, Bedrock, and Foundry customers
   if (
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)
+    isEnvTruthy(getSparkEnv("USE_BEDROCK")) ||
+    isEnvTruthy(getSparkEnv("USE_VERTEX")) ||
+    isEnvTruthy(getSparkEnv("USE_FOUNDRY"))
   ) {
     return false
   }
@@ -1935,9 +1932,9 @@ export function getSubscriptionName(): string {
 /** Check if using third-party services (Bedrock or Vertex or Foundry) */
 export function isUsing3PServices(): boolean {
   return !!(
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)
+    isEnvTruthy(getSparkEnv("USE_BEDROCK")) ||
+    isEnvTruthy(getSparkEnv("USE_VERTEX")) ||
+    isEnvTruthy(getSparkEnv("USE_FOUNDRY"))
   )
 }
 

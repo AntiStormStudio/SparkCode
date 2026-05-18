@@ -5,18 +5,19 @@ import { getOriginalCwd } from '../../../bootstrap/state.js';
 import { Text } from '../../../ink.js';
 import { getShortcutDisplay } from '../../../keybindings/shortcutFormat.js';
 import type { ToolPermissionContext } from '../../../Tool.js';
+import { getClaudeConfigHomeDir } from '../../../utils/envUtils.js';
 import { expandPath, getDirectoryForPath } from '../../../utils/path.js';
 import { normalizeCaseForComparison, pathInAllowedWorkingPath } from '../../../utils/permissions/filesystem.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 /**
- * Check if a path is within the project's .claude/ folder.
- * This is used to determine whether to show the special ".claude folder" permission option.
+ * Check if a path is within the project's .sparkc/ folder.
+ * This is used to determine whether to show the special ".sparkc folder" permission option.
  */
 export function isInClaudeFolder(filePath: string): boolean {
   const absolutePath = expandPath(filePath);
-  const claudeFolderPath = expandPath(`${getOriginalCwd()}/.claude`);
+  const claudeFolderPath = expandPath(`${getOriginalCwd()}/.sparkc`);
 
-  // Check if the path is within the project's .claude folder
+  // Check if the path is within the project's .sparkc folder
   const normalizedAbsolutePath = normalizeCaseForComparison(absolutePath);
   const normalizedClaudeFolderPath = normalizeCaseForComparison(claudeFolderPath);
 
@@ -27,13 +28,13 @@ export function isInClaudeFolder(filePath: string): boolean {
 }
 
 /**
- * Check if a path is within the global ~/.claude/ folder.
- * This is used to determine whether to show the special ".claude folder" permission option
+ * Check if a path is within the global ~/.sparkc/ folder.
+ * This is used to determine whether to show the special ".sparkc folder" permission option
  * for files in the user's home directory.
  */
 export function isInGlobalClaudeFolder(filePath: string): boolean {
   const absolutePath = expandPath(filePath);
-  const globalClaudeFolderPath = join(homedir(), '.claude');
+  const globalClaudeFolderPath = getClaudeConfigHomeDir();
   const normalizedAbsolutePath = normalizeCaseForComparison(absolutePath);
   const normalizedGlobalClaudeFolderPath = normalizeCaseForComparison(globalClaudeFolderPath);
   return normalizedAbsolutePath.startsWith(normalizedGlobalClaudeFolderPath + sep.toLowerCase()) || normalizedAbsolutePath.startsWith(normalizedGlobalClaudeFolderPath + '/');
@@ -94,11 +95,11 @@ export function getFilePermissionOptions({
   }
   const inAllowedPath = pathInAllowedWorkingPath(filePath, toolPermissionContext);
 
-  // Check if this is a .claude/ folder path (project or global)
+  // Check if this is a .sparkc/ folder path (project or global)
   const inClaudeFolder = isInClaudeFolder(filePath);
   const inGlobalClaudeFolder = isInGlobalClaudeFolder(filePath);
 
-  // Option 2: For .claude/ folder, show special option instead of generic session option
+  // Option 2: For .sparkc/ folder, show special option instead of generic session option
   // Note: Session-level options are always shown since they only affect in-memory state,
   // not persisted settings. The allowManagedPermissionRulesOnly setting only restricts
   // persisted permission rules.

@@ -2,6 +2,7 @@ import memoize from 'lodash-es/memoize.js'
 import * as path from 'path'
 import * as pathWin32 from 'path/win32'
 import { getCwd } from './cwd.js'
+import { getSparkEnv } from './envUtils.js'
 import { logForDebugging } from './debug.js'
 import { execSync_DEPRECATED } from './execSyncWrapper.js'
 import { memoizeWithLRU } from './memoize.js'
@@ -96,13 +97,13 @@ export function setShellIfWindows(): void {
  * Find the path where `bash.exe` included with git-bash exists, exiting the process if not found.
  */
 export const findGitBashPath = memoize((): string => {
-  if (process.env.CLAUDE_CODE_GIT_BASH_PATH) {
-    if (checkPathExists(process.env.CLAUDE_CODE_GIT_BASH_PATH)) {
-      return process.env.CLAUDE_CODE_GIT_BASH_PATH
+  if (getSparkEnv("GIT_BASH_PATH")) {
+    if (checkPathExists(getSparkEnv("GIT_BASH_PATH"))) {
+      return getSparkEnv("GIT_BASH_PATH")
     }
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.error(
-      `Spark Code was unable to find CLAUDE_CODE_GIT_BASH_PATH path "${process.env.CLAUDE_CODE_GIT_BASH_PATH}"`,
+      `Spark Code was unable to find CLAUDE_CODE_GIT_BASH_PATH path "${getSparkEnv("GIT_BASH_PATH")}"`,
     )
     // eslint-disable-next-line custom-rules/no-process-exit
     process.exit(1)

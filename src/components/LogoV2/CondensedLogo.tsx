@@ -1,160 +1,191 @@
-import { c as _c } from "react/compiler-runtime";
-import * as React from 'react';
-import { type ReactNode, useEffect } from 'react';
-import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
-import { useTerminalSize } from '../../hooks/useTerminalSize.js';
-import { stringWidth } from '../../ink/stringWidth.js';
-import { Box, Text } from '../../ink.js';
-import { useAppState } from '../../state/AppState.js';
-import { getEffortSuffix } from '../../utils/effort.js';
-import { truncate } from '../../utils/format.js';
-import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
-import { formatModelAndBilling, getLogoDisplayData, truncatePath } from '../../utils/logoV2Utils.js';
-import { renderModelSetting } from '../../utils/model/model.js';
-import { OffscreenFreeze } from '../OffscreenFreeze.js';
-import { AnimatedClawd } from './AnimatedClawd.js';
-import { Clawd } from './Clawd.js';
-import { GuestPassesUpsell, incrementGuestPassesSeenCount, useShowGuestPassesUpsell } from './GuestPassesUpsell.js';
-import { incrementOverageCreditUpsellSeenCount, OverageCreditUpsell, useShowOverageCreditUpsell } from './OverageCreditUpsell.js';
+import * as React from 'react'
+import { useEffect } from 'react'
+import { useMainLoopModel } from '../../hooks/useMainLoopModel.js'
+import { useTerminalSize } from '../../hooks/useTerminalSize.js'
+import { stringWidth } from '../../ink/stringWidth.js'
+import { Box, Text } from '../../ink.js'
+import { useAppState } from '../../state/AppState.js'
+import { getEffortSuffix } from '../../utils/effort.js'
+import { truncate } from '../../utils/format.js'
+import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js'
+import {
+  formatModelAndBilling,
+  getLogoDisplayData,
+  truncatePath,
+} from '../../utils/logoV2Utils.js'
+import { renderModelSetting } from '../../utils/model/model.js'
+import { OffscreenFreeze } from '../OffscreenFreeze.js'
+import { AnimatedClawd } from './AnimatedClawd.js'
+import { Clawd } from './Clawd.js'
+import {
+  GuestPassesUpsell,
+  incrementGuestPassesSeenCount,
+  useShowGuestPassesUpsell,
+} from './GuestPassesUpsell.js'
+import {
+  incrementOverageCreditUpsellSeenCount,
+  OverageCreditUpsell,
+  useShowOverageCreditUpsell,
+} from './OverageCreditUpsell.js'
+
+const CLAWD_ART_WIDTH = 41
+const LOGO_TEXT_GAP = 1
+const LOGO_DIVIDER_WIDTH = 1
+const MIN_INLINE_TEXT_WIDTH = 24
+const MIN_TEXT_WIDTH = 12
+const BORDER_INSET = 4
+
 export function CondensedLogo() {
-  const $ = _c(29);
-  const {
-    columns
-  } = useTerminalSize();
-  const agent = useAppState(_temp);
-  const effortValue = useAppState(_temp2);
-  const model = useMainLoopModel();
-  const modelDisplayName = renderModelSetting(model);
+  const { columns } = useTerminalSize()
+  const agent = useAppState(_temp)
+  const effortValue = useAppState(_temp2)
+  const model = useMainLoopModel()
+  const modelDisplayName = renderModelSetting(model)
   const {
     version,
     cwd,
     billingType,
-    agentName: agentNameFromSettings
-  } = getLogoDisplayData();
-  const agentName = agent ?? agentNameFromSettings;
-  const showGuestPassesUpsell = useShowGuestPassesUpsell();
-  const showOverageCreditUpsell = useShowOverageCreditUpsell();
-  let t0;
-  let t1;
-  if ($[0] !== showGuestPassesUpsell) {
-    t0 = () => {
-      if (showGuestPassesUpsell) {
-        incrementGuestPassesSeenCount();
-      }
-    };
-    t1 = [showGuestPassesUpsell];
-    $[0] = showGuestPassesUpsell;
-    $[1] = t0;
-    $[2] = t1;
-  } else {
-    t0 = $[1];
-    t1 = $[2];
-  }
-  useEffect(t0, t1);
-  let t2;
-  let t3;
-  if ($[3] !== showGuestPassesUpsell || $[4] !== showOverageCreditUpsell) {
-    t2 = () => {
-      if (showOverageCreditUpsell && !showGuestPassesUpsell) {
-        incrementOverageCreditUpsellSeenCount();
-      }
-    };
-    t3 = [showOverageCreditUpsell, showGuestPassesUpsell];
-    $[3] = showGuestPassesUpsell;
-    $[4] = showOverageCreditUpsell;
-    $[5] = t2;
-    $[6] = t3;
-  } else {
-    t2 = $[5];
-    t3 = $[6];
-  }
-  useEffect(t2, t3);
-  const textWidth = Math.max(columns - 15, 20);
-  const truncatedVersion = truncate(version, Math.max(textWidth - 13, 6));
-  const effortSuffix = getEffortSuffix(model, effortValue);
+    agentName: agentNameFromSettings,
+  } = getLogoDisplayData()
+  const agentName = agent ?? agentNameFromSettings
+  const showGuestPassesUpsell = useShowGuestPassesUpsell()
+  const showOverageCreditUpsell = useShowOverageCreditUpsell()
+
+  useEffect(() => {
+    if (showGuestPassesUpsell) {
+      incrementGuestPassesSeenCount()
+    }
+  }, [showGuestPassesUpsell])
+
+  useEffect(() => {
+    if (showOverageCreditUpsell && !showGuestPassesUpsell) {
+      incrementOverageCreditUpsellSeenCount()
+    }
+  }, [showOverageCreditUpsell, showGuestPassesUpsell])
+
+  const availableContentWidth = Math.max(columns - BORDER_INSET, MIN_TEXT_WIDTH)
+  const inlineTextWidth =
+    availableContentWidth -
+    CLAWD_ART_WIDTH -
+    LOGO_DIVIDER_WIDTH -
+    LOGO_TEXT_GAP * 2
+  const shouldStack = inlineTextWidth < MIN_INLINE_TEXT_WIDTH
+  const stackOuterWidth = Math.max(Math.min(columns, 52), 1)
+  const stackContentWidth = Math.max(stackOuterWidth - BORDER_INSET, 1)
+  const textWidth = shouldStack ? stackContentWidth : inlineTextWidth
+  const titleVersionWidth = textWidth - stringWidth('SparkCode v')
+  const truncatedVersion =
+    titleVersionWidth >= 4 ? truncate(version, titleVersionWidth) : ''
+  const effortSuffix = getEffortSuffix(model, effortValue)
   const {
     shouldSplit,
     truncatedModel,
-    truncatedBilling
-  } = formatModelAndBilling(modelDisplayName + effortSuffix, billingType, textWidth);
-  const cwdAvailableWidth = agentName ? textWidth - 1 - stringWidth(agentName) - 3 : textWidth;
-  const truncatedCwd = truncatePath(cwd, Math.max(cwdAvailableWidth, 10));
-  let t4;
-  if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = isFullscreenEnvEnabled() ? <AnimatedClawd /> : <Clawd />;
-    $[7] = t4;
-  } else {
-    t4 = $[7];
+    truncatedBilling,
+  } = formatModelAndBilling(modelDisplayName + effortSuffix, billingType, textWidth)
+  const cwdAvailableWidth = agentName
+    ? textWidth - stringWidth('工作目录：') - 1 - stringWidth(agentName) - 3
+    : textWidth - stringWidth('工作目录：')
+  const truncatedCwd = truncatePath(cwd, Math.max(cwdAvailableWidth, 10))
+  const cwdLine = agentName
+    ? `@${agentName} · 工作目录：${truncatedCwd}`
+    : `工作目录：${truncatedCwd}`
+  const logo = isFullscreenEnvEnabled() ? <AnimatedClawd /> : <Clawd />
+  const title = truncatedVersion ? (
+    <Text>
+      <Text bold={true}>SparkCode</Text>{' '}
+      <Text dimColor={true}>v{truncatedVersion}</Text>
+    </Text>
+  ) : (
+    <Text bold={true}>SparkCode</Text>
+  )
+  const modelAndBilling = shouldSplit ? (
+    <>
+      <Text dimColor={true}>{truncatedModel}</Text>
+      <Text dimColor={true}>{truncatedBilling}</Text>
+    </>
+  ) : (
+    <Text dimColor={true}>
+      {truncatedModel} · {truncatedBilling}
+    </Text>
+  )
+  const guestPassesUpsell = showGuestPassesUpsell && <GuestPassesUpsell />
+  const overageCreditUpsell = !showGuestPassesUpsell &&
+    showOverageCreditUpsell && (
+      <OverageCreditUpsell maxWidth={textWidth} twoLine={true} />
+    )
+  const details = (
+    <Box
+      flexDirection="column"
+      alignItems={shouldStack ? 'center' : 'flex-start'}
+      width={textWidth}
+      flexShrink={0}
+    >
+      {title}
+      {modelAndBilling}
+      <Text dimColor={true}>{cwdLine}</Text>
+      {guestPassesUpsell}
+      {overageCreditUpsell}
+    </Box>
+  )
+
+  if (shouldStack) {
+    return (
+      <OffscreenFreeze>
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="claude"
+          paddingX={1}
+          paddingY={1}
+          alignItems="center"
+          width={stackOuterWidth}
+        >
+          {details}
+        </Box>
+      </OffscreenFreeze>
+    )
   }
-  let t5;
-  if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Text bold={true}>SparkCode</Text>;
-    $[8] = t5;
-  } else {
-    t5 = $[8];
-  }
-  let t6;
-  if ($[9] !== truncatedVersion) {
-    t6 = <Text>{t5}{" "}<Text dimColor={true}>v{truncatedVersion}</Text></Text>;
-    $[9] = truncatedVersion;
-    $[10] = t6;
-  } else {
-    t6 = $[10];
-  }
-  let t7;
-  if ($[11] !== shouldSplit || $[12] !== truncatedBilling || $[13] !== truncatedModel) {
-    t7 = shouldSplit ? <><Text dimColor={true}>{truncatedModel}</Text><Text dimColor={true}>{truncatedBilling}</Text></> : <Text dimColor={true}>{truncatedModel} · {truncatedBilling}</Text>;
-    $[11] = shouldSplit;
-    $[12] = truncatedBilling;
-    $[13] = truncatedModel;
-    $[14] = t7;
-  } else {
-    t7 = $[14];
-  }
-  const t8 = agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd;
-  let t9;
-  if ($[15] !== t8) {
-    t9 = <Text dimColor={true}>{t8}</Text>;
-    $[15] = t8;
-    $[16] = t9;
-  } else {
-    t9 = $[16];
-  }
-  let t10;
-  if ($[17] !== showGuestPassesUpsell) {
-    t10 = showGuestPassesUpsell && <GuestPassesUpsell />;
-    $[17] = showGuestPassesUpsell;
-    $[18] = t10;
-  } else {
-    t10 = $[18];
-  }
-  let t11;
-  if ($[19] !== showGuestPassesUpsell || $[20] !== showOverageCreditUpsell || $[21] !== textWidth) {
-    t11 = !showGuestPassesUpsell && showOverageCreditUpsell && <OverageCreditUpsell maxWidth={textWidth} twoLine={true} />;
-    $[19] = showGuestPassesUpsell;
-    $[20] = showOverageCreditUpsell;
-    $[21] = textWidth;
-    $[22] = t11;
-  } else {
-    t11 = $[22];
-  }
-  let t12;
-  if ($[23] !== t10 || $[24] !== t11 || $[25] !== t6 || $[26] !== t7 || $[27] !== t9) {
-    t12 = <OffscreenFreeze><Box flexDirection="row" gap={2} alignItems="center">{t4}<Box flexDirection="column">{t6}{t7}{t9}{t10}{t11}</Box></Box></OffscreenFreeze>;
-    $[23] = t10;
-    $[24] = t11;
-    $[25] = t6;
-    $[26] = t7;
-    $[27] = t9;
-    $[28] = t12;
-  } else {
-    t12 = $[28];
-  }
-  return t12;
+
+  return (
+    <OffscreenFreeze>
+      <Box
+        flexDirection="row"
+        borderStyle="round"
+        borderColor="claude"
+        paddingX={1}
+        paddingY={1}
+        gap={LOGO_TEXT_GAP}
+        alignItems="center"
+        width={
+          CLAWD_ART_WIDTH +
+          LOGO_DIVIDER_WIDTH +
+          LOGO_TEXT_GAP * 2 +
+          textWidth +
+          BORDER_INSET
+        }
+      >
+        <Box width={CLAWD_ART_WIDTH} flexShrink={0}>
+          {logo}
+        </Box>
+        <Box
+          width={LOGO_DIVIDER_WIDTH}
+          height={6}
+          flexShrink={0}
+          borderStyle="single"
+          borderColor="claude"
+          borderDimColor={true}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={false}
+        />
+        {details}
+      </Box>
+    </OffscreenFreeze>
+  )
 }
 function _temp2(s_0) {
-  return s_0.effortValue;
+  return s_0.effortValue
 }
 function _temp(s) {
-  return s.agent;
+  return s.agent
 }

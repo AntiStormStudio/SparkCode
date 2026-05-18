@@ -60,7 +60,7 @@ export function ConsoleOAuthFlow({
   const settings = getSettings_DEPRECATED() || {};
   const forceLoginMethod = forceLoginMethodProp ?? settings.forceLoginMethod;
   const orgUUID = settings.forceLoginOrgUUID;
-  const forcedMethodMessage = forceLoginMethod === 'claudeai' ? '登录方式已预选：订阅套餐（Spark Pro/Max）' : forceLoginMethod === 'console' ? '登录方式已预选：API 用量计费（Anthropic Console）' : null;
+  const forcedMethodMessage = forceLoginMethod === 'claudeai' ? '登录方式已预选：订阅套餐（Spark Pro/Max）' : forceLoginMethod === 'console' ? '登录方式已预选：免费使用（Anthropic Console）' : null;
   const terminal = useTerminalNotification();
   const [oauthStatus, setOAuthStatus] = useState<OAuthStatus>(() => {
     if (mode === 'setup-token') {
@@ -363,7 +363,7 @@ function OAuthStatusMessage(t0) {
   switch (oauthStatus.state) {
     case "idle":
       {
-        const t1 = startingMessage ? startingMessage : "Spark Code 支持使用你的 Spark 订阅，也可通过 Console 账户按 API 用量计费。";
+        const t1 = startingMessage ? startingMessage : "Spark Code 支持使用你的 Spark 订阅，也可通过 Console 账户免费使用。";
         let t2;
         if ($[0] !== t1) {
           t2 = <Text bold={true}>{t1}</Text>;

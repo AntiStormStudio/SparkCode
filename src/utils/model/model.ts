@@ -27,6 +27,7 @@ import { getAPIProvider } from './providers.js'
 import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
+import { isModelReflexAlias } from './modelReflex.js'
 import { capitalize } from '../stringUtils.js'
 
 export type ModelShortName = string
@@ -70,7 +71,11 @@ export function getUserSpecifiedModelSetting(): ModelSetting | undefined {
   }
 
   // Ignore the user-specified model if it's not in the availableModels allowlist.
-  if (specifiedModel && !isModelAllowed(specifiedModel)) {
+  if (
+    specifiedModel &&
+    !isModelAllowed(specifiedModel) &&
+    !isModelReflexAlias(specifiedModel)
+  ) {
     return undefined
   }
 
@@ -446,6 +451,9 @@ export function parseUserSpecifiedModel(
   modelInput: ModelName | ModelAlias,
 ): ModelName {
   const modelInputTrimmed = modelInput.trim()
+  if (isModelReflexAlias(modelInputTrimmed)) {
+    return modelInputTrimmed
+  }
   const normalizedModel = modelInputTrimmed.toLowerCase()
 
   const has1mTag = has1mContext(normalizedModel)

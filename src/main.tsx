@@ -106,7 +106,7 @@ import { setupClaudeInChrome, shouldAutoEnableClaudeInChrome, shouldEnableClaude
 import { getContextWindowForModel } from './utils/context.js';
 import { loadConversationForResume } from './utils/conversationRecovery.js';
 import { buildDeepLinkBanner } from './utils/deepLink/banner.js';
-import { hasNodeOption, isBareMode, isEnvTruthy, isInProtectedNamespace } from './utils/envUtils.js';
+import { getSparkEnv, hasNodeOption, isBareMode, isEnvTruthy, isInProtectedNamespace, isSparkEnvTruthy } from './utils/envUtils.js';
 import { refreshExampleCommands } from './utils/exampleCommands.js';
 import type { FpsMetrics } from './utils/fpsTracker.js';
 import { getWorktreePaths } from './utils/getWorktreePaths.js';
@@ -293,7 +293,7 @@ function getCertEnvVarTelemetry(): Record<string, boolean> {
   if (process.env.NODE_EXTRA_CA_CERTS) {
     result.has_node_extra_ca_certs = true;
   }
-  if (process.env.CLAUDE_CODE_CLIENT_CERT) {
+  if (getSparkEnv("CLIENT_CERT")) {
     result.has_client_cert = true;
   }
   if (hasNodeOption('--use-system-ca')) {
@@ -405,10 +405,10 @@ export function startDeferredPrefetches(): void {
   void getUserContext();
   prefetchSystemContextIfSafe();
   void getRelevantTips();
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) && !isEnvTruthy(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH)) {
+  if (isEnvTruthy(getSparkEnv("USE_BEDROCK")) && !isEnvTruthy(getSparkEnv("SKIP_BEDROCK_AUTH"))) {
     void prefetchAwsCredentialsAndBedRockInfoIfSafe();
   }
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) && !isEnvTruthy(process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH)) {
+  if (isEnvTruthy(getSparkEnv("USE_VERTEX")) && !isEnvTruthy(process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH)) {
     void prefetchGcpCredentialsIfSafe();
   }
   void countFilesRoundedRg(getCwd(), AbortSignal.timeout(3000), []);
@@ -516,7 +516,7 @@ function eagerLoadSettings(): void {
 }
 function initializeEntrypoint(isNonInteractive: boolean): void {
   // Skip if already set (e.g., by SDK or other entrypoints)
-  if (process.env.CLAUDE_CODE_ENTRYPOINT) {
+  if (getSparkEnv('ENTRYPOINT')) {
     return;
   }
   const cliArgs = process.argv.slice(2);
@@ -525,10 +525,12 @@ function initializeEntrypoint(isNonInteractive: boolean): void {
   const mcpIndex = cliArgs.indexOf('mcp');
   if (mcpIndex !== -1 && cliArgs[mcpIndex + 1] === 'serve') {
     process.env.CLAUDE_CODE_ENTRYPOINT = 'mcp';
+    process.env.SPARK_ENTRYPOINT = 'mcp';
     return;
   }
-  if (isEnvTruthy(process.env.CLAUDE_CODE_ACTION)) {
+  if (isEnvTruthy(getSparkEnv('ACTION'))) {
     process.env.CLAUDE_CODE_ENTRYPOINT = 'claude-code-github-action';
+    process.env.SPARK_ENTRYPOINT = 'claude-code-github-action';
     return;
   }
 
@@ -537,6 +539,7 @@ function initializeEntrypoint(isNonInteractive: boolean): void {
 
   // Set based on interactive status
   process.env.CLAUDE_CODE_ENTRYPOINT = isNonInteractive ? 'sdk-cli' : 'cli';
+  process.env.SPARK_ENTRYPOINT = isNonInteractive ? 'sdk-cli' : 'cli';
 }
 
 // Set by early argv processing when `claude open <url>` is detected (interactive mode only)
@@ -814,16 +817,16 @@ export async function main() {
   // Determine client type
   const clientType = (() => {
     if (isEnvTruthy(process.env.GITHUB_ACTIONS)) return 'github-action';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'sdk-ts') return 'sdk-typescript';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'sdk-py') return 'sdk-python';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'sdk-cli') return 'sdk-cli';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'claude-vscode') return 'claude-vscode';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'local-agent') return 'local-agent';
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'claude-desktop') return 'claude-desktop';
+    if (getSparkEnv('ENTRYPOINT') === 'sdk-ts') return 'sdk-typescript';
+    if (getSparkEnv('ENTRYPOINT') === 'sdk-py') return 'sdk-python';
+    if (getSparkEnv('ENTRYPOINT') === 'sdk-cli') return 'sdk-cli';
+    if (getSparkEnv('ENTRYPOINT') === 'claude-vscode') return 'claude-vscode';
+    if (getSparkEnv('ENTRYPOINT') === 'local-agent') return 'local-agent';
+    if (getSparkEnv('ENTRYPOINT') === 'claude-desktop') return 'claude-desktop';
 
     // Check if session-ingress token is provided (indicates remote session)
-    const hasSessionIngressToken = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN || process.env.CLAUDE_CODE_WEBSOCKET_AUTH_FILE_DESCRIPTOR;
-    if (process.env.CLAUDE_CODE_ENTRYPOINT === 'remote' || hasSessionIngressToken) {
+    const hasSessionIngressToken = process.env.SPARK_SESSION_ACCESS_TOKEN || process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN || process.env.SPARK_WEBSOCKET_AUTH_FILE_DESCRIPTOR || process.env.CLAUDE_CODE_WEBSOCKET_AUTH_FILE_DESCRIPTOR;
+    if (getSparkEnv('ENTRYPOINT') === 'remote' || hasSessionIngressToken) {
       return 'remote';
     }
     return 'cli';
@@ -970,7 +973,7 @@ async function run(): Promise<CommanderCommand> {
     // If not provided but flag is present, value will be true
     // The actual filtering is handled in debug.ts by parsing process.argv
     return true;
-  }).addOption(new Option('--debug-to-stderr', 'Enable debug mode (to stderr)').argParser(Boolean).hideHelp()).option('--debug-file <path>', 'Write debug logs to a specific file path (implicitly enables debug mode)', () => true).option('--verbose', 'Override verbose mode setting from config', () => true).option('-p, --print', 'Print response and exit (useful for pipes). Note: The workspace trust dialog is skipped when Claude is run with the -p mode. Only use this flag in directories you trust.', () => true).option('--bare', 'Minimal mode: skip hooks, LSP, plugin sync, attribution, auto-memory, background prefetches, keychain reads, and CLAUDE.md auto-discovery. Sets CLAUDE_CODE_SIMPLE=1. Anthropic auth is strictly ANTHROPIC_API_KEY or apiKeyHelper via --settings (OAuth and keychain are never read). 3P providers (Bedrock/Vertex/Foundry) use their own credentials. Skills still resolve via /skill-name. Explicitly provide context via: --system-prompt[-file], --append-system-prompt[-file], --add-dir (CLAUDE.md dirs), --mcp-config, --settings, --agents, --plugin-dir.', () => true).addOption(new Option('--init', 'Run Setup hooks with init trigger, then continue').hideHelp()).addOption(new Option('--init-only', 'Run Setup and SessionStart:startup hooks, then exit').hideHelp()).addOption(new Option('--maintenance', 'Run Setup hooks with maintenance trigger, then continue').hideHelp()).addOption(new Option('--output-format <format>', 'Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming)').choices(['text', 'json', 'stream-json'])).addOption(new Option('--json-schema <schema>', 'JSON Schema for structured output validation. ' + 'Example: {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}').argParser(String)).option('--include-hook-events', 'Include all hook lifecycle events in the output stream (only works with --output-format=stream-json)', () => true).option('--include-partial-messages', 'Include partial message chunks as they arrive (only works with --print and --output-format=stream-json)', () => true).addOption(new Option('--input-format <format>', 'Input format (only works with --print): "text" (default), or "stream-json" (realtime streaming input)').choices(['text', 'stream-json'])).option('--mcp-debug', '[DEPRECATED. Use --debug instead] Enable MCP debug mode (shows MCP server errors)', () => true).option('--dangerously-skip-permissions', 'Bypass all permission checks. Recommended only for sandboxes with no internet access.', () => true).option('--allow-dangerously-skip-permissions', 'Enable bypassing all permission checks as an option, without it being enabled by default. Recommended only for sandboxes with no internet access.', () => true).addOption(new Option('--thinking <mode>', 'Thinking mode: enabled (equivalent to adaptive), disabled').choices(['enabled', 'adaptive', 'disabled']).hideHelp()).addOption(new Option('--max-thinking-tokens <tokens>', '[DEPRECATED. Use --thinking instead for newer models] Maximum number of thinking tokens (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-turns <turns>', 'Maximum number of agentic turns in non-interactive mode. This will early exit the conversation after the specified number of turns. (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-budget-usd <amount>', 'Maximum dollar amount to spend on API calls (only works with --print)').argParser(value => {
+  }).addOption(new Option('--debug-to-stderr', 'Enable debug mode (to stderr)').argParser(Boolean).hideHelp()).option('--debug-file <path>', 'Write debug logs to a specific file path (implicitly enables debug mode)', () => true).option('--verbose', 'Override verbose mode setting from config', () => true).option('-p, --print', 'Print response and exit (useful for pipes). Note: The workspace trust dialog is skipped when Claude is run with the -p mode. Only use this flag in directories you trust.', () => true).option('--bare', 'Minimal mode: skip hooks, LSP, plugin sync, attribution, auto-memory, background prefetches, keychain reads, and SPARK.md auto-discovery. Sets CLAUDE_CODE_SIMPLE=1. Anthropic auth is strictly ANTHROPIC_API_KEY or apiKeyHelper via --settings (OAuth and keychain are never read). 3P providers (Bedrock/Vertex/Foundry) use their own credentials. Skills still resolve via /skill-name. Explicitly provide context via: --system-prompt[-file], --append-system-prompt[-file], --add-dir (SPARK.md dirs), --mcp-config, --settings, --agents, --plugin-dir.', () => true).addOption(new Option('--init', 'Run Setup hooks with init trigger, then continue').hideHelp()).addOption(new Option('--init-only', 'Run Setup and SessionStart:startup hooks, then exit').hideHelp()).addOption(new Option('--maintenance', 'Run Setup hooks with maintenance trigger, then continue').hideHelp()).addOption(new Option('--output-format <format>', 'Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming)').choices(['text', 'json', 'stream-json'])).addOption(new Option('--json-schema <schema>', 'JSON Schema for structured output validation. ' + 'Example: {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}').argParser(String)).option('--include-hook-events', 'Include all hook lifecycle events in the output stream (only works with --output-format=stream-json)', () => true).option('--include-partial-messages', 'Include partial message chunks as they arrive (only works with --print and --output-format=stream-json)', () => true).addOption(new Option('--input-format <format>', 'Input format (only works with --print): "text" (default), or "stream-json" (realtime streaming input)').choices(['text', 'stream-json'])).option('--mcp-debug', '[DEPRECATED. Use --debug instead] Enable MCP debug mode (shows MCP server errors)', () => true).option('--dangerously-skip-permissions', 'Bypass all permission checks. Recommended only for sandboxes with no internet access.', () => true).option('--allow-dangerously-skip-permissions', 'Enable bypassing all permission checks as an option, without it being enabled by default. Recommended only for sandboxes with no internet access.', () => true).addOption(new Option('--thinking <mode>', 'Thinking mode: enabled (equivalent to adaptive), disabled').choices(['enabled', 'adaptive', 'disabled']).hideHelp()).addOption(new Option('--max-thinking-tokens <tokens>', '[DEPRECATED. Use --thinking instead for newer models] Maximum number of thinking tokens (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-turns <turns>', 'Maximum number of agentic turns in non-interactive mode. This will early exit the conversation after the specified number of turns. (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-budget-usd <amount>', 'Maximum dollar amount to spend on API calls (only works with --print)').argParser(value => {
     const amount = Number(value);
     if (isNaN(amount) || amount <= 0) {
       throw new Error('--max-budget-usd must be a positive number greater than 0');
@@ -1004,12 +1007,13 @@ async function run(): Promise<CommanderCommand> {
     profileCheckpoint('action_handler_start');
 
     // --bare = one-switch minimal mode. Sets SIMPLE so all the existing
-    // gates fire (CLAUDE.md, skills, hooks inside executeHooks, agent
+    // gates fire (SPARK.md, skills, hooks inside executeHooks, agent
     // dir-walk). Must be set before setup() / any of the gated work runs.
     if ((options as {
       bare?: boolean;
     }).bare) {
       process.env.CLAUDE_CODE_SIMPLE = '1';
+      process.env.SPARK_SIMPLE = '1';
     }
 
     // Ignore "code" as a prompt - treat it the same as no prompt
@@ -1220,12 +1224,12 @@ async function run(): Promise<CommanderCommand> {
     }).sdkUrl ?? undefined;
 
     // Allow env var to enable partial messages (used by sandbox gateway for baku)
-    const effectiveIncludePartialMessages = includePartialMessages || isEnvTruthy(process.env.CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES);
+    const effectiveIncludePartialMessages = includePartialMessages || isEnvTruthy(getSparkEnv('INCLUDE_PARTIAL_MESSAGES'));
 
     // Enable all hook event types when explicitly requested via SDK option
-    // or when running in CLAUDE_CODE_REMOTE mode (CCR needs them).
+    // or when running in SPARK_REMOTE / CLAUDE_CODE_REMOTE mode (CCR needs them).
     // Without this, only SessionStart and Setup events are emitted.
-    if (includeHookEvents || isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)) {
+    if (includeHookEvents || isSparkEnvTruthy('REMOTE')) {
       setAllHookEventsEnabled(true);
     }
 
@@ -1311,7 +1315,7 @@ async function run(): Promise<CommanderCommand> {
       }
 
       // Resolve session ID: prefer remote session ID, fall back to internal session ID
-      const fileSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID || getSessionId();
+      const fileSessionId = getSparkEnv('REMOTE_SESSION_ID') || getSessionId();
       const files = parseFileSpecs(fileSpecs);
       if (files.length > 0) {
         // Use ANTHROPIC_BASE_URL if set (by EnvManager), otherwise use OAuth config
@@ -1626,7 +1630,7 @@ async function run(): Promise<CommanderCommand> {
       }
     }
 
-    // Store additional directories for CLAUDE.md loading (controlled by env var)
+    // Store additional directories for SPARK.md loading (controlled by env var)
     setAdditionalDirectoriesForClaudeMd(addDir);
 
     // Channel server allowlist from --channels flag — servers whose
@@ -1866,7 +1870,7 @@ async function run(): Promise<CommanderCommand> {
 
     // Apply coordinator mode tool filtering for headless path
     // (mirrors useMergedTools.ts filtering for REPL/interactive path)
-    if (feature('COORDINATOR_MODE') && isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE)) {
+    if (feature('COORDINATOR_MODE') && isEnvTruthy(getSparkEnv("COORDINATOR_MODE"))) {
       const {
         applyCoordinatorToolFilter
       } = await import('./utils/toolPool.js');
@@ -1917,7 +1921,7 @@ async function run(): Promise<CommanderCommand> {
     // pure in-memory array pushes (<1ms, zero I/O) that getBundledSkills()
     // reads synchronously. Previously ran inside setup() after ~20ms of
     // await points, so the parallel getCommands() memoized an empty list.
-    if (process.env.CLAUDE_CODE_ENTRYPOINT !== 'local-agent') {
+    if (getSparkEnv('ENTRYPOINT') !== 'local-agent') {
       initBuiltinPlugins();
       initBundledSkills();
     }
@@ -1973,7 +1977,7 @@ async function run(): Promise<CommanderCommand> {
       // (same gate as prefetchSystemContextIfSafe).
       void getSystemContext();
       // Kick getUserContext now too — its first await (fs.readFile in
-      // getMemoryFiles) yields naturally, so the CLAUDE.md directory walk
+      // getMemoryFiles) yields naturally, so the SPARK.md directory walk
       // runs during the ~280ms overlap window before the context
       // Promise.all join in print.ts. The void getUserContext() in
       // startDeferredPrefetches becomes a memoize cache-hit.
@@ -2823,7 +2827,7 @@ async function run(): Promise<CommanderCommand> {
         runHeadless
       } = await import('src/cli/print.js');
       profileCheckpoint('after_print_import');
-      void runHeadless(inputPrompt, () => headlessStore.getState(), headlessStore.setState, commandsHeadless, tools, sdkMcpConfigs, agentDefinitions.activeAgents, {
+      await runHeadless(inputPrompt, () => headlessStore.getState(), headlessStore.setState, commandsHeadless, tools, sdkMcpConfigs, agentDefinitions.activeAgents, {
         continue: options.continue,
         resume: options.resume,
         verbose: verbose,
@@ -3772,7 +3776,7 @@ async function run(): Promise<CommanderCommand> {
       // knows the session originated externally. Linux xdg-open and
       // browsers with "always allow" set dispatch the link with no OS-level
       // confirmation, so this is the only signal the user gets that the
-      // prompt — and the working directory / CLAUDE.md it implies — came
+      // prompt — and the working directory / SPARK.md it implies — came
       // from an external source rather than something they typed.
       let deepLinkBanner: ReturnType<typeof createSystemMessage> | null = null;
       if (feature('LODESTONE')) {
@@ -4352,9 +4356,9 @@ async function run(): Promise<CommanderCommand> {
     await update();
   });
 
-  // sparkc up — run the project's CLAUDE.md "# sparkc up" setup instructions.
+  // sparkc up — run the project's SPARK.md "# sparkc up" setup instructions.
   if ("external" === 'ant') {
-    program.command('up').description('[ANT-ONLY] Initialize or upgrade the local dev environment using the "# sparkc up" section of the nearest CLAUDE.md').action(async () => {
+    program.command('up').description('[ANT-ONLY] Initialize or upgrade the local dev environment using the "# sparkc up" section of the nearest SPARK.md').action(async () => {
       const {
         up
       } = await import('src/cli/up.js');

@@ -7,7 +7,6 @@ import { getCwd } from './cwd.js';
 import { relative } from 'path';
 import { formatNumber } from './format.js';
 import type { getGlobalConfig } from './config.js';
-import { getAnthropicApiKeyWithSource, getApiKeyFromConfigOrMacOSKeychain, getAuthTokenSource, isClaudeAISubscriber } from './auth.js';
 import type { AgentDefinitionsResult } from '../tools/AgentTool/loadAgentsDir.js';
 import { getAgentDescriptionsTotalTokens, AGENT_DESCRIPTIONS_THRESHOLD } from './statusNoticeHelpers.js';
 import { isSupportedJetBrainsTerminal, toIDEDisplayName, getTerminalIdeType } from './ide.js';
@@ -40,101 +39,14 @@ const largeMemoryFilesNotice: StatusNoticeDefinition = {
         return <Box key={file.path} flexDirection="row">
               <Text color="warning">{figures.warning}</Text>
               <Text color="warning">
-                Large <Text bold>{displayPath}</Text> will impact performance (
+                <Text bold>{displayPath}</Text> 过大，会影响性能 (
                 {formatNumber(file.content.length)} chars &gt;{' '}
                 {formatNumber(MAX_MEMORY_CHARACTER_COUNT)})
-                <Text dimColor> · /memory to edit</Text>
+                <Text dimColor> · 输入 /memory 编辑</Text>
               </Text>
             </Box>;
       })}
       </>;
-  }
-};
-const claudeAiSubscriberExternalTokenNotice: StatusNoticeDefinition = {
-  id: 'claude-ai-external-token',
-  type: 'warning',
-  isActive: () => {
-    const authTokenInfo = getAuthTokenSource();
-    return isClaudeAISubscriber() && (authTokenInfo.source === 'ANTHROPIC_AUTH_TOKEN' || authTokenInfo.source === 'apiKeyHelper');
-  },
-  render: () => {
-    const authTokenInfo = getAuthTokenSource();
-    return <Box flexDirection="row" marginTop={1}>
-        <Text color="warning">{figures.warning}</Text>
-        <Text color="warning">
-          Auth conflict: Using {authTokenInfo.source} instead of Claude account
-          subscription token. Either unset {authTokenInfo.source}, or run
-          `claude /logout`.
-        </Text>
-      </Box>;
-  }
-};
-const apiKeyConflictNotice: StatusNoticeDefinition = {
-  id: 'api-key-conflict',
-  type: 'warning',
-  isActive: () => {
-    const {
-      source: apiKeySource
-    } = getAnthropicApiKeyWithSource({
-      skipRetrievingKeyFromApiKeyHelper: true
-    });
-    return !!getApiKeyFromConfigOrMacOSKeychain() && (apiKeySource === 'ANTHROPIC_API_KEY' || apiKeySource === 'apiKeyHelper');
-  },
-  render: () => {
-    const {
-      source: apiKeySource
-    } = getAnthropicApiKeyWithSource({
-      skipRetrievingKeyFromApiKeyHelper: true
-    });
-    return <Box flexDirection="row" marginTop={1}>
-        <Text color="warning">{figures.warning}</Text>
-        <Text color="warning">
-          Auth conflict: Using {apiKeySource} instead of Anthropic Console key.
-          Either unset {apiKeySource}, or run `claude /logout`.
-        </Text>
-      </Box>;
-  }
-};
-const bothAuthMethodsNotice: StatusNoticeDefinition = {
-  id: 'both-auth-methods',
-  type: 'warning',
-  isActive: () => {
-    const {
-      source: apiKeySource
-    } = getAnthropicApiKeyWithSource({
-      skipRetrievingKeyFromApiKeyHelper: true
-    });
-    const authTokenInfo = getAuthTokenSource();
-    return apiKeySource !== 'none' && authTokenInfo.source !== 'none' && !(apiKeySource === 'apiKeyHelper' && authTokenInfo.source === 'apiKeyHelper');
-  },
-  render: () => {
-    const {
-      source: apiKeySource
-    } = getAnthropicApiKeyWithSource({
-      skipRetrievingKeyFromApiKeyHelper: true
-    });
-    const authTokenInfo = getAuthTokenSource();
-    return <Box flexDirection="column" marginTop={1}>
-        <Box flexDirection="row">
-          <Text color="warning">{figures.warning}</Text>
-          <Text color="warning">
-            Auth conflict: Both a token ({authTokenInfo.source}) and an API key
-            ({apiKeySource}) are set. This may lead to unexpected behavior.
-          </Text>
-        </Box>
-        <Box flexDirection="column" marginLeft={3}>
-          <Text color="warning">
-            · Trying to use{' '}
-            {authTokenInfo.source === 'spark-ai.top' ? 'spark-ai.top' : authTokenInfo.source}
-            ?{' '}
-            {apiKeySource === 'ANTHROPIC_API_KEY' ? 'Unset the ANTHROPIC_API_KEY environment variable, or claude /logout then say "No" to the API key approval before login.' : apiKeySource === 'apiKeyHelper' ? 'Unset the apiKeyHelper setting.' : 'claude /logout'}
-          </Text>
-          <Text color="warning">
-            · Trying to use {apiKeySource}?{' '}
-            {authTokenInfo.source === 'spark-ai.top' ? 'claude /logout to sign out of spark-ai.top.' : `Unset the ${authTokenInfo.source} environment variable.`}
-          </Text>
-        </Box>
-      </Box>;
   }
 };
 const largeAgentDescriptionsNotice: StatusNoticeDefinition = {
@@ -149,10 +61,10 @@ const largeAgentDescriptionsNotice: StatusNoticeDefinition = {
     return <Box flexDirection="row">
         <Text color="warning">{figures.warning}</Text>
         <Text color="warning">
-          Large cumulative agent descriptions will impact performance (~
+          Agent 描述过长，会影响性能 (~
           {formatNumber(totalTokens)} tokens &gt;{' '}
           {formatNumber(AGENT_DESCRIPTIONS_THRESHOLD)})
-          <Text dimColor> · /agents to manage</Text>
+          <Text dimColor> · 输入 /agents 管理</Text>
         </Text>
       </Box>;
   }
@@ -180,16 +92,15 @@ const jetbrainsPluginNotice: StatusNoticeDefinition = {
     return <Box flexDirection="row" gap={1} marginLeft={1}>
         <Text color="ide">{figures.arrowUp}</Text>
         <Text>
-          Install the <Text color="ide">{ideName}</Text> plugin from the
-          JetBrains Marketplace:{' '}
-          <Text bold>https://docs.claude.com/s/claude-code-jetbrains</Text>
+          请从 JetBrains Marketplace 安装 <Text color="ide">{ideName}</Text>{' '}
+          插件
         </Text>
       </Box>;
   }
 };
 
 // All notice definitions
-export const statusNoticeDefinitions: StatusNoticeDefinition[] = [largeMemoryFilesNotice, largeAgentDescriptionsNotice, claudeAiSubscriberExternalTokenNotice, apiKeyConflictNotice, bothAuthMethodsNotice, jetbrainsPluginNotice];
+export const statusNoticeDefinitions: StatusNoticeDefinition[] = [largeMemoryFilesNotice, largeAgentDescriptionsNotice, jetbrainsPluginNotice];
 
 // Helper functions for external use
 export function getActiveNotices(context: StatusNoticeContext): StatusNoticeDefinition[] {

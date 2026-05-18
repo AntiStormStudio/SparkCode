@@ -2,19 +2,44 @@ import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import { join } from 'path'
 
-// Memoized: 150+ callers, many on hot paths. Keyed off SPARK_CONFIG_DIR /
-// CLAUDE_CONFIG_DIR so
+// Memoized: 150+ callers, many on hot paths. Keyed off SPARK_CONFIG_DIR so
 // tests that change the env var get a fresh value without explicit cache.clear.
-export const getClaudeConfigHomeDir = memoize(
+export const getSparkConfigHomeDir = memoize(
   (): string => {
-    return (
-      process.env.SPARK_CONFIG_DIR ??
-      process.env.CLAUDE_CONFIG_DIR ??
-      join(homedir(), '.sparkc')
-    ).normalize('NFC')
+    return (process.env.SPARK_CONFIG_DIR ?? join(homedir(), '.sparkc')).normalize(
+      'NFC',
+    )
   },
-  () => `${process.env.SPARK_CONFIG_DIR ?? ''}:${process.env.CLAUDE_CONFIG_DIR ?? ''}`,
+  () => process.env.SPARK_CONFIG_DIR ?? '',
 )
+
+// Backward-compat alias — many callers still reference the old name.
+export const getClaudeConfigHomeDir = getSparkConfigHomeDir
+
+/**
+ * Project-level config directory name.
+ * Spark Code uses `.sparkc/`; falls back to `.claude/` for migration.
+ */
+export const PROJECT_CONFIG_DIR = '.sparkc'
+export const LEGACY_PROJECT_CONFIG_DIR = '.claude'
+
+/**
+ * Read a Spark environment variable, checking `SPARK_<SUFFIX>` first,
+ * then falling back to the legacy `CLAUDE_CODE_<SUFFIX>` name.
+ * This allows a clean migration path: new deployments set `SPARK_*`,
+ * old integrations still work via `CLAUDE_CODE_*`.
+ */
+export function getSparkEnv(suffix: string): string | undefined {
+  return process.env[`SPARK_${suffix}`] ?? process.env[`CLAUDE_CODE_${suffix}`]
+}
+
+/**
+ * Boolean version of getSparkEnv — returns true when either the SPARK_
+ * or CLAUDE_CODE_ variant is truthy.
+ */
+export function isSparkEnvTruthy(suffix: string): boolean {
+  return isEnvTruthy(getSparkEnv(suffix))
+}
 
 export function getTeamsDir(): string {
   return join(getClaudeConfigHomeDir(), 'teams')
@@ -62,7 +87,7 @@ export function isEnvDefinedFalsy(
  */
 export function isBareMode(): boolean {
   return (
-    isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE) ||
+    isSparkEnvTruthy('SIMPLE') ||
     process.argv.includes('--bare')
   )
 }
@@ -112,7 +137,7 @@ export function getDefaultVertexRegion(): string {
  * @returns true if CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR is set to a truthy value
  */
 export function shouldMaintainProjectWorkingDir(): boolean {
-  return isEnvTruthy(process.env.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR)
+  return isEnvTruthy(getSparkEnv('BASH_MAINTAIN_PROJECT_WORKING_DIR') ?? process.env.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR)
 }
 
 /**
@@ -143,7 +168,7 @@ export function isInProtectedNamespace(): boolean {
     /* eslint-disable @typescript-eslint/no-require-imports */
     return (
       require('./protectedNamespace.js') as typeof import('./protectedNamespace.js')
-    ).checkProtectedNamespace()
+    ).getProtectedNamespace()
     /* eslint-enable @typescript-eslint/no-require-imports */
   }
   return false

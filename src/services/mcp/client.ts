@@ -64,7 +64,7 @@ import {
 import { registerCleanup } from '../../utils/cleanupRegistry.js'
 import { detectCodeIndexingFromMcpServerName } from '../../utils/codeIndexing.js'
 import { logForDebugging } from '../../utils/debug.js'
-import { isEnvDefinedFalsy, isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvDefinedFalsy, isEnvTruthy, getSparkEnv } from '../../utils/envUtils.js'
 import {
   errorMessage,
   TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -250,7 +250,7 @@ const isComputerUseMCPServer = feature('CHICAGO_MCP')
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { getClaudeConfigHomeDir, getSparkEnv } from '../../utils/envUtils.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 
@@ -943,8 +943,8 @@ export const connectToServer = memoize(
         logMCPDebug(name, `In-process Computer Use MCP server started`)
       } else if (serverRef.type === 'stdio' || !serverRef.type) {
         const finalCommand =
-          process.env.CLAUDE_CODE_SHELL_PREFIX || serverRef.command
-        const finalArgs = process.env.CLAUDE_CODE_SHELL_PREFIX
+          getSparkEnv("SHELL_PREFIX") || serverRef.command
+        const finalArgs = getSparkEnv("SHELL_PREFIX")
           ? [[serverRef.command, ...serverRef.args].join(' ')]
           : serverRef.args
         transport = new StdioClientTransport({

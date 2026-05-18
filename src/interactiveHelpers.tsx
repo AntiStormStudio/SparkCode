@@ -96,9 +96,14 @@ export function showSetupDialog<T = void>(root: Root, renderer: (done: (result: 
  * Handles the common epilogue: start deferred prefetches, wait for exit, graceful shutdown.
  */
 export async function renderAndRun(root: Root, element: React.ReactNode): Promise<void> {
-  root.render(element);
-  startDeferredPrefetches();
-  await root.waitUntilExit();
+  const replKeepAlive = setInterval(() => {}, 60 * 60 * 1000);
+  try {
+    root.render(element);
+    startDeferredPrefetches();
+    await root.waitUntilExit();
+  } finally {
+    clearInterval(replKeepAlive);
+  }
   await gracefulShutdown(0);
 }
 export async function showSetupScreens(root: Root, permissionMode: PermissionMode, allowDangerouslySkipPermissions: boolean, commands?: Command[], claudeInChrome?: boolean, devChannels?: ChannelEntry[]): Promise<boolean> {
@@ -124,7 +129,7 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
 
   // Always show the trust dialog in interactive sessions, regardless of permission mode.
   // The trust dialog is the workspace trust boundary — it warns about untrusted repos
-  // and checks CLAUDE.md external includes. bypassPermissions mode
+  // and checks SPARK.md external includes. bypassPermissions mode
   // only affects tool execution permissions, not workspace trust.
   // Note: non-interactive sessions (CI/CD with -p) never reach showSetupScreens at all.
   // Skip permission checks in claubbit

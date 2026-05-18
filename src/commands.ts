@@ -12,7 +12,8 @@ import desktop from './commands/desktop/index.js'
 import commitPushPr from './commands/commit-push-pr.js'
 import compact from './commands/compact/index.js'
 import config from './commands/config/index.js'
-import configServer from './commands/config-server/index.js'
+// import configServer from './commands/config-server/index.js'
+import openTerminal from './commands/openterminal/index.js'
 import { context, contextNonInteractive } from './commands/context/index.js'
 import cost from './commands/cost/index.js'
 import diff from './commands/diff/index.js'
@@ -114,6 +115,7 @@ import exportCommand from './commands/export/index.js'
 import model from './commands/model/index.js'
 import defaultModel from './commands/default-model/index.js'
 import modelList from './commands/model-list/index.js'
+import modelReflex from './commands/model-reflex/index.js'
 import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
 import remoteEnv from './commands/remote-env/index.js'
@@ -124,7 +126,6 @@ import {
 } from './commands/extra-usage/index.js'
 import rateLimitOptions from './commands/rate-limit-options/index.js'
 import statusline from './commands/statusline.js'
-import effort from './commands/effort/index.js'
 import stats from './commands/stats/index.js'
 // insights.ts is 113KB (3200 lines, includes diffLines/html rendering). Lazy
 // shim defers the heavy module until /insights is actually invoked.
@@ -192,7 +193,8 @@ const COMMANDS = memoize((): Command[] => [
   color,
   compact,
   config,
-  configServer,
+  // configServer,
+  openTerminal,
   copy,
   desktop,
   context,
@@ -200,7 +202,6 @@ const COMMANDS = memoize((): Command[] => [
   cost,
   diff,
   doctor,
-  effort,
   exit,
   fast,
   files,
@@ -217,6 +218,7 @@ const COMMANDS = memoize((): Command[] => [
   model,
   defaultModel,
   modelList,
+  modelReflex,
   outputStyle,
   remoteEnv,
   plugin,

@@ -534,6 +534,7 @@ export type GlobalConfig = {
   // Model for new teammates when the tool call doesn't pass one.
   // undefined = hardcoded Opus (backward-compat); null = leader's model; string = model alias/ID.
   teammateDefaultModel?: string | null
+  modelReflex?: Record<string, string>
 
   // Remember last choices in "Create new agent" wizard.
   lastAgentWizardDefaults?: AgentWizardDefaults
@@ -1791,13 +1792,13 @@ export function getMemoryPath(memoryType: MemoryType): string {
 
   switch (memoryType) {
     case 'User':
-      return join(getClaudeConfigHomeDir(), 'CLAUDE.md')
+      return join(getClaudeConfigHomeDir(), 'SPARK.md')
     case 'Local':
-      return join(cwd, 'CLAUDE.local.md')
+      return join(cwd, 'SPARK.local.md')
     case 'Project':
-      return join(cwd, 'CLAUDE.md')
+      return join(cwd, 'SPARK.md')
     case 'Managed':
-      return join(getManagedFilePath(), 'CLAUDE.md')
+      return join(getManagedFilePath(), 'SPARK.md')
     case 'AutoMem':
       return getAutoMemEntrypoint()
   }
@@ -1809,7 +1810,7 @@ export function getMemoryPath(memoryType: MemoryType): string {
 }
 
 export function getManagedClaudeRulesDir(): string {
-  return join(getManagedFilePath(), '.claude', 'rules')
+  return join(getManagedFilePath(), '.sparkc', 'rules')
 }
 
 export function getUserClaudeRulesDir(): string {

@@ -43,6 +43,7 @@ import { isEnvTruthy } from './envUtils.js'
 import { getCurrentSessionTitle, sessionIdExists } from './sessionStorage.js'
 import { sleep } from './sleep.js'
 import { profileReport } from './startupProfiler.js'
+import { isLiveTty, recordExitDiagnostic } from './exitDiagnostics.js'
 
 /**
  * Clean up terminal modes synchronously before process exit.
@@ -191,6 +192,7 @@ function printResumeHint(): void {
  * In that case, fall back to SIGKILL which always works.
  */
 function forceExit(exitCode: number): never {
+  recordExitDiagnostic(`forceExit code=${exitCode}`)
   // Clear failsafe timer since we're exiting now
   if (failsafeTimer !== undefined) {
     clearTimeout(failsafeTimer)
@@ -263,14 +265,20 @@ export const setupGracefulShutdown = memoize(() => {
       return
     }
     logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGINT' })
+    recordExitDiagnostic('signal SIGINT')
     void gracefulShutdown(0)
   })
   process.on('SIGTERM', () => {
     logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGTERM' })
+    recordExitDiagnostic('signal SIGTERM')
     void gracefulShutdown(143) // Exit code 143 (128 + 15) for SIGTERM
   })
   if (process.platform !== 'win32') {
     process.on('SIGHUP', () => {
+      recordExitDiagnostic(`signal SIGHUP liveTty=${isLiveTty()}`)
+      if (isLiveTty()) {
+        return
+      }
       logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGHUP' })
       void gracefulShutdown(129) // Exit code 129 (128 + 1) for SIGHUP
     })
@@ -289,6 +297,7 @@ export const setupGracefulShutdown = memoize(() => {
           logForDiagnosticsNoPII('info', 'shutdown_signal', {
             signal: 'orphan_detected',
           })
+          recordExitDiagnostic('orphan_detected')
           void gracefulShutdown(129)
         }
       }, 30_000) // Check every 30 seconds
@@ -398,6 +407,7 @@ export async function gracefulShutdown(
     finalMessage?: string
   },
 ): Promise<void> {
+  recordExitDiagnostic(`gracefulShutdown code=${exitCode} reason=${reason}`)
   if (shutdownInProgress) {
     return
   }

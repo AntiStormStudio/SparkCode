@@ -17,7 +17,7 @@ import { buildTool, type ToolDef } from '../../Tool.js'
 import { getCwd } from '../../utils/cwd.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { countLinesChanged, getPatchForDisplay } from '../../utils/diff.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv } from '../../utils/envUtils.js'
 import { isENOENT } from '../../utils/errors.js'
 import { getFileModificationTime, writeTextContent } from '../../utils/file.js'
 import {
@@ -336,14 +336,14 @@ export const FileWriteTool = buildTool({
       limit: undefined,
     })
 
-    // Log when writing to CLAUDE.md
-    if (fullFilePath.endsWith(`${sep}CLAUDE.md`)) {
+    // Log when writing to SPARK.md
+    if (fullFilePath.endsWith(`${sep}SPARK.md`)) {
       logEvent('tengu_write_claudemd', {})
     }
 
     let gitDiff: ToolUseDiff | undefined
     if (
-      isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
+      isEnvTruthy(getSparkEnv("REMOTE")) &&
       getFeatureValue_CACHED_MAY_BE_STALE('tengu_quartz_lantern', false)
     ) {
       const startTime = Date.now()

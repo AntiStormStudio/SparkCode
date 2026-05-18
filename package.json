@@ -1,6 +1,6 @@
 {
   "name": "spark-code",
-  "version": "0.1.0-insider",
+  "version": "0.1.1",
   "private": true,
   "description": "从 source map 重建并恢复的 SPARK-Code 源码树。",
   "bin": {
@@ -20,7 +20,9 @@
   "scripts": {
     "dev": "bun run ./src/dev-entry.ts",
     "start": "bun run ./src/dev-entry.ts",
-    "version": "bun run ./src/dev-entry.ts --version"
+    "version": "bun run ./src/dev-entry.ts --version",
+    "package": "bash scripts/package-release.sh",
+    "install-deps": "bun install"
   },
   "dependencies": {
     "@alcalzone/ansi-tokenize": "*",
@@ -97,5 +99,8 @@
     "color-diff-napi": "file:./shims/color-diff-napi",
     "modifiers-napi": "file:./shims/modifiers-napi",
     "url-handler-napi": "file:./shims/url-handler-napi"
+  },
+  "overrides": {
+    "zod-to-json-schema": "3.24.6"
   }
 }

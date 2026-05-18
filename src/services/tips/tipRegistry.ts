@@ -376,7 +376,7 @@ const externalTips: Tip[] = [
   {
     id: 'continue',
     content: async () =>
-      '运行 spark --continue 或 spark --resume 恢复会话',
+      '运行 sparkc --continue 或 sparkc --resume 恢复会话',
     cooldownSessions: 10,
     isRelevant: async () => true,
   },
@@ -638,7 +638,7 @@ const internalOnlyTips: Tip[] =
         {
           id: 'important-claudemd',
           content: async () =>
-            '[ANT-ONLY] 对必须遵守的 CLAUDE.md 规则使用 "IMPORTANT:" 前缀',
+            '[ANT-ONLY] 对必须遵守的 SPARK.md 规则使用 "IMPORTANT:" 前缀',
           cooldownSessions: 30,
           isRelevant: async () => true,
         },

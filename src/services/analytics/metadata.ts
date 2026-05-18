@@ -19,7 +19,7 @@ import {
   getClientType,
   getParentSessionId as getParentSessionIdFromState,
 } from '../../bootstrap/state.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv } from '../../utils/envUtils.js'
 import { isOfficialMcpUrl } from '../mcp/officialRegistry.js'
 import { isClaudeAISubscriber, getSubscriptionType } from '../../utils/auth.js'
 import { getRepoRemoteHash } from '../../utils/git.js'
@@ -593,7 +593,7 @@ const buildEnvContext = memoize(async (): Promise<EnvContext> => {
     isRunningWithBun: env.isRunningWithBun(),
     isCi: isEnvTruthy(process.env.CI),
     isClaubbit: isEnvTruthy(process.env.CLAUBBIT),
-    isClaudeCodeRemote: isEnvTruthy(process.env.CLAUDE_CODE_REMOTE),
+    isClaudeCodeRemote: isEnvTruthy(getSparkEnv("REMOTE")),
     isLocalAgentMode: process.env.CLAUDE_CODE_ENTRYPOINT === 'local-agent',
     isConductor: env.isConductor(),
     ...(process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE && {

@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle';
+import { getSparkEnv } from '../utils/envUtils.js';
 
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
@@ -6,7 +7,7 @@ process.env.COREPACK_ENABLE_AUTO_PIN = '0';
 
 // Set max heap size for child processes in CCR environments (containers have 16GB)
 // eslint-disable-next-line custom-rules/no-top-level-side-effects, custom-rules/no-process-env-top-level, custom-rules/safe-env-boolean-check
-if (process.env.CLAUDE_CODE_REMOTE === 'true') {
+if (getSparkEnv('REMOTE') === 'true') {
   // eslint-disable-next-line custom-rules/no-top-level-side-effects, custom-rules/no-process-env-top-level
   const existing = process.env.NODE_OPTIONS || '';
   // eslint-disable-next-line custom-rules/no-top-level-side-effects, custom-rules/no-process-env-top-level
@@ -18,8 +19,8 @@ if (process.env.CLAUDE_CODE_REMOTE === 'true') {
 // module-level consts at import time — init() runs too late. feature() gate
 // DCEs this entire block from external builds.
 // eslint-disable-next-line custom-rules/no-top-level-side-effects, custom-rules/no-process-env-top-level
-if (feature('ABLATION_BASELINE') && process.env.CLAUDE_CODE_ABLATION_BASELINE) {
-  for (const k of ['CLAUDE_CODE_SIMPLE', 'CLAUDE_CODE_DISABLE_THINKING', 'DISABLE_INTERLEAVED_THINKING', 'DISABLE_COMPACT', 'DISABLE_AUTO_COMPACT', 'CLAUDE_CODE_DISABLE_AUTO_MEMORY', 'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS']) {
+if (feature('ABLATION_BASELINE') && getSparkEnv('ABLATION_BASELINE')) {
+  for (const k of ['SPARK_SIMPLE', 'SPARK_DISABLE_THINKING', 'DISABLE_INTERLEAVED_THINKING', 'DISABLE_COMPACT', 'DISABLE_AUTO_COMPACT', 'SPARK_DISABLE_AUTO_MEMORY', 'SPARK_DISABLE_BACKGROUND_TASKS']) {
     // eslint-disable-next-line custom-rules/no-top-level-side-effects, custom-rules/no-process-env-top-level
     process.env[k] ??= '1';
   }
@@ -282,6 +283,7 @@ async function main(): Promise<void> {
   // option building (not just inside the action handler).
   if (args.includes('--bare')) {
     process.env.CLAUDE_CODE_SIMPLE = '1';
+    process.env.SPARK_SIMPLE = '1';
   }
 
   // No special flags detected, load and run the full CLI
@@ -299,4 +301,4 @@ async function main(): Promise<void> {
 }
 
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
-void main();
+await main();

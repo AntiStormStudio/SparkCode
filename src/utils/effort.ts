@@ -192,7 +192,7 @@ export function getEffortSuffix(
   if (effortValue === undefined) return ''
   const resolved = resolveAppliedEffort(model, effortValue)
   if (resolved === undefined) return ''
-  return `（推理强度：${convertEffortValueToLevel(resolved)}）`
+  return `（${convertEffortValueToLevel(resolved)}）`
 }
 
 export function isValidNumericEffort(value: number): boolean {
@@ -242,7 +242,7 @@ export function getEffortLevelDescription(level: EffortLevel): string {
  */
 export function getEffortValueDescription(value: EffortValue): string {
   if (process.env.USER_TYPE === 'ant' && typeof value === 'number') {
-    return `[ANT-ONLY] 数值推理强度：${value}`
+    return `[ANT-ONLY] 数值强度：${value}`
   }
 
   if (typeof value === 'string') {
@@ -261,7 +261,7 @@ const OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT: OpusDefaultEffortConfig = {
   enabled: true,
   dialogTitle: '建议在 Opus 上使用 medium 强度',
   dialogDescription:
-    '推理强度决定 Claude 完成任务前思考的深度与时长。大多数任务建议使用 medium，以平衡速度和效果，并更充分利用额度；需要时可用 ultrathink 临时提升到 high。',
+    '强度设置决定 Claude 完成任务前思考的深度与时长。大多数任务建议使用 medium，以平衡速度和效果，并更充分利用额度；需要时可用 ultrathink 临时提升到 high。',
 }
 
 export function getOpusDefaultEffortConfig(): OpusDefaultEffortConfig {

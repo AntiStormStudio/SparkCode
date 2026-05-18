@@ -33,6 +33,9 @@ import {
   getClaudeConfigHomeDir,
   isBareMode,
   isEnvTruthy,
+  PROJECT_CONFIG_DIR,
+  LEGACY_PROJECT_CONFIG_DIR,
+  isSparkEnvTruthy,
 } from '../utils/envUtils.js'
 import { isENOENT, isFsInaccessible } from '../utils/errors.js'
 import {
@@ -81,11 +84,11 @@ export function getSkillsPath(
 ): string {
   switch (source) {
     case 'policySettings':
-      return join(getManagedFilePath(), '.claude', dir)
+      return join(getManagedFilePath(), PROJECT_CONFIG_DIR, dir)
     case 'userSettings':
       return join(getClaudeConfigHomeDir(), dir)
     case 'projectSettings':
-      return `.claude/${dir}`
+      return `${PROJECT_CONFIG_DIR}/${dir}`
     case 'plugin':
       return 'plugin'
     default:
@@ -153,7 +156,7 @@ function parseHooksFromFrontmatter(
 }
 
 /**
- * Parse paths frontmatter from a skill, using the same format as CLAUDE.md rules.
+ * Parse paths frontmatter from a skill, using the same format as SPARK.md rules.
  * Returns undefined if no paths are specified or if all patterns are match-all.
  */
 function parseSkillPaths(frontmatter: FrontmatterData): string[] | undefined {
@@ -638,7 +641,7 @@ async function loadSkillsFromCommandsDir(
 export const getSkillDirCommands = memoize(
   async (cwd: string): Promise<Command[]> => {
     const userSkillsDir = join(getClaudeConfigHomeDir(), 'skills')
-    const managedSkillsDir = join(getManagedFilePath(), '.claude', 'skills')
+    const managedSkillsDir = join(getManagedFilePath(), PROJECT_CONFIG_DIR, 'skills')
     const projectSkillsDirs = getProjectDirsUpToHome('skills', cwd)
 
     logForDebugging(
@@ -665,7 +668,7 @@ export const getSkillDirCommands = memoize(
       const additionalSkillsNested = await Promise.all(
         additionalDirs.map(dir =>
           loadSkillsFromSkillsDir(
-            join(dir, '.claude', 'skills'),
+            join(dir, PROJECT_CONFIG_DIR, 'skills'),
             'projectSettings',
           ),
         ),
@@ -683,7 +686,7 @@ export const getSkillDirCommands = memoize(
       additionalSkillsNested,
       legacyCommands,
     ] = await Promise.all([
-      isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_POLICY_SKILLS)
+      isSparkEnvTruthy('DISABLE_POLICY_SKILLS')
         ? Promise.resolve([])
         : loadSkillsFromSkillsDir(managedSkillsDir, 'policySettings'),
       isSettingSourceEnabled('userSettings') && !skillsLocked
@@ -700,7 +703,7 @@ export const getSkillDirCommands = memoize(
         ? Promise.all(
             additionalDirs.map(dir =>
               loadSkillsFromSkillsDir(
-                join(dir, '.claude', 'skills'),
+                join(dir, PROJECT_CONFIG_DIR, 'skills'),
                 'projectSettings',
               ),
             ),
@@ -874,7 +877,7 @@ export async function discoverSkillDirsForPaths(
     // CWD-level skills are already loaded at startup, so we only discover nested ones
     // Use prefix+separator check to avoid matching /project-backup when cwd is /project
     while (currentDir.startsWith(resolvedCwd + pathSep)) {
-      const skillDir = join(currentDir, '.claude', 'skills')
+      const skillDir = join(currentDir, PROJECT_CONFIG_DIR, 'skills')
 
       // Skip if we've already checked this path (hit or miss) — avoids
       // repeating the same failed stat on every Read/Write/Edit call when
@@ -988,7 +991,7 @@ export function getDynamicSkills(): Command[] {
  * dynamic skills map, making them available to the model.
  *
  * Uses the `ignore` library (gitignore-style matching), matching the behavior
- * of CLAUDE.md conditional rules.
+ * of SPARK.md conditional rules.
  *
  * @param filePaths Array of file paths being operated on
  * @param cwd Current working directory (paths are matched relative to cwd)

@@ -324,6 +324,7 @@ import { jsonStringify } from '../utils/slowOperations.js'
 import { skillChangeDetector } from '../utils/skills/skillChangeDetector.js'
 import { getCommands, clearCommandsCache } from '../commands.js'
 import {
+  getSparkEnv,
   isBareMode,
   isEnvTruthy,
   isEnvDefinedFalsy,
@@ -509,7 +510,7 @@ export async function runHeadless(
   // enabledPlugins.
   if (
     feature('DOWNLOAD_USER_SETTINGS') &&
-    (isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) || getIsRemoteMode())
+    (isEnvTruthy(getSparkEnv("REMOTE")) || getIsRemoteMode())
   ) {
     void downloadUserSettings()
   }
@@ -1708,7 +1709,7 @@ function runHeadlessStreaming(
       // its promise so this awaits the same in-flight request.
       await Promise.all([
         feature('DOWNLOAD_USER_SETTINGS') &&
-        (isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) || getIsRemoteMode())
+        (isEnvTruthy(getSparkEnv("REMOTE")) || getIsRemoteMode())
           ? withDiagnosticsTiming('headless_user_settings_download', () =>
               downloadUserSettings(),
             )
@@ -3066,7 +3067,7 @@ function runHeadlessStreaming(
           try {
             if (
               feature('DOWNLOAD_USER_SETTINGS') &&
-              (isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) || getIsRemoteMode())
+              (isEnvTruthy(getSparkEnv("REMOTE")) || getIsRemoteMode())
             ) {
               // Re-pull user settings so enabledPlugins pushed from the
               // user's local CLI take effect before the cache sweep.

@@ -9,6 +9,7 @@ import { onExit } from 'signal-exit';
 import { flushInteractionTime } from 'src/bootstrap/state.js';
 import { getYogaCounters } from 'src/native-ts/yoga-layout/index.js';
 import { logForDebugging } from 'src/utils/debug.js';
+import { recordExitDiagnostic } from 'src/utils/exitDiagnostics.js';
 import { logError } from 'src/utils/log.js';
 import { format } from 'util';
 import { colorize } from './colorize.js';
@@ -1456,6 +1457,7 @@ export default class Ink {
     if (this.isUnmounted) {
       return;
     }
+    recordExitDiagnostic(`ink unmount error=${error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? '')}`);
     this.onRender();
     this.unsubscribeExit();
     if (typeof this.restoreConsole === 'function') {

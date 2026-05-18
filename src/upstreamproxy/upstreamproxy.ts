@@ -24,7 +24,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { registerCleanup } from '../utils/cleanupRegistry.js'
 import { logForDebugging } from '../utils/debug.js'
-import { isEnvTruthy } from '../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv } from '../utils/envUtils.js'
 import { isENOENT } from '../utils/errors.js'
 import { startUpstreamProxyRelay } from './relay.js'
 
@@ -82,7 +82,7 @@ export async function initUpstreamProxy(opts?: {
   caBundlePath?: string
   ccrBaseUrl?: string
 }): Promise<UpstreamProxyState> {
-  if (!isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)) {
+  if (!isEnvTruthy(getSparkEnv("REMOTE"))) {
     return state
   }
   // CCR evaluates ccr_upstream_proxy_enabled server-side (where GrowthBook is

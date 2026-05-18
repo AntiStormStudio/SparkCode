@@ -324,7 +324,7 @@ export function ModelPicker(t0) {
   }
   let t24;
   if ($[62] !== displayEffort || $[63] !== focusedDefaultEffort || $[64] !== focusedModelName || $[65] !== focusedSupportsEffort) {
-    t24 = <Box marginBottom={1} flexDirection="column">{focusedSupportsEffort ? <Text dimColor={true}><EffortLevelIndicator effort={displayEffort} />{" "}推理强度：{formatEffortLevel(displayEffort)}{displayEffort === focusedDefaultEffort ? "（默认）" : ""}{" "}<Text color="subtle">← → 调整</Text></Text> : <Text color="subtle"><EffortLevelIndicator effort={undefined} /> 不支持推理强度{focusedModelName ? `：${focusedModelName}` : ""}</Text>}</Box>;
+    t24 = <Box marginBottom={1} flexDirection="column">{focusedSupportsEffort ? <Text dimColor={true}><EffortLevelIndicator effort={displayEffort} />{" "}强度：{formatEffortLevel(displayEffort)}{displayEffort === focusedDefaultEffort ? "（默认）" : ""}{" "}<Text color="subtle">← → 调整</Text></Text> : <Text color="subtle"><EffortLevelIndicator effort={undefined} /> 不支持强度{focusedModelName ? `：${focusedModelName}` : ""}</Text>}</Box>;
     $[62] = displayEffort;
     $[63] = focusedDefaultEffort;
     $[64] = focusedModelName;

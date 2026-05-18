@@ -72,6 +72,12 @@ export async function assertMinVersion(): Promise<void> {
     return
   }
 
+  // Restored dev workspace — version is pinned and cannot satisfy server-side
+  // minimum-version gates.  Skip the check unconditionally.
+  if (MACRO.VERSION === '0.1.1') {
+    return
+  }
+
   // Local insider builds are intentionally version-pinned and should not be
   // blocked by server-side minimum-version gates.
   if (

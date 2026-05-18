@@ -4169,7 +4169,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
     case 'ultrathink_effort': {
       return wrapMessagesInSystemReminder([
         createUserMessage({
-          content: `用户请求的推理强度为：${attachment.level}。请应用到当前轮次。`,
+          content: `用户请求的强度为：${attachment.level}。请应用到当前轮次。`,
           isMeta: true,
         }),
       ])

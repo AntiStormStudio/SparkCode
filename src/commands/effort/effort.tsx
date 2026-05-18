@@ -21,7 +21,7 @@ function setEffortValue(effortValue: EffortValue): EffortCommandResult {
     });
     if (result.error) {
       return {
-        message: `设置推理强度失败：${result.error.message}`
+        message: `设置强度失败：${result.error.message}`
       };
     }
   }
@@ -53,7 +53,7 @@ function setEffortValue(effortValue: EffortValue): EffortCommandResult {
   const description = getEffortValueDescription(effortValue);
   const suffix = persistable !== undefined ? '' : '（仅当前会话）';
   return {
-    message: `已将推理强度设置为 ${effortValue}${suffix}：${description}`,
+    message: `已将强度设置为 ${effortValue}${suffix}：${description}`,
     effortUpdate: {
       value: effortValue
     }
@@ -65,12 +65,12 @@ export function showCurrentEffort(appStateEffort: EffortValue | undefined, model
   if (effectiveValue === undefined) {
     const level = getDisplayedEffortLevel(model, appStateEffort);
     return {
-      message: `推理强度：auto（当前为 ${level}）`
+      message: `强度：auto（当前为 ${level}）`
     };
   }
   const description = getEffortValueDescription(effectiveValue);
   return {
-    message: `当前推理强度：${effectiveValue}（${description}）`
+    message: `当前强度：${effectiveValue}（${description}）`
   };
 }
 function unsetEffortLevel(): EffortCommandResult {
@@ -79,7 +79,7 @@ function unsetEffortLevel(): EffortCommandResult {
   });
   if (result.error) {
     return {
-      message: `设置推理强度失败：${result.error.message}`
+      message: `设置强度失败：${result.error.message}`
     };
   }
   logEvent('tengu_effort_command', {
@@ -91,14 +91,14 @@ function unsetEffortLevel(): EffortCommandResult {
   if (envOverride !== undefined && envOverride !== null) {
     const envRaw = process.env.CLAUDE_CODE_EFFORT_LEVEL;
     return {
-      message: `已从设置中清除推理强度，但 CLAUDE_CODE_EFFORT_LEVEL=${envRaw} 仍在控制当前会话`,
+      message: `已从设置中清除强度，但 CLAUDE_CODE_EFFORT_LEVEL=${envRaw} 仍在控制当前会话`,
       effortUpdate: {
         value: undefined
       }
     };
   }
   return {
-    message: '已将推理强度设为 auto',
+    message: '已将强度设为 auto',
     effortUpdate: {
       value: undefined
     }

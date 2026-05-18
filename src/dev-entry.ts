@@ -1,6 +1,9 @@
 import pkg from '../package.json'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { dirname, extname, join, resolve } from 'path'
+import { installExitDiagnostics } from './utils/exitDiagnostics.js'
+
+installExitDiagnostics()
 
 type MacroConfig = {
   VERSION: string

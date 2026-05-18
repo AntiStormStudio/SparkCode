@@ -19,7 +19,7 @@ import { FILE_WRITE_TOOL_NAME } from '../tools/FileWriteTool/prompt.js'
 import type { Message } from '../types/message.js'
 import type { OrphanedPermission } from '../types/textInputTypes.js'
 import { logForDebugging } from './debug.js'
-import { isEnvTruthy } from './envUtils.js'
+import { isEnvTruthy, getSparkEnv } from './envUtils.js'
 import { isFsInaccessible } from './errors.js'
 import { getFileModificationTime, stripLineNumberPrefix } from './file.js'
 import { readFileSyncWithMetadata } from './fileRead.js'
@@ -161,7 +161,7 @@ export function* normalizeMessage(message: Message): Generator<SDKMessage> {
         // Filter bash progress to send only one per minute
         // Only emit for Spark Code Remote for now
         if (
-          !isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
+          !isEnvTruthy(getSparkEnv("REMOTE")) &&
           !process.env.CLAUDE_CODE_CONTAINER_ID
         ) {
           break

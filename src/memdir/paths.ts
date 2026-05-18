@@ -8,6 +8,7 @@ import {
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
   getClaudeConfigHomeDir,
+  getSparkEnv,
   isEnvDefinedFalsy,
   isEnvTruthy,
 } from '../utils/envUtils.js'
@@ -38,12 +39,12 @@ export function isAutoMemoryEnabled(): boolean {
   // --bare / SIMPLE: prompts.ts already drops the memory section from the
   // system prompt via its SIMPLE early-return; this gate stops the other half
   // (extractMemories turn-end fork, autoDream, /remember, /dream, team sync).
-  if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
+  if (isEnvTruthy(getSparkEnv("SIMPLE"))) {
     return false
   }
   if (
-    isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
-    !process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR
+    isEnvTruthy(getSparkEnv("REMOTE")) &&
+    !getSparkEnv("REMOTE_MEMORY_DIR")
   ) {
     return false
   }
@@ -83,8 +84,8 @@ export function isExtractModeActive(): boolean {
  *   2. ~/.claude (default config home)
  */
 export function getMemoryBaseDir(): string {
-  if (process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR) {
-    return process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR
+  if (getSparkEnv("REMOTE_MEMORY_DIR")) {
+    return getSparkEnv("REMOTE_MEMORY_DIR")
   }
   return getClaudeConfigHomeDir()
 }

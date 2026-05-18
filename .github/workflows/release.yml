@@ -1,0 +1,89 @@
+name: Release
+
+# 触发方式：推送 v 开头的标签（如 v0.1.2），或手动触发
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# 确保不会并发运行多个 release 任务
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- 分平台打包 ----------
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos
+            arch: arm64
+          - os: windows-latest
+            target: windows
+            arch: x64
+          - os: ubuntu-latest
+            target: linux
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # 检出源码
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 安装 Bun
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # 可选：验证依赖能正常安装（打包本身不需要 node_modules）
+      - name: Verify install
+        run: bun install
+
+      # 运行打包脚本
+      - name: Build release package
+        shell: bash
+        run: bash scripts/package-release.sh
+        env:
+          DIST_DIR: ${{ github.workspace }}/dist
+
+      # 上传产物（供 release job 汇总）
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: spark-code-${{ matrix.target }}-${{ matrix.arch }}
+          path: dist/*
+          retention-days: 1
+
+  # ---------- 汇总所有产物并创建 GitHub Release ----------
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lah artifacts/
+
+      # 创建 GitHub Release 并上传所有产物
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

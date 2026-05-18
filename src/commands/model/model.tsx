@@ -14,6 +14,7 @@ import { checkOpus1mAccess, checkSonnet1mAccess } from '../../utils/model/check1
 import { getDefaultMainLoopModelSetting, isOpus1mMergeEnabled, renderDefaultModelSetting } from '../../utils/model/model.js';
 import { fetchBackendModelList, findBackendModelMatch } from '../../utils/model/backendModels.js';
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
+import { isModelReflexAlias } from '../../utils/model/modelReflex.js';
 function ModelPickerWrapper(t0) {
   const {
     onDone
@@ -122,6 +123,10 @@ function SetModelAndClose({
         setModel(model);
         return;
       }
+      if (isModelReflexAlias(model)) {
+        setModel(model);
+        return;
+      }
 
       try {
         const { items } = await fetchBackendModelList();
@@ -193,7 +198,7 @@ function ShowModelAndClose(t0) {
   const mainLoopModelForSession = useAppState(_temp8);
   const effortValue = useAppState(_temp9);
   const displayModel = renderModelLabel(mainLoopModel);
-  const effortInfo = effortValue !== undefined ? `（推理强度：${formatEffortLevel(effortValue)}）` : "";
+  const effortInfo = effortValue !== undefined ? `（${formatEffortLevel(effortValue)}）` : "";
   if (mainLoopModelForSession) {
     onDone(`当前模型：${chalk.bold(renderModelLabel(mainLoopModelForSession))}（当前会话临时指定）\n默认模型：${displayModel}${effortInfo}`);
   } else {

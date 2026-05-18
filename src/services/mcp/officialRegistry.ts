@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getSparkEnv } from '../../utils/envUtils.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { errorMessage } from '../../utils/errors.js'
 
@@ -31,7 +32,7 @@ function normalizeUrl(url: string): string | undefined {
  * Populates officialUrls for isOfficialMcpUrl lookups.
  */
 export async function prefetchOfficialMcpUrls(): Promise<void> {
-  if (process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC) {
+  if (getSparkEnv("DISABLE_NONESSENTIAL_TRAFFIC")) {
     return
   }
 

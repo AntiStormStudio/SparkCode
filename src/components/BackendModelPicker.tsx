@@ -5,6 +5,7 @@ import {
   type BackendModelEntry,
   fetchBackendModelList,
 } from '../utils/model/backendModels.js'
+import { getModelReflexMap } from '../utils/model/modelReflex.js'
 import { Select } from './CustomSelect/index.js'
 
 type Props = {
@@ -56,14 +57,26 @@ export function BackendModelPicker({
   }, [onError])
 
   const options = useMemo(
-    () =>
-      (models ?? []).map(model => ({
-        value: model.id,
-        label: model.id,
-        description: [model.name, model.description]
-          .filter(Boolean)
-          .join(' · '),
-      })),
+    () => {
+      const reflex = getModelReflexMap()
+      const reflexAliases = new Set(Object.keys(reflex))
+      return [
+        ...Object.entries(reflex).map(([alias, target]) => ({
+          value: alias,
+          label: alias,
+          description: `映射到 ${target}`,
+        })),
+        ...(models ?? [])
+          .filter(model => !reflexAliases.has(model.id))
+          .map(model => ({
+            value: model.id,
+            label: model.id,
+            description: [model.name, model.description]
+              .filter(Boolean)
+              .join(' · '),
+          })),
+      ]
+    },
     [models],
   )
 

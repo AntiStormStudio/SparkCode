@@ -21,7 +21,7 @@ import {
   isClaudeAISubscriber,
   isEnterpriseSubscriber,
 } from '../../utils/auth.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv, isSparkEnvTruthy } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import {
   type CooldownReason,
@@ -629,7 +629,7 @@ function isOAuthTokenRevokedError(error: unknown): boolean {
 }
 
 function isBedrockAuthError(error: unknown): boolean {
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK)) {
+  if (isEnvTruthy(getSparkEnv("USE_BEDROCK"))) {
     // AWS libs reject without an API call if .aws holds a past Expiration value
     // otherwise, API calls that receive expired tokens give generic 403
     // "The security token included in the request is invalid"
@@ -668,7 +668,7 @@ function isGoogleAuthLibraryCredentialError(error: unknown): boolean {
 }
 
 function isVertexAuthError(error: unknown): boolean {
-  if (isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX)) {
+  if (isEnvTruthy(getSparkEnv("USE_VERTEX"))) {
     // SDK-level: google-auth-library fails in prepareOptions() before the HTTP call
     if (isGoogleAuthLibraryCredentialError(error)) {
       return true
@@ -710,7 +710,7 @@ function shouldRetry(error: APIError): boolean {
   // credentials. Bypass x-should-retry:false — the server assumes we'd retry
   // the same bad key, but our key is fine.
   if (
-    isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
+    isSparkEnvTruthy('REMOTE') &&
     (error.status === 401 || error.status === 403)
   ) {
     return true

@@ -1,7 +1,7 @@
 import memoize from 'lodash-es/memoize.js'
 import { join } from 'path'
 import { isRunningWithBun } from './bundledMode.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
+import { getSparkConfigHomeDir, getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
 import { findExecutable } from './findExecutable.js'
 import { getFsImplementation } from './fsOperations.js'
 import { which } from './which.js'
@@ -10,7 +10,7 @@ type Platform = 'win32' | 'darwin' | 'linux'
 
 // Config and data paths
 export const getGlobalClaudeFile = memoize((): string => {
-  return join(getClaudeConfigHomeDir(), 'config.json')
+  return join(getClaudeConfigHomeDir(), 'spark.json')
 })
 
 const hasInternetAccess = memoize(async (): Promise<boolean> => {

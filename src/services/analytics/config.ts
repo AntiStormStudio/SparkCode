@@ -5,7 +5,7 @@
  * across all analytics systems (Datadog, 1P)
  */
 
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv } from '../../utils/envUtils.js'
 import { isTelemetryDisabled } from '../../utils/privacyLevel.js'
 
 /**
@@ -19,9 +19,9 @@ import { isTelemetryDisabled } from '../../utils/privacyLevel.js'
 export function isAnalyticsDisabled(): boolean {
   return (
     process.env.NODE_ENV === 'test' ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY) ||
+    isEnvTruthy(getSparkEnv("USE_BEDROCK")) ||
+    isEnvTruthy(getSparkEnv("USE_VERTEX")) ||
+    isEnvTruthy(getSparkEnv("USE_FOUNDRY")) ||
     isTelemetryDisabled()
   )
 }

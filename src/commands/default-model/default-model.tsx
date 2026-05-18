@@ -32,6 +32,7 @@ import {
   findBackendModelMatch,
 } from '../../utils/model/backendModels.js'
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js'
+import { isModelReflexAlias } from '../../utils/model/modelReflex.js'
 import { updateSettingsForSource } from '../../utils/settings/settings.js'
 
 const CLEAR_DEFAULT_MODEL_ARGS = new Set(['default', 'auto', 'unset', 'clear'])
@@ -196,6 +197,9 @@ async function validateDefaultModel(
         error: `模型 ${model} 不可用：当前组织限制了模型选择。`,
       }
     }
+    return { model, error: null }
+  }
+  if (isModelReflexAlias(model)) {
     return { model, error: null }
   }
 

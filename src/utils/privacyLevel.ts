@@ -1,3 +1,5 @@
+import { getSparkEnv } from './envUtils.js'
+
 /**
  * Privacy level controls how much nonessential network traffic and telemetry
  * Spark Code generates.
@@ -18,7 +20,7 @@
 type PrivacyLevel = 'default' | 'no-telemetry' | 'essential-traffic'
 
 export function getPrivacyLevel(): PrivacyLevel {
-  if (process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC) {
+  if (getSparkEnv("DISABLE_NONESSENTIAL_TRAFFIC")) {
     return 'essential-traffic'
   }
   if (process.env.DISABLE_TELEMETRY) {
@@ -29,7 +31,7 @@ export function getPrivacyLevel(): PrivacyLevel {
 
 /**
  * True when all nonessential network traffic should be suppressed.
- * Equivalent to the old `process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` check.
+ * Equivalent to the old `getSparkEnv("DISABLE_NONESSENTIAL_TRAFFIC")` check.
  */
 export function isEssentialTrafficOnly(): boolean {
   return getPrivacyLevel() === 'essential-traffic'
@@ -48,7 +50,7 @@ export function isTelemetryDisabled(): boolean {
  * or null if unrestricted. Used for user-facing "unset X to re-enable" messages.
  */
 export function getEssentialTrafficOnlyReason(): string | null {
-  if (process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC) {
+  if (getSparkEnv("DISABLE_NONESSENTIAL_TRAFFIC")) {
     return 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'
   }
   return null

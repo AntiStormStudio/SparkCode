@@ -151,6 +151,7 @@ export default class App extends PureComponent<Props, State> {
   // tree may mount partially, and relying on useInput() to ref stdin causes
   // the process to exit cleanly before the UI becomes interactive.
   stdinKeepAliveActive = false;
+  stdinKeepAliveTimer: NodeJS.Timeout | null = null;
 
   // Determines if TTY is supported on the provided stdin
   isRawModeSupported(): boolean {
@@ -308,9 +309,29 @@ export default class App extends PureComponent<Props, State> {
     }
     this.stdinKeepAliveActive = active;
     if (active) {
-      stdin.ref();
-    } else if (this.rawModeEnabledCount === 0) {
-      stdin.unref();
+      try {
+        stdin.ref();
+      } catch (error) {
+        logForDebugging(`stdin keepalive ref failed: ${error instanceof Error ? error.message : String(error)}`, {
+          level: 'warn'
+        });
+      }
+      this.stdinKeepAliveTimer ??= setInterval(() => {}, 60 * 60 * 1000);
+    } else {
+      if (this.stdinKeepAliveTimer) {
+        clearInterval(this.stdinKeepAliveTimer);
+        this.stdinKeepAliveTimer = null;
+      }
+      if (this.rawModeEnabledCount !== 0) {
+        return;
+      }
+      try {
+        stdin.unref();
+      } catch (error) {
+        logForDebugging(`stdin keepalive unref failed: ${error instanceof Error ? error.message : String(error)}`, {
+          level: 'warn'
+        });
+      }
     }
   }
 

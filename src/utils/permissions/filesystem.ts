@@ -75,7 +75,7 @@ export const DANGEROUS_DIRECTORIES = [
   '.git',
   '.vscode',
   '.idea',
-  '.claude',
+  '.sparkc',
 ] as const
 
 /**
@@ -106,12 +106,12 @@ export function getClaudeSkillScope(
 
   const bases = [
     {
-      dir: expandPath(join(getOriginalCwd(), '.claude', 'skills')),
-      prefix: '/.claude/skills/',
+      dir: expandPath(join(getOriginalCwd(), '.sparkc', 'skills')),
+      prefix: '/.sparkc/skills/',
     },
     {
-      dir: expandPath(join(homedir(), '.claude', 'skills')),
-      prefix: '~/.claude/skills/',
+      dir: expandPath(join(homedir(), '.sparkc', 'skills')),
+      prefix: '~/.sparkc/skills/',
     },
   ]
 
@@ -227,12 +227,12 @@ function isClaudeConfigFilePath(filePath: string): boolean {
     return true
   }
 
-  // Check if file is within .claude/commands or .claude/agents directories
+  // Check if file is within .sparkc/commands or .sparkc/agents directories
   // using proper path segment validation (not string matching with includes())
   // pathInWorkingPath now handles case-insensitive comparison to prevent bypasses
-  const commandsDir = join(getOriginalCwd(), '.claude', 'commands')
-  const agentsDir = join(getOriginalCwd(), '.claude', 'agents')
-  const skillsDir = join(getOriginalCwd(), '.claude', 'skills')
+  const commandsDir = join(getOriginalCwd(), '.sparkc', 'commands')
+  const agentsDir = join(getOriginalCwd(), '.sparkc', 'agents')
+  const skillsDir = join(getOriginalCwd(), '.sparkc', 'skills')
 
   return (
     pathInWorkingPath(filePath, commandsDir) ||
@@ -454,10 +454,10 @@ function isDangerousFilePathToAutoEdit(path: string): boolean {
       }
 
       // Special case: .claude/worktrees/ is a structural path (where Claude stores
-      // git worktrees), not a user-created dangerous directory. Skip the .claude
+      // git worktrees), not a user-created dangerous directory. Skip the .sparkc
       // segment when it's followed by 'worktrees'. Any nested .claude directories
       // within the worktree (not followed by 'worktrees') are still blocked.
-      if (dir === '.claude') {
+      if (dir === '.sparkc') {
         const nextSegment = pathSegments[i + 1]
         if (
           nextSegment &&
@@ -1586,10 +1586,10 @@ export function checkEditableInternalPath(
   // .claude/ DANGEROUS_DIRECTORIES check prompts for it, which in SDK mode
   // cascades: user clicks "Always allow" → setMode:acceptEdits suggestion
   // applied → silent downgrade from auto mode. Matches the project-level
-  // .claude/ only (not ~/.claude/) since launch.json is per-project.
+  // .sparkc/ only (not ~/.sparkc/) since launch.json is per-project.
   if (
     normalizeCaseForComparison(normalizedPath) ===
-    normalizeCaseForComparison(join(getOriginalCwd(), '.claude', 'launch.json'))
+    normalizeCaseForComparison(join(getOriginalCwd(), '.sparkc', 'launch.json'))
   ) {
     return {
       behavior: 'allow',

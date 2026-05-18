@@ -1,5 +1,6 @@
 import type * as https from 'https'
 import { Agent as HttpsAgent } from 'https'
+import { getSparkEnv } from './envUtils.js'
 import memoize from 'lodash-es/memoize.js'
 import type * as tls from 'tls'
 import type * as undici from 'undici'
@@ -27,10 +28,10 @@ export const getMTLSConfig = memoize((): MTLSConfig | undefined => {
   // We don't need to manually load it - Node.js appends it to the built-in CAs automatically
 
   // Client certificate
-  if (process.env.CLAUDE_CODE_CLIENT_CERT) {
+  if (getSparkEnv("CLIENT_CERT")) {
     try {
       config.cert = getFsImplementation().readFileSync(
-        process.env.CLAUDE_CODE_CLIENT_CERT,
+        getSparkEnv("CLIENT_CERT"),
         { encoding: 'utf8' },
       )
       logForDebugging(
@@ -44,10 +45,10 @@ export const getMTLSConfig = memoize((): MTLSConfig | undefined => {
   }
 
   // Client key
-  if (process.env.CLAUDE_CODE_CLIENT_KEY) {
+  if (getSparkEnv("CLIENT_KEY")) {
     try {
       config.key = getFsImplementation().readFileSync(
-        process.env.CLAUDE_CODE_CLIENT_KEY,
+        getSparkEnv("CLIENT_KEY"),
         { encoding: 'utf8' },
       )
       logForDebugging('mTLS: Loaded client key from CLAUDE_CODE_CLIENT_KEY')

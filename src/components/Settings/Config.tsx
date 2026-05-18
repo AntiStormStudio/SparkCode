@@ -975,7 +975,7 @@ export function Config({
     }
   }] : []), ...(shouldShowExternalIncludesToggle ? [{
     id: 'showExternalIncludesDialog',
-    label: '外部 CLAUDE.md 引入',
+    label: '外部 SPARK.md 引入',
     value: (() => {
       const projectConfig = getCurrentProjectConfig();
       if (projectConfig.hasClaudeMdExternalIncludesApproved) {

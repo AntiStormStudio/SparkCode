@@ -16,7 +16,7 @@ import { buildTool, type ToolDef } from '../../Tool.js'
 import { getCwd } from '../../utils/cwd.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { countLinesChanged } from '../../utils/diff.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isEnvTruthy, getSparkEnv } from '../../utils/envUtils.js'
 import { isENOENT } from '../../utils/errors.js'
 import {
   FILE_NOT_FOUND_CWD_NOTE,
@@ -404,7 +404,7 @@ export const FileEditTool = buildTool({
     // Discover skills from this file's path (fire-and-forget, non-blocking)
     // Skip in simple mode - no skills available
     const cwd = getCwd()
-    if (!isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
+    if (!isEnvTruthy(getSparkEnv("SIMPLE"))) {
       const newSkillDirs = await discoverSkillDirsForPaths(
         [absoluteFilePath],
         cwd,
@@ -525,7 +525,7 @@ export const FileEditTool = buildTool({
     })
 
     // 7. Log events
-    if (absoluteFilePath.endsWith(`${sep}CLAUDE.md`)) {
+    if (absoluteFilePath.endsWith(`${sep}SPARK.md`)) {
       logEvent('tengu_write_claudemd', {})
     }
     countLinesChanged(patch)
@@ -544,7 +544,7 @@ export const FileEditTool = buildTool({
 
     let gitDiff: ToolUseDiff | undefined
     if (
-      isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
+      isEnvTruthy(getSparkEnv("REMOTE")) &&
       getFeatureValue_CACHED_MAY_BE_STALE('tengu_quartz_lantern', false)
     ) {
       const startTime = Date.now()

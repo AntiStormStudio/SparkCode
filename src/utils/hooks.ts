@@ -160,7 +160,7 @@ import {
 } from './hooks/sessionHooks.js'
 import type { AppState } from '../state/AppState.js'
 import { jsonStringify, jsonParse } from './slowOperations.js'
-import { isEnvTruthy } from './envUtils.js'
+import { isEnvTruthy, getSparkEnv } from './envUtils.js'
 import { errorMessage, getErrnoCode } from './errors.js'
 
 const TOOL_HOOK_EXECUTION_TIMEOUT_MS = 10 * 60 * 1000
@@ -870,8 +870,8 @@ async function execCommandHook(
   // PowerShell — see design §8.1. For now PS hooks ignore the prefix;
   // a CLAUDE_CODE_PS_SHELL_PREFIX (or shell-aware prefix) is a follow-up.
   const finalCommand =
-    !isPowerShell && process.env.CLAUDE_CODE_SHELL_PREFIX
-      ? formatShellPrefixCommand(process.env.CLAUDE_CODE_SHELL_PREFIX, command)
+    !isPowerShell && getSparkEnv("SHELL_PREFIX")
+      ? formatShellPrefixCommand(getSparkEnv("SHELL_PREFIX"), command)
       : command
 
   const hookTimeoutMs = hook.timeout
@@ -1979,7 +1979,7 @@ async function* executeHooks({
     return
   }
 
-  if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
+  if (isEnvTruthy(getSparkEnv("SIMPLE"))) {
     return
   }
 
@@ -3013,7 +3013,7 @@ async function executeHooksOutsideREPL({
   signal?: AbortSignal
   timeoutMs: number
 }): Promise<HookOutsideReplResult[]> {
-  if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
+  if (isEnvTruthy(getSparkEnv("SIMPLE"))) {
     return []
   }
 
@@ -4320,7 +4320,7 @@ export function hasInstructionsLoadedHook(): boolean {
 }
 
 /**
- * Execute InstructionsLoaded hooks when an instruction file (CLAUDE.md or
+ * Execute InstructionsLoaded hooks when an instruction file (SPARK.md or
  * .claude/rules/*.md) is loaded into context. Fire-and-forget — this hook is
  * for observability/audit only and does not support blocking.
  *
@@ -4328,7 +4328,7 @@ export function hasInstructionsLoadedHook(): boolean {
  * - Eager load at session start (getMemoryFiles in claudemd.ts)
  * - Eager reload after compaction (getMemoryFiles cache cleared by
  *   runPostCompactCleanup; next call reports load_reason: 'compact')
- * - Lazy load when Claude touches a file that triggers nested CLAUDE.md or
+ * - Lazy load when Claude touches a file that triggers nested SPARK.md or
  *   conditional rules with paths: frontmatter (memoryFilesToAttachments in
  *   attachments.ts)
  */

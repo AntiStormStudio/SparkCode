@@ -1417,7 +1417,7 @@ const INSIGHT_SECTIONS: InsightSection[] = [
 只返回合法 JSON 对象，所有面向用户的字符串都用简体中文：
 {
   "claude_md_additions": [
-    {"addition": "基于工作流模式建议加入 CLAUDE.md 的具体行或段落。例如：修改认证相关文件后总是运行测试。", "why": "一句话说明为什么这对实际会话有帮助", "prompt_scaffold": "说明应该加到 CLAUDE.md 哪里。例如：加入 ## 测试 部分"}
+    {"addition": "基于工作流模式建议加入 SPARK.md 的具体行或段落。例如：修改认证相关文件后总是运行测试。", "why": "一句话说明为什么这对实际会话有帮助", "prompt_scaffold": "说明应该加到 SPARK.md 哪里。例如：加入 ## 测试 部分"}
   ],
   "features_to_try": [
     {"feature": "上面 CC 功能参考中的功能名", "one_liner": "它能做什么", "why_for_you": "基于你的会话说明为什么它会帮到你", "example_code": "可复制的实际命令或配置"}
@@ -2069,8 +2069,8 @@ function generateHtmlReport(
         ? `
     <h2 id="section-features">可以试试的现有功能</h2>
     <div class="claude-md-section">
-      <h3>建议加入 CLAUDE.md 的内容</h3>
-      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">复制到 Spark Code 后即可加入你的 CLAUDE.md。</p>
+      <h3>建议加入 SPARK.md 的内容</h3>
+      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">复制到 Spark Code 后即可加入你的 SPARK.md。</p>
       <div class="claude-md-actions">
         <button class="copy-all-btn" onclick="copyAllCheckedClaudeMd()">复制已勾选</button>
       </div>
@@ -2078,7 +2078,7 @@ function generateHtmlReport(
         .map(
           (add, i) => `
         <div class="claude-md-item">
-          <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || 'Add to CLAUDE.md')}\\n\\n${escapeHtml(add.addition)}">
+          <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || 'Add to SPARK.md')}\\n\\n${escapeHtml(add.addition)}">
           <label for="cmd-${i}">
             <code class="cmd-code">${escapeHtml(add.addition)}</code>
             <button class="copy-btn" onclick="copyCmdItem(${i})">复制</button>

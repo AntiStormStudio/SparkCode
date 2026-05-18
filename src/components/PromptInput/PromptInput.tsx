@@ -72,6 +72,7 @@ import { cacheImagePath, storeImage } from '../../utils/imageStore.js';
 import { isMacosOptionChar, MACOS_OPTION_SPECIAL_CHARS } from '../../utils/keyboardShortcuts.js';
 import { logError } from '../../utils/log.js';
 import { isOpus1mMergeEnabled, modelDisplayString } from '../../utils/model/model.js';
+import { resolveModelReflex } from '../../utils/model/modelReflex.js';
 import { setAutoModeActive } from '../../utils/permissions/autoModeState.js';
 import { cyclePermissionMode, getNextPermissionMode } from '../../utils/permissions/getNextPermissionMode.js';
 import { transitionPermissionMode } from '../../utils/permissions/permissionSetup.js';
@@ -121,6 +122,15 @@ import { usePromptInputPlaceholder } from './usePromptInputPlaceholder.js';
 import { useShowFastIconHint } from './useShowFastIconHint.js';
 import { useSwarmBanner } from './useSwarmBanner.js';
 import { isNonSpacePrintable, isVimModeEnabled } from './utils.js';
+
+function doesModelBlockImagePaste(model: string): boolean {
+  const modelNames = [model, resolveModelReflex(model)];
+  return modelNames.some(modelName => {
+    const normalizedModel = modelName.toLowerCase();
+    return normalizedModel.includes('deepseek') || normalizedModel.includes('glm');
+  });
+}
+
 type Props = {
   debug: boolean;
   ideSelection: IDESelection | undefined;
@@ -749,7 +759,7 @@ function PromptInput({
     if (thinkTriggers.length && isUltrathinkEnabled()) {
       addNotification({
         key: 'ultrathink-active',
-        text: '本轮已切换为 high 推理强度',
+        text: '本轮已切换为 high 强度',
         priority: 'immediate',
         timeoutMs: 5000
       });
@@ -1149,6 +1159,15 @@ function PromptInput({
     }));
   }
   function onImagePaste(image: string, mediaType?: string, filename?: string, dimensions?: ImageDimensions, sourcePath?: string) {
+    if (doesModelBlockImagePaste(mainLoopModel)) {
+      addNotification({
+        key: 'image-paste-model-unsupported',
+        text: `当前模型 ${mainLoopModel} 不支持粘贴图片`,
+        priority: 'immediate',
+        timeoutMs: 3000
+      });
+      return;
+    }
     logEvent('tengu_paste_image', {});
     onModeChange('prompt');
     const pasteId = nextPasteIdRef.current++;

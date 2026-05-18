@@ -51,7 +51,7 @@ import { filterInjectedMemoryFiles, getMemoryFiles } from './claudemd.js'
 import { getContextWindowForModel } from './context.js'
 import { getCwd } from './cwd.js'
 import { logForDebugging } from './debug.js'
-import { isEnvTruthy } from './envUtils.js'
+import { isEnvTruthy, getSparkEnv } from './envUtils.js'
 import { errorMessage, toError } from './errors.js'
 import { logError } from './log.js'
 import { normalizeMessagesForAPI } from './messages.js'
@@ -321,8 +321,8 @@ async function countMemoryFileTokens(): Promise<{
   memoryFileDetails: MemoryFile[]
   claudeMdTokens: number
 }> {
-  // Simple mode disables CLAUDE.md loading, so don't report tokens for them
-  if (isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
+  // Simple mode disables SPARK.md loading, so don't report tokens for them
+  if (isEnvTruthy(getSparkEnv("SIMPLE"))) {
     return { memoryFileDetails: [], claudeMdTokens: 0 }
   }
 

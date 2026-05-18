@@ -39,7 +39,7 @@ function getCommandFuse(commands: Command[]): Fuse<CommandSearchItem> {
       const parts = commandName.split(SEPARATORS).filter(Boolean)
 
       return {
-        descriptionKey: (cmd.description ?? '')
+        descriptionKey: safeCommandDescription(cmd)
           .split(' ')
           .map(word => cleanWord(word))
           .filter(Boolean),
@@ -272,9 +272,9 @@ function createCommandSuggestionItem(
 
   const isWorkflow = cmd.type === 'prompt' && cmd.kind === 'workflow'
   const fullDescription =
-    (isWorkflow ? cmd.description : formatDescriptionWithSource(cmd)) +
+    (isWorkflow ? safeCommandDescription(cmd) : safeFormatDescription(cmd)) +
     (cmd.type === 'prompt' && cmd.argNames?.length
-      ? ` (arguments: ${cmd.argNames.join(', ')})`
+      ? `（参数：${cmd.argNames.join(', ')}）`
       : '')
 
   return {
@@ -283,6 +283,22 @@ function createCommandSuggestionItem(
     tag: isWorkflow ? 'workflow' : undefined,
     description: fullDescription,
     metadata: cmd,
+  }
+}
+
+function safeCommandDescription(cmd: Command): string {
+  try {
+    return cmd.description
+  } catch {
+    return '命令'
+  }
+}
+
+function safeFormatDescription(cmd: Command): string {
+  try {
+    return formatDescriptionWithSource(cmd)
+  } catch {
+    return safeCommandDescription(cmd)
   }
 }
 
@@ -538,7 +554,7 @@ export function applyCommandSuggestion(
   }
 }
 
-// Helper function at bottom of file per CLAUDE.md
+// Helper function at bottom of file per SPARK.md
 function cleanWord(word: string) {
   return word.toLowerCase().replace(/[^a-z0-9]/g, '')
 }

@@ -19,7 +19,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
         isMax20x = profile?.organization?.organization_type === 'claude_max' && profile?.organization?.rate_limit_tier === 'default_claude_max_20x';
       }
       if (isMax20x) {
-        setTimeout(onDone, 0, '你已经是最高的 Max 订阅套餐。如需额外用量，请运行 /login 切换到按 API 用量计费的账号。');
+        setTimeout(onDone, 0, '你已经是最高的 Max 订阅套餐。如需额外用量，请运行 /login 切换到免费使用的账号。');
         return null;
       }
     }
