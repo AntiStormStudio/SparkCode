@@ -15,4 +15,5 @@ coverage/
 
 .claude/
 .idea/
-.vscode/
+.vscode/TextInputPill.js
+bun 2.lock

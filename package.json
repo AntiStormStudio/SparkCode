@@ -2,7 +2,7 @@
   "name": "spark-code",
   "version": "0.1.1",
   "private": true,
-  "description": "从 source map 重建并恢复的 SPARK-Code 源码树。",
+  "description": "基于终端的 AI 编程助手，支持多模型、自定义后端和跨平台分发。",
   "bin": {
     "sparkc": "./bin/sparkc"
   },
@@ -11,7 +11,7 @@
   "packageManager": "bun@1.3.5",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anthropics/claude-code.git"
+    "url": "https://github.com/AntiStormStudio/SparkCode.git"
   },
   "engines": {
     "bun": ">=1.3.5",
