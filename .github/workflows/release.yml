@@ -46,7 +46,7 @@ jobs:
 
       # 上传产物（供 release job 汇总）
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: spark-code-release
           path: dist/*
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -72,7 +72,7 @@ jobs:
 
       # 创建 GitHub Release 并上传所有产物
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
           generate_release_notes: true
