@@ -37,16 +37,21 @@ bun run version
 tar xzf spark-code-0.1.1.tar.gz
 cd spark-code-0.1.1
 ./scripts/install.sh
+
+# 中国大陆网络可用：
+./scripts/install.sh --china
 ```
 
 **Windows：**
 ```powershell
 # 解压 spark-code-0.1.1.zip 后
 cd spark-code-0.1.1
-.\scripts\install.ps1
+.\install.cmd
 ```
 
-安装脚本会自动检查并安装 Bun，然后运行 `bun install` 完成环境配置。
+Windows 用户也可以直接双击 `install.cmd`。安装脚本会自动检查并安装 Bun，不需要提前安装 Bun/npm；完成后会生成 `sparkc.cmd`，并把 `sparkc` 命令加入当前用户 PATH。
+
+中国大陆网络环境建议双击 `install-cn.cmd`。Windows 分发包会尽量内置 Bun 运行时，依赖安装默认使用 npmmirror，减少访问 bun.sh、GitHub 和 npm 官方源的失败概率。
 
 ## 主要命令
 
@@ -58,6 +63,12 @@ cd spark-code-0.1.1
 | `/model-reflex` | 管理模型别名映射 |
 | `/config-server` | 配置后端服务器地址 |
 | `/status` | 查看当前状态 |
+
+## Windows 一键安装说明
+
+1. 解压 `spark-code-0.1.1.zip`
+2. 正常网络双击 `install.cmd`；中国大陆网络双击 `install-cn.cmd`
+3. 安装完成后，当前目录可运行 `sparkc.cmd`，新开的终端可直接运行 `sparkc`
 
 ## 打包发布
 
