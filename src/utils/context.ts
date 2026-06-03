@@ -71,6 +71,10 @@ export function getContextWindowForModel(
     return 1_000_000
   }
 
+  if (modelSupports1M(model)) {
+    return 1_000_000
+  }
+
   const cap = getModelCapability(model)
   if (cap?.max_input_tokens && cap.max_input_tokens >= 100_000) {
     if (

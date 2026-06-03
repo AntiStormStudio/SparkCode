@@ -66,6 +66,7 @@ import {
   CAPPED_DEFAULT_MAX_TOKENS,
   getModelMaxOutputTokens,
   getSonnet1mExpTreatmentEnabled,
+  modelSupports1M,
 } from '../../utils/context.js'
 import { resolveAppliedEffort } from '../../utils/effort.js'
 import { isEnvTruthy, isSparkEnvTruthy } from '../../utils/envUtils.js'
@@ -1539,10 +1540,11 @@ async function* queryModel(
   const paramsFromContext = (retryContext: RetryContext) => {
     const betasParams = [...betas]
 
-    // Append 1M beta dynamically for the Sonnet 1M experiment.
+    // Append 1M beta dynamically for supported models.
     if (
       !betasParams.includes(CONTEXT_1M_BETA_HEADER) &&
-      getSonnet1mExpTreatmentEnabled(retryContext.model)
+      (modelSupports1M(retryContext.model) ||
+        getSonnet1mExpTreatmentEnabled(retryContext.model))
     ) {
       betasParams.push(CONTEXT_1M_BETA_HEADER)
     }
@@ -2036,6 +2038,9 @@ async function* queryModel(
                   // initialize signature to ensure field exists even if signature_delta never arrives
                   signature: '',
                 }
+                ;(contentBlocks[part.index] as BetaContentBlock & {
+                  reasoning_content?: string
+                }).reasoning_content = ''
                 break
               default:
                 // even more awkwardly, the sdk mutates the contents of text blocks
@@ -2159,6 +2164,9 @@ async function* queryModel(
                     throw new Error('Content block is not a thinking block')
                   }
                   contentBlock.thinking += delta.thinking
+                  ;(contentBlock as typeof contentBlock & {
+                    reasoning_content?: string
+                  }).reasoning_content = contentBlock.thinking
                   break
               }
             }
