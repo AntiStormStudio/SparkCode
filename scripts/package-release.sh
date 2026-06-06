@@ -29,7 +29,7 @@ PROJECT_ROOT="$(to_posix_path "$(dirname "$SCRIPT_DIR")")"
 
 cd "$PROJECT_ROOT"
 
-VERSION="$(bun -e "console.log(require('./package.json').version)" 2>/dev/null || node -p "require('./package.json').version" 2>/dev/null || echo '0.1.1')"
+VERSION="$(bun -e "console.log(require('./package.json').version)" 2>/dev/null || node -p "require('./package.json').version" 2>/dev/null || echo '0.2.0')"
 BUN_VERSION="$(bun -e "const pm=require('./package.json').packageManager||'bun@1.3.5'; console.log(pm.replace(/^bun@/, ''))" 2>/dev/null || echo '1.3.5')"
 NAME="spark-code"
 INCLUDE_WINDOWS_BUN="${INCLUDE_WINDOWS_BUN:-1}"

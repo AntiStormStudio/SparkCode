@@ -118,6 +118,7 @@ import modelList from './commands/model-list/index.js'
 import modelReflex from './commands/model-reflex/index.js'
 import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
+import remote from './commands/remote/index.js'
 import remoteEnv from './commands/remote-env/index.js'
 import upgrade from './commands/upgrade/index.js'
 import {
@@ -220,6 +221,7 @@ const COMMANDS = memoize((): Command[] => [
   modelList,
   modelReflex,
   outputStyle,
+  remote,
   remoteEnv,
   plugin,
   pr_comments,

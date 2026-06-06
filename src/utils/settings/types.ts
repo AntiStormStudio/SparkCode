@@ -794,6 +794,10 @@ export const SettingsSchema = lazySchema(() =>
         ),
       remote: z
         .object({
+          backendUrl: z
+            .string()
+            .optional()
+            .describe('Spark Code Remote backend endpoint URL'),
           defaultEnvironmentId: z
             .string()
             .optional()

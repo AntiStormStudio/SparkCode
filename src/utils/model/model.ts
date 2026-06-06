@@ -199,9 +199,12 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
     return getDefaultOpusModel() + (isOpus1mMergeEnabled() ? '[1m]' : '')
   }
 
-  // PAYG (1P and 3P), Enterprise, Team Standard, and Pro get Sonnet as default
+  // PAYG (1P and 3P), Enterprise, Team Standard, and Pro get Sonnet 1M as default
   // Note that PAYG (3P) may default to an older Sonnet model
-  return getDefaultSonnetModel()
+  const defaultSonnetModel = getDefaultSonnetModel()
+  return is1mContextDisabled() || /\[1m\]$/i.test(defaultSonnetModel)
+    ? defaultSonnetModel
+    : defaultSonnetModel + '[1m]'
 }
 
 /**
@@ -297,7 +300,9 @@ export function getClaudeAiUserDefaultModelDescription(
     }
     return `Opus 4.6 · 适合复杂任务${fastMode ? getOpus46PricingSuffix(true) : ''}`
   }
-  return 'Sonnet 4.6 · 适合日常任务'
+  return is1mContextDisabled()
+    ? 'Sonnet 4.6 · 适合日常任务'
+    : 'Sonnet 4.6，1M 上下文 · 适合日常任务'
 }
 
 export function renderDefaultModelSetting(
