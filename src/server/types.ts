@@ -37,6 +37,7 @@ export type SessionInfo = {
   workDir: string
   process: ChildProcess | null
   sessionKey?: string
+  hasStarted?: boolean
 }
 
 /**

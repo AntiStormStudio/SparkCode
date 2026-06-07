@@ -1,13 +1,17 @@
 import { randomUUID } from 'crypto'
 import {
+  clearConfiguredAndroidAuth,
   getConfiguredApiBaseUrl,
   getConfiguredAuthToken,
+  getConfiguredAuthRefreshToken,
   normalizeApiBaseUrl,
 } from '../../utils/auth.js'
 import { getUserAgent } from '../../utils/http.js'
 import { refreshConfiguredAndroidToken } from '../../utils/sparkAndroidAuth.js'
 
 const ANDROID_CHAT_COMPLETIONS_PATH = '/api/v1/android/chat/completions'
+const ANDROID_AUTH_EXPIRED_MESSAGE =
+  '登录已过期或令牌无效，请运行 /login 重新登录'
 
 type JsonObject = Record<string, unknown>
 
@@ -417,6 +421,7 @@ export async function maybeHandleSparkAndroidChatFetch(
 
   const baseUrl = normalizeApiBaseUrl(configuredBaseUrl)
   let authToken = getConfiguredAuthToken()
+  const hadAndroidAuth = !!authToken || !!getConfiguredAuthRefreshToken()
 
   const payload = await readJsonBody(input, init)
 
@@ -432,7 +437,9 @@ export async function maybeHandleSparkAndroidChatFetch(
 
   if (!authToken) {
     authToken = await refreshConfiguredAndroidToken(baseUrl)
-    if (!authToken) return null
+    if (!authToken) {
+      return hadAndroidAuth ? errorResponse(ANDROID_AUTH_EXPIRED_MESSAGE, 401) : null
+    }
   }
 
   const openAIPayload = convertAnthropicToOpenAI(payload)
@@ -455,6 +462,10 @@ export async function maybeHandleSparkAndroidChatFetch(
         openAIPayload,
         signal,
       )
+    }
+    if (!nextAuthToken || response.status === 401) {
+      clearConfiguredAndroidAuth()
+      return errorResponse(ANDROID_AUTH_EXPIRED_MESSAGE, 401)
     }
   }
 

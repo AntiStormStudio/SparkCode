@@ -3959,7 +3959,8 @@ async function run(): Promise<CommanderCommand> {
   });
 
   // claude server
-  if (feature('DIRECT_CONNECT')) {
+  // Spark Code desktop launches this local session server on startup.
+  {
     program.command('server').description('Start a SPARK-Code session server').option('--port <number>', 'HTTP port', '0').option('--host <string>', 'Bind address', '0.0.0.0').option('--auth-token <token>', 'Bearer token for auth').option('--unix <path>', 'Listen on a unix domain socket').option('--workspace <dir>', 'Default working directory for sessions that do not specify cwd').option('--idle-timeout <ms>', 'Idle timeout for detached sessions in ms (0 = never expire)', '600000').option('--max-sessions <n>', 'Maximum concurrent sessions (0 = unlimited)', '32').action(async (opts: {
       port: string;
       host: string;
@@ -3979,8 +3980,9 @@ async function run(): Promise<CommanderCommand> {
         SessionManager
       } = await import('./server/sessionManager.js');
       const {
-        DangerousBackend
-      } = await import('./server/backends/dangerousBackend.js');
+        initializeServerRegistries,
+        ServerQueryBackend
+      } = await import('./server/backends/queryBackend.js');
       const {
         printBanner
       } = await import('./server/serverBanner.js');
@@ -3994,7 +3996,7 @@ async function run(): Promise<CommanderCommand> {
       } = await import('./server/lockfile.js');
       const existing = await probeRunningServer();
       if (existing) {
-        process.stderr.write(`已有 claude 服务器正在运行（pid ${existing.pid}）：${existing.httpUrl}\n`);
+        process.stderr.write(`已有 Spark Code 服务器正在运行（pid ${existing.pid}）：${existing.httpUrl}\n`);
         process.exit(1);
       }
       const authToken = opts.authToken ?? `sk-ant-cc-${randomBytes(16).toString('base64url')}`;
@@ -4007,7 +4009,8 @@ async function run(): Promise<CommanderCommand> {
         idleTimeoutMs: parseInt(opts.idleTimeout, 10),
         maxSessions: parseInt(opts.maxSessions, 10)
       };
-      const backend = new DangerousBackend();
+      initializeServerRegistries();
+      const backend = new ServerQueryBackend();
       const sessionManager = new SessionManager(backend, {
         idleTimeoutMs: config.idleTimeoutMs,
         maxSessions: config.maxSessions

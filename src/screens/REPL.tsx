@@ -20,6 +20,7 @@ import { writeFile } from 'fs/promises';
 import { Box, Text, useStdin, useTheme, useTerminalFocus, useTerminalTitle, useTabStatus } from '../ink.js';
 import type { TabStatusKind } from '../ink/hooks/use-tab-status.js';
 import { CostThresholdDialog } from '../components/CostThresholdDialog.js';
+import { ConversationStatusBar } from '../components/ConversationStatusBar.js';
 import { IdleReturnDialog } from '../components/IdleReturnDialog.js';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, useLayoutEffect, type RefObject } from 'react';
@@ -4583,6 +4584,7 @@ export function REPL({
   // check footerSelection: pill FOCUS (arrow-down to tasks pill) must keep
   // the sprite visible so arrow-right can navigate to it.
   const companionVisible = !toolJSX?.shouldHidePromptInput && !focusedInputDialog && !showBashesDialog;
+  const showConversationStatusBar = messages.length > 0 || !!userInputOnProcessing;
 
   // In fullscreen, ALL local-jsx slash commands float in the modal slot —
   // FullscreenLayout wraps them in an absolute-positioned bottom-anchored
@@ -4615,6 +4617,7 @@ export function REPL({
       <ScrollKeybindingHandler scrollRef={scrollRef} isActive={isFullscreenEnvEnabled() && (centeredModal != null || !focusedInputDialog || focusedInputDialog === 'tool-permission')} onScroll={centeredModal || toolPermissionOverlay || viewedAgentTask ? undefined : composedOnScroll} />
       {feature('MESSAGE_ACTIONS') && isFullscreenEnvEnabled() && !disableMessageActions ? <MessageActionsKeybindings handlers={messageActionHandlers} isActive={cursor !== null} /> : null}
       <CancelRequestHandler {...cancelRequestProps} />
+      <ConversationStatusBar messages={messages} mainLoopModel={mainLoopModel} title={terminalTitle} visible={showConversationStatusBar} />
       <MCPConnectionManager key={remountKey} dynamicMcpConfig={dynamicMcpConfig} isStrictMcpConfig={strictMcpConfig}>
         <FullscreenLayout scrollRef={scrollRef} overlay={toolPermissionOverlay} bottomFloat={feature('BUDDY') && companionVisible && !companionNarrow ? <CompanionFloatingBubble /> : undefined} modal={centeredModal} modalScrollRef={modalScrollRef} dividerYRef={dividerYRef} hidePill={!!viewedAgentTask} hideSticky={!!viewedTeammateTask} newMessageCount={unseenDivider?.count ?? 0} onPillClick={() => {
         setCursor(null);

@@ -1,7 +1,9 @@
 import { feature } from 'bun:bundle'
+import { existsSync, readFileSync } from 'fs'
 import { chmod, open, rename, stat, unlink } from 'fs/promises'
 import mapValues from 'lodash-es/mapValues.js'
 import memoize from 'lodash-es/memoize.js'
+import { homedir } from 'os'
 import { dirname, join, parse } from 'path'
 import { getPlatform } from 'src/utils/platform.js'
 import type { PluginError } from '../../types/plugin.js'
@@ -78,6 +80,172 @@ function addScopeToServers(
     scopedServers[name] = { ...config, scope }
   }
   return scopedServers
+}
+
+function parseTomlString(raw: string): string | null {
+  const value = raw.trim()
+  const match = value.match(/^"((?:\\.|[^"\\])*)"$/)
+  if (!match) return null
+  return match[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+}
+
+function parseTomlStringArray(raw: string): string[] | null {
+  const value = raw.trim()
+  if (!value.startsWith('[') || !value.endsWith(']')) return null
+  const items: string[] = []
+  const pattern = /"((?:\\.|[^"\\])*)"/g
+  for (const match of value.matchAll(pattern)) {
+    items.push(match[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\'))
+  }
+  return items
+}
+
+function parseTomlInlineStringTable(raw: string): Record<string, string> | null {
+  const value = raw.trim()
+  if (!value.startsWith('{') || !value.endsWith('}')) return null
+  const table: Record<string, string> = {}
+  const body = value.slice(1, -1)
+  const pattern = /([A-Za-z0-9_.-]+)\s*=\s*"((?:\\.|[^"\\])*)"/g
+  for (const match of body.matchAll(pattern)) {
+    table[match[1]!] = match[2]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  }
+  return table
+}
+
+function splitTomlAssignment(line: string): [string, string] | null {
+  const index = line.indexOf('=')
+  if (index === -1) return null
+  return [line.slice(0, index).trim(), line.slice(index + 1).trim()]
+}
+
+type CodexMcpDraft = {
+  type?: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  headers?: Record<string, string>
+  url?: string
+  enabled?: boolean
+}
+
+function codexDraftToMcpConfig(draft: CodexMcpDraft): McpServerConfig | null {
+  if (draft.enabled === false) return null
+  if (draft.url) {
+    const type = draft.type === 'sse' || draft.type === 'ws' ? draft.type : 'http'
+    return {
+      type,
+      url: draft.url,
+      ...(draft.headers && Object.keys(draft.headers).length > 0
+        ? { headers: draft.headers }
+        : {}),
+    } as McpServerConfig
+  }
+  if (!draft.command) return null
+  return {
+    type: 'stdio',
+    command: draft.command,
+    args: draft.args ?? [],
+    ...(draft.env && Object.keys(draft.env).length > 0 ? { env: draft.env } : {}),
+  } as McpServerConfig
+}
+
+function loadCodexMcpServers(): Record<string, McpServerConfig> {
+  const path = join(homedir(), '.codex', 'config.toml')
+  if (!existsSync(path)) return {}
+
+  const drafts = new Map<string, CodexMcpDraft>()
+  let currentName: string | null = null
+  let currentSubsection: 'root' | 'env' | 'headers' | null = null
+
+  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+
+    const section = line.match(/^\[mcp_servers\.("([^"]+)"|([^\].]+))(?:\.([^\]]+))?\]$/)
+    if (section) {
+      currentName = section[2] ?? section[3] ?? null
+      const suffix = section[4]
+      currentSubsection =
+        suffix === undefined
+          ? 'root'
+          : suffix === 'env'
+            ? 'env'
+            : suffix === 'http_headers' || suffix === 'headers'
+              ? 'headers'
+              : null
+      if (currentName && !drafts.has(currentName)) drafts.set(currentName, {})
+      continue
+    }
+
+    if (line.startsWith('[')) {
+      currentName = null
+      currentSubsection = null
+      continue
+    }
+
+    if (!currentName || !currentSubsection) continue
+    const assignment = splitTomlAssignment(line)
+    if (!assignment) continue
+    const [key, value] = assignment
+    const draft = drafts.get(currentName)
+    if (!draft) continue
+
+    if (currentSubsection === 'env') {
+      const parsed = parseTomlString(value)
+      if (parsed !== null) draft.env = { ...(draft.env ?? {}), [key]: parsed }
+      continue
+    }
+
+    if (currentSubsection === 'headers') {
+      const parsed = parseTomlString(value)
+      if (parsed !== null) draft.headers = { ...(draft.headers ?? {}), [key]: parsed }
+      continue
+    }
+
+    if (key === 'enabled') {
+      draft.enabled = value === 'true' ? true : value === 'false' ? false : draft.enabled
+    } else if (key === 'type') {
+      draft.type = parseTomlString(value) ?? draft.type
+    } else if (key === 'command') {
+      draft.command = parseTomlString(value) ?? draft.command
+    } else if (key === 'url') {
+      draft.url = parseTomlString(value) ?? draft.url
+    } else if (key === 'args') {
+      draft.args = parseTomlStringArray(value) ?? draft.args
+    } else if (key === 'headers') {
+      draft.headers = parseTomlInlineStringTable(value) ?? draft.headers
+    }
+  }
+
+  const servers: Record<string, McpServerConfig> = {}
+  for (const [name, draft] of drafts) {
+    const config = codexDraftToMcpConfig(draft)
+    if (config) servers[name] = config
+  }
+  return servers
+}
+
+function loadJsonMcpServers(path: string): Record<string, McpServerConfig> {
+  if (!existsSync(path)) return {}
+  try {
+    const parsed = safeParseJSON(readFileSync(path, 'utf8'))
+    if (!parsed || typeof parsed !== 'object') return {}
+    const servers = (parsed as { mcpServers?: unknown }).mcpServers
+    return servers && typeof servers === 'object'
+      ? (servers as Record<string, McpServerConfig>)
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function loadImportedUserMcpServers(): Record<string, McpServerConfig> {
+  const home = homedir()
+  return {
+    ...loadCodexMcpServers(),
+    ...loadJsonMcpServers(join(home, '.claude', 'settings.json')),
+    ...loadJsonMcpServers(join(home, '.claude', 'config.json')),
+  }
 }
 
 /**
@@ -960,8 +1128,11 @@ export function getMcpConfigsByScope(
       }
     }
     case 'user': {
-      const mcpServers = getGlobalConfig().mcpServers
-      if (!mcpServers) {
+      const mcpServers = {
+        ...loadImportedUserMcpServers(),
+        ...(getGlobalConfig().mcpServers ?? {}),
+      }
+      if (Object.keys(mcpServers).length === 0) {
         return { servers: {}, errors: [] }
       }
 

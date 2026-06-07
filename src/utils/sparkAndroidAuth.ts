@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import {
+  clearConfiguredAndroidAuth,
   getConfiguredAuthRefreshToken,
   saveConfiguredAuthRefreshToken,
   saveConfiguredAuthToken,
@@ -104,7 +105,12 @@ export async function refreshConfiguredAndroidToken(
     return null
   }
 
-  if (!response.ok) return null
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearConfiguredAndroidAuth()
+    }
+    return null
+  }
 
   const data = await response.json()
   if (!isRecord(data)) return null

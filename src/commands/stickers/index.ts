@@ -4,7 +4,7 @@ const stickers = {
   type: 'local',
   name: 'stickers',
   description: '订购 Spark Code 贴纸',
-  supportsNonInteractive: false,
+  supportsNonInteractive: true,
   load: () => import('./stickers.js'),
 } satisfies Command
 

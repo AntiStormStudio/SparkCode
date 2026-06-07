@@ -1,0 +1,18 @@
+[package]
+name = "sparkcode_app"
+version = "0.2.0"
+description = "Spark Code"
+authors = ["AntiStorm Studio"]
+edition = "2021"
+
+[lib]
+name = "sparkcode_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }

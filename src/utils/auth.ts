@@ -408,6 +408,16 @@ export function clearConfiguredAuthRefreshToken(): void {
   delete process.env[AUTH_REFRESH_TOKEN_ENV_KEY]
 }
 
+export function clearConfiguredAndroidAuth(): void {
+  clearConfiguredAuthToken()
+  clearConfiguredAuthRefreshToken()
+  saveGlobalConfig(current => {
+    if (!current.oauthAccount) return current
+    const { oauthAccount: _, ...rest } = current
+    return rest
+  })
+}
+
 export function getAnthropicApiKey(): null | string {
   const { key } = getAnthropicApiKeyWithSource()
   return key

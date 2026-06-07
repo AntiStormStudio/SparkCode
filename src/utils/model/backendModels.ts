@@ -1,5 +1,6 @@
 import axios from 'axios'
 import {
+  clearConfiguredAndroidAuth,
   getConfiguredApiBaseUrl,
   getConfiguredAuthToken,
   normalizeApiBaseUrl,
@@ -183,9 +184,13 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
         try {
           response = await requestModelList(nextAuthToken)
         } catch (retryError) {
+          if (axios.isAxiosError(retryError) && retryError.response?.status === 401) {
+            clearConfiguredAndroidAuth()
+          }
           throw new Error(describeHttpError(retryError))
         }
       } else {
+        clearConfiguredAndroidAuth()
         throw new Error(describeHttpError(error))
       }
     } else {
