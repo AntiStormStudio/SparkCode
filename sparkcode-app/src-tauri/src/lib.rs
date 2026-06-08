@@ -209,6 +209,54 @@ fn default_remote_config() -> RemoteConfig {
     }
 }
 
+fn default_spark_code_endpoint() -> String {
+    format!("{FIXED_BACKEND_URL}{SPARK_CODE_API_PATH}")
+}
+
+fn is_loopback_endpoint(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let without_scheme = trimmed
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(trimmed);
+    let without_user = without_scheme
+        .rsplit_once('@')
+        .map(|(_, rest)| rest)
+        .unwrap_or(without_scheme);
+    let authority = without_user.split('/').next().unwrap_or(without_user);
+    let host = if let Some(stripped) = authority.strip_prefix('[') {
+        stripped.split(']').next().unwrap_or(stripped)
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    }
+    .to_ascii_lowercase();
+
+    host == "localhost" || host == "0.0.0.0" || host == "::1" || host.starts_with("127.")
+}
+
+fn resolve_remote_response_endpoint(value: Option<String>) -> Option<String> {
+    match value {
+        Some(endpoint) if is_loopback_endpoint(&endpoint) => Some(default_spark_code_endpoint()),
+        endpoint => endpoint,
+    }
+}
+
+fn resolve_remote_response_stream_endpoint(
+    value: Option<String>,
+    endpoint: &Option<String>,
+) -> Option<String> {
+    match value {
+        Some(stream_endpoint) if is_loopback_endpoint(&stream_endpoint) => endpoint
+            .as_ref()
+            .map(|base| format!("{base}/client/sessions/{{session_id}}/events/stream")),
+        stream_endpoint => stream_endpoint,
+    }
+}
+
 fn remote_config() -> &'static Mutex<RemoteConfig> {
     REMOTE_CONFIG.get_or_init(|| Mutex::new(default_remote_config()))
 }
@@ -2105,11 +2153,16 @@ fn bind_remote_device(
 
     let client_token = value_string(value.get("client_token"))
         .ok_or_else(|| "后端没有返回 Remote client_token".to_string())?;
+    let endpoint = resolve_remote_response_endpoint(value_string(value.get("endpoint")));
+    let stream_endpoint = resolve_remote_response_stream_endpoint(
+        value_string(value.get("stream_endpoint")),
+        &endpoint,
+    );
     let remote_client = RemoteClientConfig {
         binding_id: value_string(value.get("id")),
         client_token: Some(client_token),
-        endpoint: value_string(value.get("endpoint")),
-        stream_endpoint: value_string(value.get("stream_endpoint")),
+        endpoint,
+        stream_endpoint,
         client_name: value_string(value.get("client_name")).or(Some(client_name)),
         status: value_string(value.get("status")),
     };

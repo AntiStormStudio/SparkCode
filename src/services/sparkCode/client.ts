@@ -105,6 +105,41 @@ export function normalizeSparkCodeEndpoint(rawValue: string): string {
   return parsed.toString().replace(/\/$/g, '')
 }
 
+function isLoopbackSparkCodeEndpoint(rawValue: string): boolean {
+  try {
+    const { hostname } = new URL(normalizeSparkCodeEndpoint(rawValue))
+    const normalized = hostname.toLowerCase()
+    return (
+      normalized === 'localhost' ||
+      normalized === '0.0.0.0' ||
+      normalized === '::1' ||
+      normalized === '[::1]' ||
+      /^127(?:\.\d{1,3}){3}$/.test(normalized)
+    )
+  } catch {
+    return false
+  }
+}
+
+function resolveBoundSparkCodeEndpoint(
+  requestedEndpoint: string,
+  returnedEndpoint?: string,
+): string {
+  const requested = normalizeSparkCodeEndpoint(requestedEndpoint)
+  const returned = returnedEndpoint
+    ? normalizeSparkCodeEndpoint(returnedEndpoint)
+    : requested
+
+  if (
+    isLoopbackSparkCodeEndpoint(returned) &&
+    !isLoopbackSparkCodeEndpoint(requested)
+  ) {
+    return requested
+  }
+
+  return returned
+}
+
 export function getDefaultSparkCodeEndpoint(): string {
   return normalizeSparkCodeEndpoint(DEFAULT_BACKEND_URL)
 }
@@ -146,7 +181,7 @@ export async function bindSparkCodeClient(
   )
 
   const credentials: SparkCodeRemoteCredentials = {
-    endpoint: normalizeSparkCodeEndpoint(response.endpoint || endpoint),
+    endpoint: resolveBoundSparkCodeEndpoint(endpoint, response.endpoint),
     clientToken: response.client_token,
     bindingId: response.id,
     userId: response.user_id,
