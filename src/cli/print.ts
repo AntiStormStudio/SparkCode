@@ -7,6 +7,10 @@ import {
   redownloadUserSettings,
 } from 'src/services/settingsSync/index.js'
 import { waitForRemoteManagedSettingsToLoad } from 'src/services/remoteManagedSettings/index.js'
+import {
+  publishSparkCodeOutput,
+  startSparkCodeRemoteBridge,
+} from 'src/services/sparkCode/remoteBridge.js'
 import { StructuredIO } from 'src/cli/structuredIO.js'
 import { RemoteIO } from 'src/cli/remoteIO.js'
 import {
@@ -876,6 +880,7 @@ export async function runHeadless(
     options,
     turnInterruptionState,
   )) {
+    publishSparkCodeOutput(message)
     if (transformToStreamlined) {
       // Streamlined mode: transform messages and stream immediately
       const transformed = transformToStreamlined(message)
@@ -1021,6 +1026,15 @@ function runHeadlessStreaming(
   let abortController: AbortController | undefined
   // Same queue sendRequest() enqueues to — one FIFO for everything.
   const output = structuredIO.outbound
+  let wakeSparkCodeBridge = () => {}
+  const sparkCodeBridge = startSparkCodeRemoteBridge({
+    onEnqueued: () => wakeSparkCodeBridge(),
+  })
+  if (sparkCodeBridge) {
+    registerCleanup(async () => {
+      sparkCodeBridge.stop()
+    })
+  }
 
   // Ctrl+C in -p mode: abort the in-flight query, then shut down gracefully.
   // gracefulShutdown persists session state and flushes analytics, with a
@@ -2679,6 +2693,9 @@ function runHeadlessStreaming(
         output.done()
       }
     }
+  }
+  wakeSparkCodeBridge = () => {
+    void run()
   }
 
   // Set up UDS inbox callback so the query loop is kicked off

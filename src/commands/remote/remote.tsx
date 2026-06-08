@@ -8,6 +8,7 @@ import type { LocalJSXCommandCall } from '../../types/command.js'
 import {
   bindSparkCodeClient,
   clearSparkCodeCredentials,
+  getDefaultSparkCodeEndpoint,
   getSparkCodeClientMe,
   getSparkCodeCredentials,
   getSparkCodeStatus,
@@ -18,6 +19,7 @@ import {
   getSettings_DEPRECATED,
   updateSettingsForSource,
 } from '../../utils/settings/settings.js'
+import { startSparkCodeRemoteBridge } from '../../services/sparkCode/remoteBridge.js'
 
 type SaveRemoteBackendResult = {
   backendUrl?: string
@@ -29,6 +31,14 @@ function normalizeRemoteBackendUrl(rawValue: string): string | undefined {
     return undefined
   }
   return normalizeSparkCodeEndpoint(trimmed)
+}
+
+function getConfiguredRemoteEndpoint(): string {
+  return (
+    getSettings_DEPRECATED()?.remote?.backendUrl ??
+    getSparkCodeCredentials()?.endpoint ??
+    getDefaultSparkCodeEndpoint()
+  )
 }
 
 function saveRemoteBackendUrl(rawValue: string): SaveRemoteBackendResult {
@@ -80,7 +90,7 @@ function RemoteBackendDialog({
 }: {
   onDone: (result: string) => void
 }): React.ReactNode {
-  const current = getSettings_DEPRECATED()?.remote?.backendUrl ?? ''
+  const current = getSettings_DEPRECATED()?.remote?.backendUrl ?? getDefaultSparkCodeEndpoint()
   const [value, setValue] = useState(current)
   const [cursorOffset, setCursorOffset] = useState(current.length)
   const [error, setError] = useState('')
@@ -148,13 +158,10 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args = '') => 
       onDone('请提供绑定码：/remote bind 123456-654321')
       return null
     }
-    const endpoint = getSettings_DEPRECATED()?.remote?.backendUrl
-    if (!endpoint) {
-      onDone('请先运行 /remote <后端地址> 配置 Spark EDU 后端')
-      return null
-    }
+    const endpoint = getConfiguredRemoteEndpoint()
     try {
       const credentials = await bindSparkCodeClient(endpoint, code)
+      startSparkCodeRemoteBridge()
       onDone(`Remote 已绑定：${credentials.endpoint}`)
     } catch (error) {
       onDone(error instanceof Error ? error.message : 'Remote 绑定失败')
@@ -163,13 +170,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args = '') => 
   }
 
   if (command === 'status') {
-    const endpoint =
-      getSettings_DEPRECATED()?.remote?.backendUrl ??
-      getSparkCodeCredentials()?.endpoint
-    if (!endpoint) {
-      onDone('尚未配置 Remote 后端地址')
-      return null
-    }
+    const endpoint = getConfiguredRemoteEndpoint()
     try {
       const protocol = await getSparkCodeStatus(endpoint)
       const credentials = getSparkCodeCredentials()
@@ -200,6 +201,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args = '') => 
         credentials,
         commandArgs || undefined,
       )
+      startSparkCodeRemoteBridge()
       onDone(`Remote 会话已同步：${session.title} (${session.id})`)
     } catch (error) {
       onDone(error instanceof Error ? error.message : 'Remote 会话同步失败')

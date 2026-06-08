@@ -6,6 +6,8 @@ import { getBranch, getRemoteUrl, normalizeGitRemoteUrl } from '../../utils/git.
 import { getSecureStorage } from '../../utils/secureStorage/index.js'
 
 const STORAGE_KEY = 'sparkCodeRemote'
+const DEFAULT_BACKEND_URL =
+  process.env.SPARK_CODE_REMOTE_BACKEND_URL?.trim() || 'https://chat.spark-ai.top'
 
 export type SparkCodeBinding = {
   id: string
@@ -101,6 +103,10 @@ export function normalizeSparkCodeEndpoint(rawValue: string): string {
   }
 
   return parsed.toString().replace(/\/$/g, '')
+}
+
+export function getDefaultSparkCodeEndpoint(): string {
+  return normalizeSparkCodeEndpoint(DEFAULT_BACKEND_URL)
 }
 
 export async function getSparkCodeStatus(endpoint: string): Promise<{
@@ -209,6 +215,59 @@ export async function createSparkCodeEvent(
       method: 'POST',
       token: credentials.clientToken,
       body: event,
+    },
+  )
+}
+
+export async function getSparkCodeSessionEvents(
+  credentials: SparkCodeRemoteCredentials,
+  sessionId: string,
+  options: {
+    after?: number
+    afterId?: string
+    source?: string
+    excludeSource?: string
+    order?: 'asc' | 'desc'
+    limit?: number
+  } = {},
+): Promise<{ items: SparkCodeEvent[]; total: number }> {
+  const params = new URLSearchParams()
+  if (options.after) params.set('after', String(options.after))
+  if (options.afterId) params.set('after_id', options.afterId)
+  if (options.source) params.set('source', options.source)
+  if (options.excludeSource) params.set('exclude_source', options.excludeSource)
+  if (options.order) params.set('order', options.order)
+  if (options.limit) params.set('limit', String(options.limit))
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+
+  return sparkCodeFetch(
+    credentials.endpoint,
+    `/client/sessions/${encodeURIComponent(sessionId)}/events${suffix}`,
+    {
+      token: credentials.clientToken,
+    },
+  )
+}
+
+export async function updateSparkCodeCurrentSession(
+  credentials: SparkCodeRemoteCredentials,
+  sessionId: string,
+  patch: {
+    title?: string
+    cwd?: string | null
+    branch?: string | null
+    status?: string
+    data?: Record<string, unknown> | null
+    meta?: Record<string, unknown> | null
+  },
+): Promise<SparkCodeSession> {
+  return sparkCodeFetch(
+    credentials.endpoint,
+    `/client/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'PATCH',
+      token: credentials.clientToken,
+      body: patch,
     },
   )
 }

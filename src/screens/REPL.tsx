@@ -26,6 +26,7 @@ import * as React from 'react';
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, useLayoutEffect, type RefObject } from 'react';
 import { useNotifications } from '../context/notifications.js';
 import { sendNotification } from '../services/notifier.js';
+import { publishSparkCodeOutput, startSparkCodeRemoteBridge } from '../services/sparkCode/remoteBridge.js';
 import { startPreventSleep, stopPreventSleep } from '../services/preventSleep.js';
 import { useTerminalNotification } from '../ink/useTerminalNotification.js';
 import { hasCursorUpViewportYankBug } from '../ink/terminal.js';
@@ -1214,6 +1215,24 @@ export function REPL({
   }, [setToolUseConfirmQueue]);
   const [messages, rawSetMessages] = useState<MessageType[]>(initialMessages ?? []);
   const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    let handle = startSparkCodeRemoteBridge({
+      setAppState,
+      getMessages: () => messagesRef.current
+    });
+    const timer = setInterval(() => {
+      handle = startSparkCodeRemoteBridge({
+        setAppState,
+        getMessages: () => messagesRef.current
+      }) ?? handle;
+    }, 2000);
+    timer.unref?.();
+    return () => {
+      clearInterval(timer);
+      handle?.stop();
+    };
+  }, [setAppState]);
   // Stores the willowMode variant that was shown (or false if no hint shown).
   // Captured at hint_shown time so hint_converted telemetry reports the same
   // variant — the GrowthBook value shouldn't change mid-session, but reading
@@ -2671,6 +2690,7 @@ export function REPL({
           proactiveModule?.setContextBlocked(false);
         }
       }
+      publishSparkCodeOutput(newMessage);
     }, newContent => {
       // setResponseLength handles updating both responseLengthRef (for
       // spinner animation) and apiMetricsRef (endResponseLength/lastTokenTime
