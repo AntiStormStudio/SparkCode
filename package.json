@@ -1,6 +1,6 @@
 {
   "name": "spark-code",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "基于终端的 AI 编程助手，支持多模型、自定义后端和跨平台分发。",
   "bin": {

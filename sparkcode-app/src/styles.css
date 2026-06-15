@@ -1567,8 +1567,8 @@ p {
 }
 
 .message-row.terminal .message-card {
-  width: min(860px, 92%);
-  max-width: min(860px, 92%);
+  width: min(820px, 82%);
+  max-width: min(820px, 82%);
 }
 
 .message-row.user .message-card .message-markdown {
@@ -1782,11 +1782,15 @@ p {
 }
 
 .terminal-result:not([open]) .terminal-result-header {
+  width: max-content;
+  max-width: 100%;
+  min-height: 32px;
   padding: 0;
   color: #f1f1f1;
-  border-bottom: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 780;
 }
 

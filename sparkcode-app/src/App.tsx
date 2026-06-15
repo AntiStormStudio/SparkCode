@@ -160,7 +160,7 @@ type ReviewDiffState = {
 }
 
 const fallbackSnapshot: AppSnapshot = {
-  version: '0.2.0',
+  version: '0.2.1',
   remote: {
     backend_url: FIXED_BACKEND_URL,
     configured: true,
@@ -222,7 +222,7 @@ const fallbackSnapshot: AppSnapshot = {
     context_limit: 1_000_000,
   },
   update_status: {
-    current_version: '0.2.0',
+    current_version: '0.2.1',
     current_revision: null,
     latest_revision: null,
     checked_at: 0,
@@ -1153,20 +1153,54 @@ function renderMarkdownBlocks(content: string, keyPrefix: string): ReactNode {
 function shouldRenderAsTerminal(message: ChatMessage): boolean {
   if (message.id.startsWith('local-')) return true
   if (message.id.startsWith('terminal-output-')) return true
+  if (looksLikeTerminalOutput(message.content)) return true
   return /^(Spark Code (Doctor|Status|Stats)|原 TUI 后台任务列表)/.test(message.content.trim())
 }
 
 function shouldRenderAsExpandedTerminal(message: ChatMessage): boolean {
-  return message.id.startsWith('terminal-output-')
+  return false
+}
+
+function orderedConversationMessages(messages: ChatMessage[]): ChatMessage[] {
+  const ordered: ChatMessage[] = []
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]
+    const isAssistantAnswer =
+      message.role === 'assistant' &&
+      !shouldRenderAsTerminal(message) &&
+      !parseThinkingChain(message.content)
+
+    if (isAssistantAnswer) {
+      const terminalMessages: ChatMessage[] = []
+      let cursor = index + 1
+      while (cursor < messages.length && shouldRenderAsTerminal(messages[cursor])) {
+        terminalMessages.push(messages[cursor])
+        cursor += 1
+      }
+      if (terminalMessages.length > 0) {
+        ordered.push(...terminalMessages, message)
+        index = cursor - 1
+        continue
+      }
+    }
+
+    ordered.push(message)
+  }
+  return ordered
 }
 
 function terminalResultTitle(content: string): string {
   const lines = content.split('\n').map(line => line.trim()).filter(Boolean)
   const commandLine = lines.find(line => line.startsWith('$ '))
   const running = lines.some(line => line === '正在执行...')
-  if (!commandLine) return running ? '工具执行中' : '工具输出'
+  const toolLine = lines[0] ?? ''
+  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|TodoWrite|WebFetch|WebSearch)\b/.test(toolLine)) {
+    const payload = lines[1] && lines[1].startsWith('{') ? ` ${lines[1]}` : ''
+    return `${running ? '正在调用' : '已调用'} ${toolLine}${payload}`
+  }
+  if (!commandLine) return running ? '正在调用 工具' : '已调用 工具'
   const command = commandLine.slice(2).replace(/\s+/g, ' ').trim() || '未知指令'
-  return `${running ? '执行中' : '已执行'} ${command}`
+  return `${running ? '正在调用' : '已调用'} Bash ${command}`
 }
 
 function terminalResultBody(content: string): string {
@@ -1179,6 +1213,31 @@ function terminalResultBody(content: string): string {
     return nextLines.join('\n') || '指令已执行'
   }
   return content
+}
+
+function looksLikeTerminalOutput(text: string): boolean {
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
+  if (lines.length < 4) return false
+  if (lines.some(line => line.startsWith('$ '))) return true
+  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|TodoWrite|WebFetch|WebSearch)\b/.test(lines[0] ?? '')) return true
+
+  const absolutePathLines = lines.filter(line =>
+    /^\/Users\/[^ ]+/.test(line) ||
+    /^\/(Applications|System|Library|Volumes|tmp|var|opt|usr)\//.test(line),
+  )
+  if (absolutePathLines.length >= 3) return true
+
+  const gitLogLines = lines.filter(line => /^[a-f0-9]{7,40}\s+\S+/.test(line))
+  if (gitLogLines.length >= 3) return true
+
+  const fileLikeLines = lines.filter(line =>
+    /^[\w@./~:+ -]+$/.test(line) &&
+    (
+      /[./]/.test(line) ||
+      /\.(ts|tsx|js|jsx|json|md|css|scss|html|rs|toml|lock|ya?ml|dart|swift|kt|java|py|go|sh|png|ico)$/.test(line)
+    ),
+  )
+  return fileLikeLines.length >= 5 && fileLikeLines.length / lines.length >= 0.55
 }
 
 function looksLikeToolOnlyOutput(text: string): boolean {
@@ -5236,6 +5295,7 @@ function App() {
   }
 
   function renderConversation() {
+    const orderedMessages = orderedConversationMessages(visibleMessages)
     const hasStreamingAssistant = visibleMessages.some(message =>
       message.role === 'assistant' && message.id.startsWith('a-stream-'),
     )
@@ -5243,7 +5303,7 @@ function App() {
     return (
       <>
         <div className="conversation-stream" aria-live="polite">
-          {visibleMessages.length === 0 ? (
+          {orderedMessages.length === 0 ? (
             <section className="workspace-empty">
               <h2>我们应该在 {activeProjectName} 中构建什么？</h2>
               {renderComposer('center')}
@@ -5263,14 +5323,14 @@ function App() {
               </div>
             </section>
           ) : (
-	            visibleMessages.map((message, index) => {
-	              const streaming = message.role === 'assistant' && message.id === streamingMessageId
-	              const thinking = streaming && message.content.startsWith('正在思考')
-	              const terminal = shouldRenderAsTerminal(message)
-	              const thinkingChain = Boolean(parseThinkingChain(message.content))
-	              return (
+		            orderedMessages.map((message, index) => {
+		              const streaming = message.role === 'assistant' && message.id === streamingMessageId
+		              const thinking = streaming && message.content.startsWith('正在思考')
+		              const terminal = shouldRenderAsTerminal(message)
+		              const thinkingChain = Boolean(parseThinkingChain(message.content))
+		              return (
                 <div className="message-block" key={message.id}>
-                  {shouldShowIdleDivider(visibleMessages, index) ? (
+	                  {shouldShowIdleDivider(orderedMessages, index) ? (
                     <div className="conversation-idle-divider">
                       <span>{formatIdleDivider(messageCreatedAt(message))}</span>
                     </div>

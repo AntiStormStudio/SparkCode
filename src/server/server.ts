@@ -732,7 +732,7 @@ async function runLocalCommand(
     return formatStatsText()
   }
   if (normalized === 'version') {
-    return '0.2.0'
+    return '0.2.1'
   }
 
   const wasInteractive = getIsInteractive()
@@ -819,7 +819,7 @@ async function submitFeedbackReport(input: {
     platform: process.platform,
     gitRepo: Boolean(gitState),
     terminal: 'Spark Code.app',
-    version: '0.2.0',
+    version: '0.2.1',
     transcript: input.messages.map(message => ({
       role: message.role,
       content: redactFeedbackText(message.content ?? ''),
@@ -871,7 +871,7 @@ export function startServer(
       }
 
       if (url.pathname === '/health' || url.pathname === '/status') {
-        return json({ ok: true, version: '0.2.0' })
+        return json({ ok: true, version: '0.2.1' })
       }
 
       if (!isAuthorized(req, config)) {
