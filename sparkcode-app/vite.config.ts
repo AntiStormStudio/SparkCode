@@ -5,6 +5,12 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   clearScreen: false,
+  esbuild: {
+    target: 'safari15',
+  },
+  build: {
+    target: 'safari15',
+  },
   server: {
     port: 5188,
     strictPort: true,

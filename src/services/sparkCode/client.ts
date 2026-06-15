@@ -105,7 +105,7 @@ export function normalizeSparkCodeEndpoint(rawValue: string): string {
   return parsed.toString().replace(/\/$/g, '')
 }
 
-function isLoopbackSparkCodeEndpoint(rawValue: string): boolean {
+export function isLoopbackSparkCodeEndpoint(rawValue: string): boolean {
   try {
     const { hostname } = new URL(normalizeSparkCodeEndpoint(rawValue))
     const normalized = hostname.toLowerCase()
@@ -323,6 +323,9 @@ export function getSparkCodeCredentials():
     !credentials.userId ||
     !credentials.clientId
   ) {
+    return undefined
+  }
+  if (isLoopbackSparkCodeEndpoint(credentials.endpoint)) {
     return undefined
   }
   return credentials as SparkCodeRemoteCredentials

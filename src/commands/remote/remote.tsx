@@ -12,6 +12,7 @@ import {
   getSparkCodeClientMe,
   getSparkCodeCredentials,
   getSparkCodeStatus,
+  isLoopbackSparkCodeEndpoint,
   normalizeSparkCodeEndpoint,
   upsertSparkCodeCurrentSession,
 } from '../../services/sparkCode/client.js'
@@ -30,15 +31,25 @@ function normalizeRemoteBackendUrl(rawValue: string): string | undefined {
   if (!trimmed) {
     return undefined
   }
-  return normalizeSparkCodeEndpoint(trimmed)
+  const endpoint = normalizeSparkCodeEndpoint(trimmed)
+  if (isLoopbackSparkCodeEndpoint(endpoint)) {
+    throw new Error('Remote 后端不能使用 127.0.0.1/localhost，请使用 Spark 线上地址')
+  }
+  return endpoint
 }
 
 function getConfiguredRemoteEndpoint(): string {
-  return (
-    getSettings_DEPRECATED()?.remote?.backendUrl ??
-    getSparkCodeCredentials()?.endpoint ??
-    getDefaultSparkCodeEndpoint()
-  )
+  const configured = getSettings_DEPRECATED()?.remote?.backendUrl
+  if (configured && !isLoopbackSparkCodeEndpoint(configured)) {
+    return configured
+  }
+
+  const credentials = getSparkCodeCredentials()
+  if (credentials?.endpoint && !isLoopbackSparkCodeEndpoint(credentials.endpoint)) {
+    return credentials.endpoint
+  }
+
+  return getDefaultSparkCodeEndpoint()
 }
 
 function saveRemoteBackendUrl(rawValue: string): SaveRemoteBackendResult {
@@ -90,7 +101,7 @@ function RemoteBackendDialog({
 }: {
   onDone: (result: string) => void
 }): React.ReactNode {
-  const current = getSettings_DEPRECATED()?.remote?.backendUrl ?? getDefaultSparkCodeEndpoint()
+  const current = getConfiguredRemoteEndpoint()
   const [value, setValue] = useState(current)
   const [cursorOffset, setCursorOffset] = useState(current.length)
   const [error, setError] = useState('')

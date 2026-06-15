@@ -18,8 +18,10 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "bun run ./src/dev-entry.ts",
-    "start": "bun run ./src/dev-entry.ts",
+    "dev": "cd sparkcode-app && bun run tauri:dev",
+    "start": "cd sparkcode-app && bun run tauri:dev",
+    "gui": "cd sparkcode-app && bun run tauri:dev",
+    "cli:dev": "bun run ./src/dev-entry.ts",
     "version": "bun run ./src/dev-entry.ts --version",
     "package": "bash scripts/package-release.sh",
     "install-deps": "bun install"

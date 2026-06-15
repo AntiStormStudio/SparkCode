@@ -22,13 +22,27 @@ export function dedupeByName<T extends { name: string }>(items: T[]): T[] {
   return out
 }
 
-export async function loadServerMcpRuntime(): Promise<ServerMcpRuntime> {
+function mcpRuntimeSnapshot(input: {
+  clients: MCPServerConnection[]
+  tools: Tool[]
+  commands: Command[]
+  resources: Record<string, ServerResource[]>
+}): ServerMcpRuntime {
+  return {
+    clients: [...input.clients],
+    tools: dedupeByName(input.tools),
+    commands: dedupeByName(input.commands),
+    resources: { ...input.resources },
+  }
+}
+
+export async function loadServerMcpRuntime(options: { timeoutMs?: number } = {}): Promise<ServerMcpRuntime> {
   const clients: MCPServerConnection[] = []
   const tools: Tool[] = []
   const commands: Command[] = []
   const resources: Record<string, ServerResource[]> = {}
 
-  await getMcpToolsCommandsAndResources(result => {
+  const load = getMcpToolsCommandsAndResources(result => {
     const existingIndex = clients.findIndex(client => client.name === result.client.name)
     if (existingIndex >= 0) {
       clients[existingIndex] = result.client
@@ -42,10 +56,17 @@ export async function loadServerMcpRuntime(): Promise<ServerMcpRuntime> {
     }
   })
 
-  return {
-    clients,
-    tools: dedupeByName(tools),
-    commands: dedupeByName(commands),
-    resources,
+  if (!options.timeoutMs || options.timeoutMs <= 0) {
+    await load
+    return mcpRuntimeSnapshot({ clients, tools, commands, resources })
   }
+
+  return await Promise.race([
+    load.then(() => mcpRuntimeSnapshot({ clients, tools, commands, resources })),
+    new Promise<ServerMcpRuntime>(resolve => {
+      setTimeout(() => {
+        resolve(mcpRuntimeSnapshot({ clients, tools, commands, resources }))
+      }, options.timeoutMs)
+    }),
+  ])
 }

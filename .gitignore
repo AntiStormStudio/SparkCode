@@ -14,6 +14,8 @@ coverage/
 *.swo
 
 .claude/
+.playwright-mcp/
 .idea/
 .vscode/TextInputPill.js
 bun 2.lock
+spark-vite.png

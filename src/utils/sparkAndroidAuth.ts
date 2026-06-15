@@ -79,15 +79,19 @@ export function getStoredSparkAndroidDevice(): SparkAndroidDevice | null {
 
 export async function refreshConfiguredAndroidToken(
   baseUrl: string,
+  timeoutMs = 15_000,
 ): Promise<string | null> {
   const refreshToken = getConfiguredAuthRefreshToken()
   const device = getStoredSparkAndroidDevice()
   if (!refreshToken || !device) return null
 
   let response: Response
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs)
   try {
     response = await fetch(`${baseUrl}${ANDROID_AUTH_REFRESH_PATH}`, {
       method: 'POST',
+      signal: abortController.signal,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': getUserAgent(),
@@ -103,6 +107,8 @@ export async function refreshConfiguredAndroidToken(
     })
   } catch {
     return null
+  } finally {
+    clearTimeout(timeout)
   }
 
   if (!response.ok) {

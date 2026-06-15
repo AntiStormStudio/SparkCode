@@ -18,6 +18,7 @@ type JsonObject = Record<string, unknown>
 type OpenAIMessage = {
   role: string
   content?: unknown
+  reasoning_content?: string
   tool_calls?: unknown[]
   tool_call_id?: string
 }
@@ -126,6 +127,7 @@ function convertAnthropicContentToOpenAI(
   }
 
   const textParts: string[] = []
+  const reasoningParts: string[] = []
   const multimodalParts: JsonObject[] = []
   const toolCalls: OpenAIToolCall[] = []
   const toolMessages: OpenAIMessage[] = []
@@ -139,6 +141,12 @@ function convertAnthropicContentToOpenAI(
         textParts.push(text)
         multimodalParts.push({ type: 'text', text })
       }
+      continue
+    }
+
+    if (block.type === 'thinking') {
+      const thinking = getString(block.thinking) ?? getString(block.reasoning_content)
+      if (thinking) reasoningParts.push(thinking)
       continue
     }
 
@@ -182,10 +190,14 @@ function convertAnthropicContentToOpenAI(
   }
 
   const messages: OpenAIMessage[] = []
+  const reasoningContent = role === 'assistant' && reasoningParts.length > 0
+    ? reasoningParts.join('\n')
+    : undefined
   if (toolCalls.length > 0) {
     messages.push({
       role,
       content: textParts.join('\n'),
+      ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
       tool_calls: toolCalls,
     })
   } else if (multimodalParts.length > 0) {
@@ -193,6 +205,13 @@ function convertAnthropicContentToOpenAI(
     messages.push({
       role,
       content: onlyText ? textParts.join('\n') : multimodalParts,
+      ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+    })
+  } else if (reasoningContent) {
+    messages.push({
+      role,
+      content: '',
+      reasoning_content: reasoningContent,
     })
   }
 
@@ -315,6 +334,33 @@ function openAIResponseToAnthropicSSE(
   })
 
   const content = getString(message.content)
+  const reasoningContent =
+    getString(message.reasoning_content) ??
+    getString(message.reasoning) ??
+    getString(message.reasoningContent)
+  if (reasoningContent) {
+    output += sse('content_block_start', {
+      type: 'content_block_start',
+      index,
+      content_block: { type: 'thinking', thinking: '', signature: '' },
+    })
+    output += sse('content_block_delta', {
+      type: 'content_block_delta',
+      index,
+      delta: { type: 'thinking_delta', thinking: reasoningContent },
+    })
+    output += sse('content_block_delta', {
+      type: 'content_block_delta',
+      index,
+      delta: { type: 'signature_delta', signature: '' },
+    })
+    output += sse('content_block_stop', {
+      type: 'content_block_stop',
+      index,
+    })
+    index += 1
+  }
+
   if (content) {
     output += sse('content_block_start', {
       type: 'content_block_start',

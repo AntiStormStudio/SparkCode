@@ -5,6 +5,8 @@ import {
   getCommandName,
   type Command,
 } from '../commands.js'
+import commitCommand from '../commands/commit.js'
+import commitPushPrCommand from '../commands/commit-push-pr.js'
 import { switchSession, setCwdState, setOriginalCwd, setProjectRoot } from '../bootstrap/state.js'
 import { getDefaultAppState, type AppState } from '../state/AppStateStore.js'
 import { getEmptyToolPermissionContext, type ToolUseContext } from '../Tool.js'
@@ -154,8 +156,11 @@ export async function expandSlashPromptForServer({
     commands: [],
     resources: {},
   }))
+  const baseCommands = await getCommands(cwd).catch(() => [] as Command[])
   const commands = dedupeByName([
-    ...await getCommands(cwd),
+    commitCommand,
+    commitPushPrCommand,
+    ...baseCommands,
     ...mcpRuntime.commands,
   ])
   const command = findCommand(parsed.commandName, commands)

@@ -10,14 +10,15 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
         "title": "Spark Code",
         "width": 1280,
         "height": 820,
-        "minWidth": 1040,
-        "minHeight": 680,
+        "minWidth": 980,
+        "minHeight": 640,
         "resizable": true,
         "visible": true,
         "fullscreen": false
@@ -31,7 +32,7 @@
     "active": true,
     "targets": ["app"],
     "resources": {
-      "resources/spark-code-backend": "spark-code-backend"
+      "resources/spark-code-backend.tar.gz": "spark-code-backend.tar.gz"
     },
     "icon": [
       "icons/32x32.png",

@@ -250,6 +250,14 @@ export function normalizeApiBaseUrl(baseUrlInput: string): string {
 }
 
 export function getConfiguredApiBaseUrl(): string | null {
+  const baseUrlFromEnv = process.env[BASE_URL_ENV_KEY]?.trim()
+  if (baseUrlFromEnv) {
+    return normalizeApiBaseUrl(baseUrlFromEnv)
+  }
+  const configBaseUrl = getGlobalConfig().env?.[BASE_URL_ENV_KEY]?.trim()
+  if (configBaseUrl) {
+    return normalizeApiBaseUrl(configBaseUrl)
+  }
   return FIXED_API_BASE_URL
 }
 

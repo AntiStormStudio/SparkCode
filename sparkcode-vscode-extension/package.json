@@ -1,0 +1,64 @@
+{
+  "name": "sparkcode-vscode",
+  "displayName": "Spark Code",
+  "description": "Connect VSCode to the local Spark Code desktop backend.",
+  "version": "0.1.0",
+  "publisher": "spark-ai",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:sparkCode.connect",
+    "onCommand:sparkCode.sendSelection",
+    "onCommand:sparkCode.sendFile",
+    "onCommand:sparkCode.openApp"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sparkCode.connect",
+        "title": "Spark Code: Connect"
+      },
+      {
+        "command": "sparkCode.sendSelection",
+        "title": "Spark Code: Send Selection"
+      },
+      {
+        "command": "sparkCode.sendFile",
+        "title": "Spark Code: Send Current File"
+      },
+      {
+        "command": "sparkCode.openApp",
+        "title": "Spark Code: Open App"
+      }
+    ],
+    "configuration": {
+      "title": "Spark Code",
+      "properties": {
+        "sparkCode.backendUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override Spark Code local backend URL. Leave empty to read ~/.sparkc/sparkcode-app-*.lock."
+        },
+        "sparkCode.authToken": {
+          "type": "string",
+          "default": "sparkcode-app-local",
+          "description": "Local backend auth token."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -3,6 +3,13 @@ import { existsSync } from 'fs'
 import { resolve } from 'path'
 import type { SessionInfo } from './types.js'
 
+export type ImageAttachment = {
+  id?: string
+  name?: string
+  media_type?: string
+  data: string
+}
+
 type Backend = {
   runPrompt: (input: {
     prompt: string
@@ -11,7 +18,10 @@ type Backend = {
     resume: boolean
     model?: string
     permissionMode?: string
+    images?: ImageAttachment[]
+    onEvent?: (event: unknown) => void
   }) => Promise<string>
+  listTasks?: (sessionId: string) => unknown[]
 }
 
 type SessionManagerOptions = {
@@ -58,7 +68,18 @@ export class SessionManager {
     hasStarted?: boolean
   }): SessionInfo {
     const existing = this.sessions.get(input.sessionId)
-    if (existing) return existing
+    if (existing) {
+      const nextWorkDir = resolve(input.cwd || existing.workDir)
+      if (!existsSync(nextWorkDir)) {
+        throw new Error(`工作目录不存在：${nextWorkDir}`)
+      }
+      if (existing.status !== 'running' && existing.workDir !== nextWorkDir) {
+        existing.workDir = nextWorkDir
+        existing.sessionKey = input.sessionKey ?? existing.sessionKey
+        existing.hasStarted = input.hasStarted === true
+      }
+      return existing
+    }
 
     const maxSessions = this.options.maxSessions ?? 32
     if (maxSessions > 0 && this.sessions.size >= maxSessions) {
@@ -87,11 +108,20 @@ export class SessionManager {
     return this.sessions.get(id)
   }
 
+  listTasks(sessionId: string): unknown[] {
+    if (!this.sessions.has(sessionId)) {
+      throw new Error('会话不存在')
+    }
+    return this.backend.listTasks?.(sessionId) ?? []
+  }
+
   async runPrompt(
     sessionId: string,
     prompt: string,
     model?: string,
     permissionMode?: string,
+    images: ImageAttachment[] = [],
+    onEvent?: (event: unknown) => void,
   ): Promise<string> {
     const session = this.sessions.get(sessionId)
     if (!session) {
@@ -107,6 +137,8 @@ export class SessionManager {
         resume: session.hasStarted === true,
         model,
         permissionMode,
+        images,
+        onEvent,
       })
       if (prompt.trim() !== '/__sparkcode_healthcheck') {
         session.hasStarted = true

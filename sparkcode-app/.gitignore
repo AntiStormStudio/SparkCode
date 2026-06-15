@@ -5,5 +5,6 @@ src-tauri/target/
 src-tauri/icons/android/
 src-tauri/icons/ios/
 src-tauri/resources/spark-code-backend/
+src-tauri/resources/*.tar.gz
 *.log
 *.tmp

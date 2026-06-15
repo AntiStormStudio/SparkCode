@@ -6,7 +6,11 @@ import { spawnSync } from 'node:child_process'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(scriptDir, '..')
 const projectRoot = resolve(appRoot, '..')
-const targetRoot = join(appRoot, 'src-tauri', 'resources', 'spark-code-backend')
+const resourceDir = join(appRoot, 'src-tauri', 'resources')
+const oldDirectoryResource = join(resourceDir, 'spark-code-backend')
+const archivePath = join(resourceDir, 'spark-code-backend.tar.gz')
+const stageRoot = join(appRoot, 'src-tauri', 'target', 'spark-code-backend-resource')
+const targetRoot = join(stageRoot, 'spark-code-backend')
 
 const dirs = ['src', 'vendor', 'shims', 'bin', 'scripts', 'node_modules']
 const files = ['package.json', 'tsconfig.json', 'bun.lock', 'image-processor.node']
@@ -23,6 +27,16 @@ function run(command, args) {
     stdio: 'inherit',
   })
   return result.status === 0
+}
+
+function runChecked(command, args, cwd = projectRoot) {
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: 'inherit',
+  })
+  if (result.status !== 0) {
+    throw new Error(`${command} ${args.join(' ')} 执行失败`)
+  }
 }
 
 function commandOutput(command, args) {
@@ -73,6 +87,9 @@ function findBunBinary() {
   return realpathSync(bunPath)
 }
 
+rmSync(targetRoot, { force: true, recursive: true })
+rmSync(oldDirectoryResource, { force: true, recursive: true })
+ensureDir(resourceDir)
 ensureDir(targetRoot)
 for (const dir of dirs) syncDir(dir)
 for (const file of files) syncFile(file)
@@ -96,4 +113,7 @@ writeFileSync(
   }, null, 2)}\n`,
 )
 
-console.log(`Spark Code backend resource prepared: ${targetRoot}`)
+rmSync(archivePath, { force: true })
+runChecked('/usr/bin/tar', ['-czf', archivePath, '-C', stageRoot, 'spark-code-backend'], appRoot)
+
+console.log(`Spark Code backend resource prepared: ${archivePath}`)

@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command as ProcessCommand, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -36,6 +37,7 @@ struct SparkUserProfile {
     id: Option<String>,
     name: Option<String>,
     email: Option<String>,
+    avatar_url: Option<String>,
     organization_id: Option<String>,
     organization_name: Option<String>,
     billing_type: Option<String>,
@@ -102,6 +104,10 @@ struct RecentChange {
     status: String,
     can_revert: bool,
     before_content: Option<String>,
+    #[serde(default)]
+    added_lines: u32,
+    #[serde(default)]
+    removed_lines: u32,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -111,6 +117,28 @@ struct SlashCommandEntry {
     aliases: Vec<String>,
     category: String,
     accepts_args: bool,
+    #[serde(default, rename = "type")]
+    command_type: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    loaded_from: Option<String>,
+    #[serde(default)]
+    argument_hint: Option<String>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+struct ToolEntry {
+    name: String,
+    description: String,
+    source: String,
+    category: String,
+    read_only: Option<bool>,
+    enabled: bool,
+    mcp_server: Option<String>,
+    mcp_tool: Option<String>,
+    input_schema: Option<Value>,
+    should_defer: bool,
 }
 
 #[derive(Serialize)]
@@ -124,17 +152,49 @@ struct AppSnapshot {
     workspace: WorkspaceInfo,
     skills: Vec<SkillEntry>,
     mcp_servers: Vec<McpServerEntry>,
+    tools: Vec<ToolEntry>,
     projects: Vec<ProjectEntry>,
     recent_changes: Vec<RecentChange>,
     slash_commands: Vec<SlashCommandEntry>,
+    backend_runtime: BackendRuntime,
+    update_status: UpdateStatus,
     sessions: Vec<Session>,
 }
 
 #[derive(Serialize)]
+struct BackendRuntime {
+    local_url: Option<String>,
+    auth_token: String,
+    streaming_enabled: bool,
+    context_limit: u32,
+}
+
+#[derive(Clone, Serialize)]
+struct UpdateStatus {
+    current_version: String,
+    current_revision: Option<String>,
+    latest_revision: Option<String>,
+    checked_at: u64,
+    update_available: bool,
+    source: String,
+    detail: String,
+    release_url: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
 struct ChatMessage {
     id: String,
     role: String,
     content: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+struct ImageAttachment {
+    id: String,
+    name: String,
+    media_type: String,
+    data: String,
 }
 
 #[derive(Serialize)]
@@ -174,6 +234,39 @@ struct ProjectEntry {
     trust_level: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+struct ProjectFileEntry {
+    path: String,
+    name: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ProjectDirectoryEntry {
+    path: String,
+    name: String,
+    is_dir: bool,
+    size: u64,
+    modified_at: Option<u64>,
+}
+
+#[derive(Clone, Serialize)]
+struct ProjectFileDocument {
+    path: String,
+    name: String,
+    content: String,
+    exists: bool,
+    size: u64,
+    modified_at: Option<u64>,
+    recent_changes: Vec<RecentChange>,
+}
+
+#[derive(Serialize)]
+struct MemoryDocument {
+    path: String,
+    content: String,
+    exists: bool,
+}
+
 #[derive(Default, Deserialize, Serialize)]
 struct ProjectOverrides {
     added: Vec<ProjectEntry>,
@@ -184,6 +277,8 @@ static REMOTE_CONFIG: OnceLock<Mutex<RemoteConfig>> = OnceLock::new();
 static MODEL_CONFIG: OnceLock<Mutex<ModelConfig>> = OnceLock::new();
 static BACKEND_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static APP_SESSIONS: OnceLock<Mutex<Vec<Session>>> = OnceLock::new();
+static ACTIVE_PROJECT_PATH: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static STALE_BACKEND_CLEANUP_DONE: OnceLock<()> = OnceLock::new();
 static FALLBACK_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 const FIXED_BACKEND_URL: &str = "https://chat.spark-ai.top";
@@ -193,14 +288,18 @@ const SPARK_DEVICE_ID_ENV_KEY: &str = "SPARK_ANDROID_DEVICE_ID";
 const SPARK_REFRESH_TOKEN_ENV_KEY: &str = "SPARK_ANDROID_REFRESH_TOKEN";
 const SPARK_AUTH_TOKEN_ENV_KEY: &str = "ANTHROPIC_AUTH_TOKEN";
 const SPARK_BASE_URL_ENV_KEY: &str = "ANTHROPIC_BASE_URL";
+const SPARK_OAUTH_CLIENT_ID_ENV_KEY: &str = "SPARK_OAUTH_CLIENT_ID";
+const SPARK_OAUTH_CLIENT_SECRET_ENV_KEY: &str = "SPARK_OAUTH_CLIENT_SECRET";
+const SPARK_OAUTH_CALLBACK_PORT_ENV_KEY: &str = "SPARK_OAUTH_CALLBACK_PORT";
 const BUNDLED_BACKEND_ROOT_ENV_KEY: &str = "SPARK_CODE_BUNDLED_BACKEND_ROOT";
 const SPARK_PACKAGE_NAME: &str = "com.sparkatlas.app";
 const SPARK_APP_VERSION: &str = "9.0.3";
-const SPARK_CERT_SHA256: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const OAUTH_CALLBACK_PATH: &str = "/spark/oauth/callback";
-const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth/mobile/authorize";
-const SPARK_AUTH_REFRESH_PATH: &str = "/api/v1/android/auth/refresh";
+const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth2/authorize";
+const SPARK_OAUTH_TOKEN_PATH: &str = "/oauth2/token";
+const SPARK_OAUTH_USERINFO_PATH: &str = "/oauth2/userinfo";
 const SPARK_CODE_API_PATH: &str = "/api/v1/spark-code";
+const SPARK_MODEL_LIST_PATH: &str = "/api/v1/android/models";
 
 fn default_remote_config() -> RemoteConfig {
     RemoteConfig {
@@ -262,85 +361,56 @@ fn remote_config() -> &'static Mutex<RemoteConfig> {
 }
 
 fn default_model_options() -> Vec<ModelOption> {
-    vec![
-        ModelOption {
-            id: "sonnet".to_string(),
-            name: "Sonnet".to_string(),
-            description: "Sonnet 4.6 · 适合日常编码任务".to_string(),
-        },
-        ModelOption {
-            id: "opus".to_string(),
-            name: "Opus".to_string(),
-            description: "Opus 4.6 · 适合复杂任务".to_string(),
-        },
-        ModelOption {
-            id: "haiku".to_string(),
-            name: "Haiku".to_string(),
-            description: "Haiku 4.5 · 适合快速回答".to_string(),
-        },
-        ModelOption {
-            id: "sonnet[1m]".to_string(),
-            name: "Sonnet（1M 上下文）".to_string(),
-            description: "Sonnet 4.6 · 适合长会话".to_string(),
-        },
-        ModelOption {
-            id: "opus[1m]".to_string(),
-            name: "Opus（1M 上下文）".to_string(),
-            description: "Opus 4.6 · 适合大型代码库长会话".to_string(),
-        },
-        ModelOption {
-            id: "opusplan".to_string(),
-            name: "Opus 计划模式".to_string(),
-            description: "计划用 Opus，执行用 Sonnet".to_string(),
-        },
-        ModelOption {
-            id: "best".to_string(),
-            name: "Best".to_string(),
-            description: "自动选择当前最佳模型".to_string(),
-        },
-    ]
+    Vec::new()
 }
 
 fn default_model_config() -> ModelConfig {
     ModelConfig {
-        selected: "opus[1m]".to_string(),
+        selected: String::new(),
         options: default_model_options(),
     }
 }
 
 fn model_config_with_options(options: Vec<ModelOption>) -> ModelConfig {
-    ModelConfig {
-        selected: "opus[1m]".to_string(),
-        options,
-    }
+    let selected = options
+        .first()
+        .map(|option| option.id.clone())
+        .unwrap_or_default();
+    ModelConfig { selected, options }
 }
 
 fn ensure_selected_model_option(mut config: ModelConfig) -> ModelConfig {
+    if config.selected.trim().is_empty() {
+        config.selected = config
+            .options
+            .first()
+            .map(|option| option.id.clone())
+            .unwrap_or_default();
+    }
     if !config
         .options
         .iter()
         .any(|option| option.id == config.selected)
     {
-        config.options.push(ModelOption {
-            id: config.selected.clone(),
-            name: config.selected.clone(),
-            description: "来自本机配置的模型名称".to_string(),
-        });
+        config.selected = config
+            .options
+            .first()
+            .map(|option| option.id.clone())
+            .unwrap_or_default();
     }
     config
 }
 
-fn backend_model_options() -> Vec<ModelOption> {
-    start_spark_backend();
-    let Ok(value) = post_local_backend_json("/model-options", &serde_json::json!({})) else {
-        return default_model_options();
-    };
+fn model_options_from_value(value: &Value) -> Vec<ModelOption> {
     let Some(items) = value
         .get("options")
         .and_then(Value::as_array)
+        .or_else(|| value.get("items").and_then(Value::as_array))
+        .or_else(|| value.get("data").and_then(Value::as_array))
+        .or_else(|| value.get("models").and_then(Value::as_array))
         .or_else(|| value.as_array())
     else {
-        return default_model_options();
+        return Vec::new();
     };
 
     let mut options = Vec::new();
@@ -362,11 +432,43 @@ fn backend_model_options() -> Vec<ModelOption> {
         }
     }
 
-    if options.is_empty() {
-        default_model_options()
-    } else {
-        options
+    options
+}
+
+fn remote_backend_model_options() -> Vec<ModelOption> {
+    let config = read_spark_config();
+    let Some(auth_token) = env_string(&config, SPARK_AUTH_TOKEN_ENV_KEY) else {
+        return Vec::new();
+    };
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_MODEL_LIST_PATH}");
+    let Ok(value) = curl_json(&[
+        "-sS".to_string(),
+        "--max-time".to_string(),
+        "3".to_string(),
+        "-w".to_string(),
+        "\n%{http_code}".to_string(),
+        "-H".to_string(),
+        format!("Authorization: Bearer {auth_token}"),
+        "-H".to_string(),
+        "Content-Type: application/json".to_string(),
+        url,
+    ]) else {
+        return Vec::new();
+    };
+    model_options_from_value(&value)
+}
+
+fn backend_model_options() -> Vec<ModelOption> {
+    let remote_options = remote_backend_model_options();
+    if !remote_options.is_empty() {
+        return remote_options;
     }
+
+    start_spark_backend();
+    let Ok(value) = post_local_backend_json("/model-options", &serde_json::json!({})) else {
+        return Vec::new();
+    };
+    model_options_from_value(&value)
 }
 
 fn model_config() -> &'static Mutex<ModelConfig> {
@@ -375,6 +477,10 @@ fn model_config() -> &'static Mutex<ModelConfig> {
 
 fn app_sessions() -> &'static Mutex<Vec<Session>> {
     APP_SESSIONS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn active_project_path() -> &'static Mutex<Option<String>> {
+    ACTIVE_PROJECT_PATH.get_or_init(|| Mutex::new(None))
 }
 
 fn config_path(app: &tauri::AppHandle, file_name: &str) -> Result<PathBuf, String> {
@@ -460,6 +566,16 @@ fn value_string(value: Option<&Value>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+fn value_u32(value: Option<&Value>) -> Option<u32> {
+    value.and_then(Value::as_u64).and_then(|number| {
+        if number <= u32::MAX as u64 {
+            Some(number as u32)
+        } else {
+            None
+        }
+    })
+}
+
 fn env_string(config: &Value, key: &str) -> Option<String> {
     value_string(config.get("env").and_then(|env| env.get(key))).or_else(|| {
         env::var(key)
@@ -489,6 +605,49 @@ fn env_object_mut(config: &mut Value) -> Result<&mut Map<String, Value>, String>
     env_value
         .as_object_mut()
         .ok_or_else(|| "Spark 环境配置格式无效".to_string())
+}
+
+fn normalize_backend_base_url(raw_value: &str) -> Result<String, String> {
+    let trimmed = raw_value.trim();
+    if trimmed.is_empty() {
+        return Err("后端地址不能为空".to_string());
+    }
+
+    let with_scheme = if trimmed.contains("://") {
+        trimmed.to_string()
+    } else {
+        format!("https://{trimmed}")
+    };
+    let (scheme, rest) = with_scheme
+        .split_once("://")
+        .ok_or_else(|| "后端地址格式无效，请填写类似 https://api.example.com".to_string())?;
+    if scheme != "http" && scheme != "https" {
+        return Err("后端地址只支持 http 或 https".to_string());
+    }
+    if rest.contains('?') || rest.contains('#') {
+        return Err("后端地址不能包含查询参数或哈希".to_string());
+    }
+
+    let authority = rest.split('/').next().unwrap_or("").trim();
+    if authority.is_empty() {
+        return Err("后端地址缺少域名".to_string());
+    }
+    if authority.contains('@') {
+        return Err("后端地址不能包含用户名或密码".to_string());
+    }
+
+    let path = rest
+        .split_once('/')
+        .map(|(_, path)| path.trim_matches('/'))
+        .unwrap_or("");
+    if path == "v1" {
+        return Err("后端地址不要包含 /v1，请仅填写根地址".to_string());
+    }
+    if !path.is_empty() {
+        return Err("后端地址不能包含路径，请仅填写协议和域名（可带端口）".to_string());
+    }
+
+    Ok(format!("{scheme}://{authority}"))
 }
 
 fn get_or_create_android_device(config: &mut Value) -> Result<(String, String), String> {
@@ -793,19 +952,211 @@ fn project_entry(path: String, trust_level: Option<String>) -> ProjectEntry {
     }
 }
 
+fn project_root_from_input(project_path: &str) -> Result<PathBuf, String> {
+    let root = if project_path.trim().is_empty() {
+        app_workspace()
+    } else {
+        PathBuf::from(project_path.trim())
+    };
+    let root = fs::canonicalize(&root).map_err(|error| format!("无法读取项目目录：{error}"))?;
+    if !root.is_dir() {
+        return Err("项目路径必须是文件夹".to_string());
+    }
+    Ok(root)
+}
+
+fn relative_path_is_safe(path: &Path) -> bool {
+    path.components().all(|component| {
+        matches!(
+            component,
+            std::path::Component::Normal(_) | std::path::Component::CurDir
+        )
+    })
+}
+
+fn display_relative_path(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+fn resolve_project_child_path(
+    project_path: &str,
+    child_path: &str,
+    allow_missing: bool,
+) -> Result<(PathBuf, PathBuf, String), String> {
+    let root = project_root_from_input(project_path)?;
+    let trimmed = child_path.trim().trim_start_matches("./");
+    let input = PathBuf::from(trimmed);
+    if input.is_absolute() {
+        let target = if allow_missing {
+            input
+        } else {
+            fs::canonicalize(&input).map_err(|error| format!("无法读取路径：{error}"))?
+        };
+        let comparable = if target.exists() {
+            fs::canonicalize(&target).map_err(|error| format!("无法读取路径：{error}"))?
+        } else if let Some(parent) = target.parent() {
+            let parent =
+                fs::canonicalize(parent).map_err(|error| format!("无法读取父目录：{error}"))?;
+            target
+                .file_name()
+                .map(|name| parent.join(name))
+                .unwrap_or(parent)
+        } else {
+            target.clone()
+        };
+        if !comparable.starts_with(&root) {
+            return Err("只能访问当前项目目录内的文件".to_string());
+        }
+        let relative = display_relative_path(&root, &target);
+        return Ok((root, target, relative));
+    }
+
+    if !relative_path_is_safe(&input) {
+        return Err("路径不能包含 .. 或跨出项目目录".to_string());
+    }
+    let target = root.join(input);
+    if !allow_missing && !target.exists() {
+        return Err("路径不存在".to_string());
+    }
+    let comparable = if target.exists() {
+        fs::canonicalize(&target).map_err(|error| format!("无法读取路径：{error}"))?
+    } else if let Some(parent) = target.parent() {
+        let parent =
+            fs::canonicalize(parent).map_err(|error| format!("无法读取父目录：{error}"))?;
+        target
+            .file_name()
+            .map(|name| parent.join(name))
+            .unwrap_or(parent)
+    } else {
+        target.clone()
+    };
+    if !comparable.starts_with(&root) {
+        return Err("只能访问当前项目目录内的文件".to_string());
+    }
+    let relative = display_relative_path(&root, &target);
+    Ok((root, target, relative))
+}
+
+fn metadata_modified_millis(metadata: &fs::Metadata) -> Option<u64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+        .map(|value| value.as_millis() as u64)
+}
+
+fn should_skip_project_file_entry(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    matches!(
+        name,
+        ".git"
+            | ".next"
+            | ".nuxt"
+            | ".cache"
+            | ".turbo"
+            | ".venv"
+            | "node_modules"
+            | "dist"
+            | "build"
+            | "target"
+            | "coverage"
+            | "vendor"
+    )
+}
+
+fn fuzzy_file_match(path: &str, query: &str) -> bool {
+    let normalized_path = path.to_lowercase();
+    let normalized_query = query.trim().to_lowercase();
+    if normalized_query.is_empty() {
+        return true;
+    }
+    if normalized_path.contains(&normalized_query) {
+        return true;
+    }
+
+    let mut chars = normalized_query.chars();
+    let mut current = chars.next();
+    if current.is_none() {
+        return true;
+    }
+    for item in normalized_path.chars() {
+        if Some(item) == current {
+            current = chars.next();
+            if current.is_none() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn collect_project_files(
+    root: &Path,
+    dir: &Path,
+    query: &str,
+    visited: &mut usize,
+    out: &mut Vec<ProjectFileEntry>,
+) {
+    if *visited >= 2_000 || out.len() >= 50 {
+        return;
+    }
+
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        if *visited >= 2_000 || out.len() >= 50 {
+            return;
+        }
+        let path = entry.path();
+        if should_skip_project_file_entry(&path) {
+            continue;
+        }
+        if path.is_dir() {
+            collect_project_files(root, &path, query, visited, out);
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+
+        *visited += 1;
+        let relative = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if !fuzzy_file_match(&relative, query) {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&relative)
+            .to_string();
+        out.push(ProjectFileEntry {
+            path: relative,
+            name,
+        });
+    }
+}
+
 fn load_spark_user_profile(config: &Value) -> SparkUserProfile {
     let account = config.get("oauthAccount").and_then(Value::as_object);
-    let has_token = env_string(config, SPARK_AUTH_TOKEN_ENV_KEY).is_some()
-        || env_string(config, SPARK_REFRESH_TOKEN_ENV_KEY).is_some();
-    let logged_in = account.is_some() || has_token;
+    let logged_in = account.is_some() || env_string(config, SPARK_AUTH_TOKEN_ENV_KEY).is_some();
 
     SparkUserProfile {
         logged_in,
         id: account.and_then(|item| value_string(item.get("accountUuid"))),
-        name: account
-            .and_then(|item| value_string(item.get("displayName")))
-            .or_else(|| logged_in.then(|| "已登录".to_string())),
+        name: account.and_then(|item| value_string(item.get("displayName"))),
         email: account.and_then(|item| value_string(item.get("emailAddress"))),
+        avatar_url: account.and_then(|item| value_string(item.get("avatarUrl"))),
         organization_id: account.and_then(|item| value_string(item.get("organizationUuid"))),
         organization_name: account.and_then(|item| value_string(item.get("organizationName"))),
         billing_type: account.and_then(|item| value_string(item.get("billingType"))),
@@ -939,21 +1290,22 @@ fn remove_remote_client_config(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 fn load_model_config(app: &tauri::AppHandle) -> ModelConfig {
-    let options = backend_model_options();
-    let default = model_config_with_options(options.clone());
+    let default = model_config_with_options(default_model_options());
     let Ok(path) = config_path(app, "model.json") else {
-        return ensure_selected_model_option(load_user_model_config(default));
+        return load_user_model_config(default);
     };
     let Ok(content) = fs::read_to_string(path) else {
-        return ensure_selected_model_option(load_user_model_config(default));
+        return load_user_model_config(default);
     };
     let mut config: ModelConfig = serde_json::from_str(&content).unwrap_or(default);
     if config.selected.trim().is_empty() {
-        config.selected =
-            load_user_model_config(model_config_with_options(options.clone())).selected;
+        config.selected = load_user_model_config(default_model_config()).selected;
     }
-    config.options = options;
-    ensure_selected_model_option(config)
+    if config.options.is_empty() {
+        config
+    } else {
+        ensure_selected_model_option(config)
+    }
 }
 
 fn load_user_model_config(mut default: ModelConfig) -> ModelConfig {
@@ -982,6 +1334,9 @@ fn load_user_model_config(mut default: ModelConfig) -> ModelConfig {
 
 fn normalize_model_alias(value: String) -> String {
     let options = default_model_options();
+    if options.is_empty() {
+        return value;
+    }
     if options.iter().any(|option| option.id == value) {
         return value;
     }
@@ -1112,28 +1467,90 @@ fn open_browser(url: &str) -> Result<(), String> {
         .map_err(|error| format!("无法打开浏览器，请手动访问：{url}\n{error}"))
 }
 
+fn curl_json(args: &[String]) -> Result<Value, String> {
+    let output = ProcessCommand::new("curl")
+        .args(args)
+        .output()
+        .map_err(|error| format!("无法调用 curl：{error}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !output.status.success() {
+        return Err(if stderr.is_empty() {
+            "网络请求失败".to_string()
+        } else {
+            stderr
+        });
+    }
+
+    let (body, status) = stdout
+        .rsplit_once('\n')
+        .ok_or_else(|| "后端响应格式无效".to_string())?;
+    let status_code = status.trim().parse::<u16>().unwrap_or(0);
+    if !(200..300).contains(&status_code) {
+        let detail = serde_json::from_str::<Value>(body)
+            .ok()
+            .and_then(|value| {
+                value_string(value.get("detail"))
+                    .or_else(|| value_string(value.get("message")))
+                    .or_else(|| value_string(value.get("error")))
+            })
+            .unwrap_or_else(|| body.trim().to_string());
+        return Err(format!("后端返回 {status_code}：{detail}"));
+    }
+    serde_json::from_str(body).map_err(|error| format!("无法解析后端响应：{error}"))
+}
+
+fn build_oauth_callback_url(port: u16) -> String {
+    format!("http://127.0.0.1:{port}{OAUTH_CALLBACK_PATH}")
+}
+
+fn oauth_client_id(config: &Value) -> Result<String, String> {
+    env_string(config, SPARK_OAUTH_CLIENT_ID_ENV_KEY)
+        .ok_or_else(|| {
+            "请先在 Spark 配置里设置 SPARK_OAUTH_CLIENT_ID，并在 Spark-EDU OAuth2 App 里登记 Redirect URI: http://127.0.0.1:42872/spark/oauth/callback".to_string()
+        })
+}
+
+fn oauth_client_secret(config: &Value) -> Option<String> {
+    env_string(config, SPARK_OAUTH_CLIENT_SECRET_ENV_KEY)
+}
+
+fn oauth_callback_port(config: &Value) -> u16 {
+    env_string(config, SPARK_OAUTH_CALLBACK_PORT_ENV_KEY)
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port > 0)
+        .unwrap_or(42872)
+}
+
+fn oauth_redirect_url(port: u16) -> String {
+    build_oauth_callback_url(port)
+}
+
+fn oauth_code_verifier() -> String {
+    format!("spark-pkce-{}-{}", compact_id("v"), compact_id("x"))
+}
+
+fn oauth_code_challenge(verifier: &str) -> String {
+    verifier.to_string()
+}
+
 fn build_spark_oauth_url(
-    callback_url: &str,
+    base_url: &str,
+    client_id: &str,
+    redirect_uri: &str,
     state: &str,
-    install_id: &str,
-    device_id: &str,
+    code_challenge: &str,
 ) -> String {
     format!(
-        "{FIXED_BACKEND_URL}{SPARK_OAUTH_AUTHORIZE_PATH}?redirect_uri={}&response_mode=query&install_id={}&device_id={}&package_name={}&cert_sha256={}&app_version={}&state={}",
-        url_encode(callback_url),
-        url_encode(install_id),
-        url_encode(device_id),
-        url_encode(SPARK_PACKAGE_NAME),
-        url_encode(SPARK_CERT_SHA256),
-        url_encode(SPARK_APP_VERSION),
+        "{base_url}{SPARK_OAUTH_AUTHORIZE_PATH}?response_type=code&client_id={}&redirect_uri={}&scope=openid%20profile%20email&state={}&code_challenge={}&code_challenge_method=plain",
+        url_encode(client_id),
+        url_encode(redirect_uri),
         url_encode(state),
+        url_encode(code_challenge),
     )
 }
 
-fn wait_for_oauth_refresh_token(
-    listener: TcpListener,
-    expected_state: &str,
-) -> Result<String, String> {
+fn wait_for_oauth_code(listener: TcpListener, expected_state: &str) -> Result<String, String> {
     listener
         .set_nonblocking(true)
         .map_err(|error| format!("无法设置 OAuth 回调监听：{error}"))?;
@@ -1184,14 +1601,14 @@ fn wait_for_oauth_refresh_token(
                     return Err("授权状态校验失败，请重新登录".to_string());
                 }
 
-                let refresh_token = query_value(query, "refresh_token")
-                    .ok_or_else(|| "授权回调里没有刷新令牌".to_string())?;
+                let code =
+                    query_value(query, "code").ok_or_else(|| "授权回调里没有授权码".to_string())?;
                 write_oauth_html(
                     &mut stream,
                     "登录成功",
                     "可以关闭这个页面，回到 Spark Code。",
                 );
-                return Ok(refresh_token);
+                return Ok(code);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(100));
@@ -1201,54 +1618,29 @@ fn wait_for_oauth_refresh_token(
     }
 }
 
-fn curl_json(args: &[String]) -> Result<Value, String> {
-    let output = ProcessCommand::new("curl")
-        .args(args)
-        .output()
-        .map_err(|error| format!("无法调用 curl：{error}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if !output.status.success() {
-        return Err(if stderr.is_empty() {
-            "网络请求失败".to_string()
-        } else {
-            stderr
-        });
+fn exchange_oauth_code(
+    code: &str,
+    client_id: &str,
+    client_secret: Option<&str>,
+    redirect_uri: &str,
+    code_verifier: &str,
+) -> Result<String, String> {
+    let mut body = vec![
+        ("grant_type", "authorization_code".to_string()),
+        ("client_id", client_id.to_string()),
+        ("code", code.to_string()),
+        ("redirect_uri", redirect_uri.to_string()),
+        ("code_verifier", code_verifier.to_string()),
+    ];
+    if let Some(secret) = client_secret {
+        body.push(("client_secret", secret.to_string()));
     }
-
-    let (body, status) = stdout
-        .rsplit_once('\n')
-        .ok_or_else(|| "后端响应格式无效".to_string())?;
-    let status_code = status.trim().parse::<u16>().unwrap_or(0);
-    if !(200..300).contains(&status_code) {
-        let detail = serde_json::from_str::<Value>(body)
-            .ok()
-            .and_then(|value| {
-                value_string(value.get("detail"))
-                    .or_else(|| value_string(value.get("message")))
-                    .or_else(|| value_string(value.get("error")))
-            })
-            .unwrap_or_else(|| body.trim().to_string());
-        return Err(format!("后端返回 {status_code}：{detail}"));
-    }
-    serde_json::from_str(body).map_err(|error| format!("无法解析后端响应：{error}"))
-}
-
-fn refresh_android_token(
-    refresh_token: &str,
-    install_id: &str,
-    device_id: &str,
-) -> Result<(String, String), String> {
-    let body = serde_json::json!({
-        "refresh_token": refresh_token,
-        "install_id": install_id,
-        "device_id": device_id,
-        "package_name": SPARK_PACKAGE_NAME,
-        "cert_sha256": SPARK_CERT_SHA256,
-        "app_version": SPARK_APP_VERSION,
-    })
-    .to_string();
-    let url = format!("{FIXED_BACKEND_URL}{SPARK_AUTH_REFRESH_PATH}");
+    let encoded = body
+        .into_iter()
+        .map(|(key, value)| format!("{}={}", url_encode(key), url_encode(&value)))
+        .collect::<Vec<_>>()
+        .join("&");
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_OAUTH_TOKEN_PATH}");
     let value = curl_json(&[
         "-sS".to_string(),
         "--max-time".to_string(),
@@ -1258,36 +1650,70 @@ fn refresh_android_token(
         "-X".to_string(),
         "POST".to_string(),
         "-H".to_string(),
-        "Content-Type: application/json".to_string(),
+        "Content-Type: application/x-www-form-urlencoded".to_string(),
         "-d".to_string(),
-        body,
+        encoded,
         url,
     ])?;
-
-    let access_token = value_string(value.get("access_token"))
+    value_string(value.get("access_token"))
         .or_else(|| value_string(value.get("accessToken")))
-        .ok_or_else(|| "后端没有返回访问令牌".to_string())?;
-    let next_refresh_token = value_string(value.get("refresh_token"))
-        .or_else(|| value_string(value.get("refreshToken")))
-        .ok_or_else(|| "后端没有返回刷新令牌".to_string())?;
-    Ok((access_token, next_refresh_token))
+        .ok_or_else(|| "后端没有返回访问令牌".to_string())
 }
 
 fn fetch_spark_profile(access_token: &str) -> Option<Value> {
-    let url = format!("{FIXED_BACKEND_URL}/api/oauth/profile");
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_OAUTH_USERINFO_PATH}");
     curl_json(&[
         "-sS".to_string(),
         "--max-time".to_string(),
-        "10".to_string(),
+        "5".to_string(),
         "-w".to_string(),
         "\n%{http_code}".to_string(),
         "-H".to_string(),
         format!("Authorization: Bearer {access_token}"),
-        "-H".to_string(),
-        "Content-Type: application/json".to_string(),
         url,
     ])
     .ok()
+}
+
+fn refresh_spark_user_profile(config: &Value) -> SparkUserProfile {
+    let Some(auth_token) = env_string(config, SPARK_AUTH_TOKEN_ENV_KEY) else {
+        return load_spark_user_profile(config);
+    };
+    let Some(profile) = fetch_spark_profile(&auth_token) else {
+        return load_spark_user_profile(config);
+    };
+    save_spark_login(auth_token, Some(profile)).unwrap_or_else(|_| load_spark_user_profile(config))
+}
+
+fn line_change_counts(before: &str, after: &str) -> (u32, u32) {
+    let before_lines: Vec<&str> = before.lines().collect();
+    let after_lines: Vec<&str> = after.lines().collect();
+    if before_lines.len() > 2_000 || after_lines.len() > 2_000 {
+        return if after_lines.len() >= before_lines.len() {
+            ((after_lines.len() - before_lines.len()) as u32, 0)
+        } else {
+            (0, (before_lines.len() - after_lines.len()) as u32)
+        };
+    }
+
+    let mut previous = vec![0u16; after_lines.len() + 1];
+    let mut current = vec![0u16; after_lines.len() + 1];
+    for before_line in before_lines.iter() {
+        for (index, after_line) in after_lines.iter().enumerate() {
+            current[index + 1] = if before_line == after_line {
+                previous[index].saturating_add(1)
+            } else {
+                previous[index + 1].max(current[index])
+            };
+        }
+        std::mem::swap(&mut previous, &mut current);
+        current.fill(0);
+    }
+    let common = previous[after_lines.len()] as usize;
+    (
+        after_lines.len().saturating_sub(common) as u32,
+        before_lines.len().saturating_sub(common) as u32,
+    )
 }
 
 fn load_recent_changes(app: &tauri::AppHandle) -> Vec<RecentChange> {
@@ -1297,7 +1723,19 @@ fn load_recent_changes(app: &tauri::AppHandle) -> Vec<RecentChange> {
     let Ok(content) = fs::read_to_string(path) else {
         return Vec::new();
     };
-    serde_json::from_str(&content).unwrap_or_default()
+    let mut changes: Vec<RecentChange> = serde_json::from_str(&content).unwrap_or_default();
+    for change in changes.iter_mut() {
+        let Some(before_content) = change.before_content.as_deref() else {
+            continue;
+        };
+        let Ok(after_content) = fs::read_to_string(&change.path) else {
+            continue;
+        };
+        let (added, removed) = line_change_counts(before_content, &after_content);
+        change.added_lines = added;
+        change.removed_lines = removed;
+    }
+    changes
 }
 
 fn persist_recent_changes(app: &tauri::AppHandle, changes: &[RecentChange]) -> Result<(), String> {
@@ -1362,6 +1800,11 @@ fn find_spark_code_root() -> Option<PathBuf> {
     }
 
     if let Some(path) = env::var_os(BUNDLED_BACKEND_ROOT_ENV_KEY).map(PathBuf::from) {
+        if is_app_resource_backend_archive(&path) {
+            if let Some(root) = stage_bundled_backend_archive(&path) {
+                return Some(root);
+            }
+        }
         if path_has_spark_source(&path) {
             return Some(path);
         }
@@ -1401,6 +1844,13 @@ fn is_app_resource_backend(path: &Path) -> bool {
         .contains(".app/Contents/Resources/spark-code-backend")
 }
 
+fn is_app_resource_backend_archive(path: &Path) -> bool {
+    path.file_name().and_then(|name| name.to_str()) == Some("spark-code-backend.tar.gz")
+        && path
+            .to_string_lossy()
+            .contains(".app/Contents/Resources/spark-code-backend.tar.gz")
+}
+
 fn is_staged_backend_path(path: &Path) -> bool {
     path.to_string_lossy().contains("/.sparkc/backend/")
 }
@@ -1428,18 +1878,110 @@ fn copy_backend_resource(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn backend_stage_target() -> Option<PathBuf> {
+    home_dir().map(|home| {
+        home.join(".sparkc")
+            .join("backend")
+            .join(env!("CARGO_PKG_VERSION"))
+    })
+}
+
+fn temp_backend_stage_dir(target: &Path) -> PathBuf {
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("backend");
+    target.with_file_name(format!("{name}.tmp-{}", std::process::id()))
+}
+
+fn archive_stamp_text(archive: &Path) -> String {
+    let metadata = fs::metadata(archive).ok();
+    let size = metadata
+        .as_ref()
+        .map(|value| value.len())
+        .unwrap_or_default();
+    let modified = metadata
+        .and_then(|value| value.modified().ok())
+        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+        .map(|value| value.as_secs())
+        .unwrap_or_default();
+    format!(
+        "archive={}\nsize={size}\nmodified={modified}",
+        archive.display()
+    )
+}
+
+fn extract_backend_archive(archive: &Path, target: &Path) -> Result<(), String> {
+    let tmp = temp_backend_stage_dir(target);
+    if tmp.exists() {
+        fs::remove_dir_all(&tmp).map_err(|error| format!("无法清理后端缓存：{error}"))?;
+    }
+    fs::create_dir_all(&tmp).map_err(|error| format!("无法创建后端缓存目录：{error}"))?;
+
+    let status = ProcessCommand::new("/usr/bin/tar")
+        .arg("-xzf")
+        .arg(archive)
+        .arg("-C")
+        .arg(&tmp)
+        .status()
+        .map_err(|error| format!("无法解包内置后端：{error}"))?;
+    if !status.success() {
+        return Err(format!("解包内置后端失败：{status}"));
+    }
+
+    let extracted = tmp.join("spark-code-backend");
+    if !path_has_spark_source(&extracted) {
+        let _ = fs::remove_dir_all(&tmp);
+        return Err("内置后端资源不完整".to_string());
+    }
+
+    if target.exists() {
+        fs::remove_dir_all(target).map_err(|error| format!("无法替换后端缓存：{error}"))?;
+    }
+    fs::rename(&extracted, target).map_err(|error| format!("无法安装后端缓存：{error}"))?;
+    let _ = fs::remove_dir_all(&tmp);
+    Ok(())
+}
+
+fn stage_bundled_backend_archive(archive: &Path) -> Option<PathBuf> {
+    let target = backend_stage_target()?;
+    let stamp = target.join(".sparkcode-backend-source");
+    let source_text = archive_stamp_text(archive);
+    let target_ready = path_has_spark_source(&target)
+        && bundled_bun_for_root(&target).is_some()
+        && fs::read_to_string(&stamp)
+            .map(|value| value == source_text)
+            .unwrap_or(false);
+
+    if target_ready {
+        return Some(target);
+    }
+
+    app_log(format!(
+        "backend:stage-extract archive={} target={}",
+        archive.display(),
+        target.display()
+    ));
+    match extract_backend_archive(archive, &target) {
+        Ok(()) => {
+            let _ = fs::write(&stamp, source_text);
+            Some(target)
+        }
+        Err(error) => {
+            app_log(format!("backend:stage-extract-error {error}"));
+            None
+        }
+    }
+}
+
 fn stage_bundled_backend_root(root: &Path) -> PathBuf {
     if cfg!(debug_assertions) || !is_app_resource_backend(root) {
         return root.to_path_buf();
     }
 
-    let Some(home) = home_dir() else {
+    let Some(target) = backend_stage_target() else {
         return root.to_path_buf();
     };
-    let target = home
-        .join(".sparkc")
-        .join("backend")
-        .join(env!("CARGO_PKG_VERSION"));
     let stamp = target.join(".sparkcode-backend-source");
     let source_manifest =
         fs::read_to_string(root.join("backend-resource.json")).unwrap_or_else(|_| String::new());
@@ -1517,6 +2059,37 @@ fn backend_workspace() -> PathBuf {
     fs::canonicalize(&workspace).unwrap_or(workspace)
 }
 
+fn app_workspace() -> PathBuf {
+    if let Ok(active) = active_project_path().lock() {
+        if let Some(path) = active.as_deref().filter(|value| !value.trim().is_empty()) {
+            let path = PathBuf::from(path);
+            return fs::canonicalize(&path).unwrap_or(path);
+        }
+    }
+    backend_workspace()
+}
+
+#[tauri::command]
+fn set_active_project_path(project_path: String) -> Result<Option<String>, String> {
+    let trimmed = project_path.trim();
+    let next = if trimmed.is_empty() || trimmed == "__sparkcode_no_project__" {
+        None
+    } else {
+        let canonical =
+            fs::canonicalize(trimmed).map_err(|error| format!("无法读取项目目录：{error}"))?;
+        if !canonical.is_dir() {
+            return Err("项目路径必须是文件夹".to_string());
+        }
+        Some(canonical.display().to_string())
+    };
+
+    let mut active = active_project_path()
+        .lock()
+        .map_err(|_| "当前项目状态暂时不可用".to_string())?;
+    *active = next.clone();
+    Ok(next)
+}
+
 fn backend_cache_dir() -> Option<PathBuf> {
     home_dir().map(|home| home.join(".sparkc").join("cache").join("sparkcode-app"))
 }
@@ -1575,7 +2148,7 @@ fn describe_command(command: &ProcessCommand) -> String {
 }
 
 fn build_backend_command() -> Result<(ProcessCommand, String), String> {
-    let workspace = backend_workspace();
+    let workspace = app_workspace();
 
     if let Some(root) = find_spark_code_root() {
         let root = stage_bundled_backend_root(&root);
@@ -1628,6 +2201,93 @@ fn server_lock_path() -> Option<PathBuf> {
     })
 }
 
+fn app_pid_from_lock_path(path: &Path) -> Option<u32> {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix("sparkcode-app-"))
+        .and_then(|name| name.strip_suffix(".lock"))
+        .and_then(|name| name.parse::<u32>().ok())
+}
+
+fn process_is_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+
+    #[cfg(target_family = "unix")]
+    {
+        ProcessCommand::new("kill")
+            .arg("-0")
+            .arg(pid.to_string())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(target_family = "unix"))]
+    {
+        false
+    }
+}
+
+fn terminate_process(pid: u32, reason: &str) {
+    if pid == 0 || pid == std::process::id() {
+        return;
+    }
+
+    #[cfg(target_family = "unix")]
+    {
+        let _ = ProcessCommand::new("kill")
+            .arg("-TERM")
+            .arg(pid.to_string())
+            .status();
+        thread::sleep(Duration::from_millis(120));
+        if process_is_alive(pid) {
+            let _ = ProcessCommand::new("kill")
+                .arg("-KILL")
+                .arg(pid.to_string())
+                .status();
+        }
+        app_log(format!(
+            "backend:terminated-stale pid={pid} reason={reason}"
+        ));
+    }
+}
+
+fn cleanup_stale_app_backends() {
+    let Some(home) = home_dir() else {
+        return;
+    };
+    let dir = home.join(".sparkc");
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return;
+    };
+    let current_app_pid = std::process::id();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(app_pid) = app_pid_from_lock_path(&path) else {
+            continue;
+        };
+        if app_pid == current_app_pid {
+            continue;
+        }
+        if process_is_alive(app_pid) {
+            continue;
+        }
+
+        let backend_pid = read_json_file(&path).and_then(|lock| value_u32(lock.get("pid")));
+        if let Some(pid) = backend_pid {
+            if process_is_alive(pid) {
+                terminate_process(pid, "dead-app-lock");
+            }
+        }
+        if fs::remove_file(&path).is_ok() {
+            app_log(format!("backend:removed-stale-lock {}", path.display()));
+        }
+    }
+}
+
 fn read_local_backend_url() -> Option<String> {
     let path = server_lock_path()?;
     let lock = read_json_file(&path)?;
@@ -1660,14 +2320,81 @@ fn parse_local_http_url(url: &str) -> Result<(String, u16), String> {
     Ok((host.to_string(), port))
 }
 
+fn local_http_response_complete(response: &[u8]) -> bool {
+    let Some(header_end) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
+        return false;
+    };
+    let headers = String::from_utf8_lossy(&response[..header_end]);
+    let content_length = headers.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        if name.eq_ignore_ascii_case("content-length") {
+            return value.trim().parse::<usize>().ok();
+        }
+        None
+    });
+    match content_length {
+        Some(length) => response.len().saturating_sub(header_end + 4) >= length,
+        None => false,
+    }
+}
+
+fn is_transient_http_read_error(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock
+            | std::io::ErrorKind::Interrupted
+            | std::io::ErrorKind::TimedOut
+    ) || matches!(error.raw_os_error(), Some(11 | 35))
+}
+
+fn read_local_http_response(stream: &mut TcpStream) -> Result<String, String> {
+    let deadline = Instant::now() + Duration::from_millis(15_000);
+    let mut response = Vec::new();
+    let mut buffer = [0_u8; 8192];
+
+    loop {
+        match stream.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(read) => {
+                response.extend_from_slice(&buffer[..read]);
+                if local_http_response_complete(&response) {
+                    break;
+                }
+            }
+            Err(error) if is_transient_http_read_error(&error) => {
+                if local_http_response_complete(&response) {
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    if response.is_empty() {
+                        return Err("本地后端响应超时，请稍后重试".to_string());
+                    }
+                    break;
+                }
+                thread::sleep(Duration::from_millis(25));
+            }
+            Err(error) => return Err(format!("无法读取后端响应：{error}")),
+        }
+    }
+
+    String::from_utf8(response).map_err(|error| format!("后端响应不是有效 UTF-8：{error}"))
+}
+
 fn post_local_backend_json(path: &str, body: &Value) -> Result<Value, String> {
     let url =
         wait_for_local_backend_url().ok_or_else(|| "本地 Spark Code 后端尚未就绪".to_string())?;
     let (host, port) = parse_local_http_url(&url)?;
     let body_text =
         serde_json::to_string(body).map_err(|error| format!("无法序列化请求：{error}"))?;
-    let mut stream = TcpStream::connect((host.as_str(), port))
+    let address = (host.as_str(), port)
+        .to_socket_addrs()
+        .map_err(|error| format!("无法解析本地后端地址：{error}"))?
+        .next()
+        .ok_or_else(|| "本地后端地址无效".to_string())?;
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_millis(1_800))
         .map_err(|error| format!("无法连接本地后端：{error}"))?;
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(750)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(1_500)));
     let request = format!(
         "POST {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAuthorization: Bearer {LOCAL_BACKEND_AUTH_TOKEN}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body_text}",
         body_text.len()
@@ -1675,10 +2402,7 @@ fn post_local_backend_json(path: &str, body: &Value) -> Result<Value, String> {
     stream
         .write_all(request.as_bytes())
         .map_err(|error| format!("无法写入后端请求：{error}"))?;
-    let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(|error| format!("无法读取后端响应：{error}"))?;
+    let response = read_local_http_response(&mut stream)?;
     let (_, payload) = response
         .split_once("\r\n\r\n")
         .ok_or_else(|| "本地后端响应格式无效".to_string())?;
@@ -1700,24 +2424,9 @@ fn canonical_project_path(path: impl AsRef<Path>) -> String {
         .to_string()
 }
 
-fn create_backend_session_id(project_path: &str) -> Result<String, String> {
-    start_spark_backend();
-    let body = serde_json::json!({
-        "cwd": project_path,
-        "session_key": format!("sparkcode-app:{project_path}:{}", compact_id("")),
-    });
-    let value = post_local_backend_json("/sessions", &body)?;
-    value_string(value.get("session_id")).ok_or_else(|| "本地后端没有返回会话 ID".to_string())
-}
-
 fn create_app_session(title: String, project_path: String, remote: bool) -> Session {
-    let id = create_backend_session_id(&project_path).unwrap_or_else(|error| {
-        app_log(format!("backend:create-session-error {error}"));
-        fallback_session_uuid()
-    });
-
     Session {
-        id,
+        id: fallback_session_uuid(),
         title,
         tokens: 0,
         context_used: 0,
@@ -1725,6 +2434,33 @@ fn create_app_session(title: String, project_path: String, remote: bool) -> Sess
         project_path,
         remote,
     }
+}
+
+fn normalized_session_project_key(project_path: &str) -> String {
+    let normalized = project_path
+        .trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string();
+    if normalized.is_empty() {
+        "default".to_string()
+    } else {
+        normalized
+    }
+}
+
+fn is_empty_current_session(session: &Session) -> bool {
+    session.title.trim() == "当前会话" && session.tokens == 0 && session.context_used == 0
+}
+
+fn prune_empty_current_sessions(sessions: &mut Vec<Session>) {
+    let mut seen_projects = HashSet::new();
+    sessions.retain(|session| {
+        if !is_empty_current_session(session) {
+            return true;
+        }
+        seen_projects.insert(normalized_session_project_key(&session.project_path))
+    });
 }
 
 fn load_slash_commands(project_path: &str) -> Vec<SlashCommandEntry> {
@@ -1746,10 +2482,43 @@ fn load_slash_commands(project_path: &str) -> Vec<SlashCommandEntry> {
     }
 }
 
+fn load_tool_catalog(permission_mode: &str) -> Vec<ToolEntry> {
+    start_spark_backend();
+    let body = serde_json::json!({
+        "permission_mode": backend_permission_mode(permission_mode),
+    });
+    match post_local_backend_json("/tools", &body) {
+        Ok(value) => serde_json::from_value::<Vec<ToolEntry>>(value).unwrap_or_else(|error| {
+            app_log(format!("backend:tool-catalog-parse-error {error}"));
+            Vec::new()
+        }),
+        Err(error) => {
+            app_log(format!("backend:tool-catalog-load-error {error}"));
+            Vec::new()
+        }
+    }
+}
+
+fn backend_runtime_snapshot() -> BackendRuntime {
+    BackendRuntime {
+        local_url: read_local_backend_url(),
+        auth_token: LOCAL_BACKEND_AUTH_TOKEN.to_string(),
+        streaming_enabled: true,
+        context_limit: 1_000_000,
+    }
+}
+
+#[tauri::command]
+fn ensure_local_backend() -> BackendRuntime {
+    start_spark_backend();
+    let _ = wait_for_local_backend_url();
+    backend_runtime_snapshot()
+}
+
 #[tauri::command]
 fn get_slash_commands(project_path: String) -> Vec<SlashCommandEntry> {
     let project_path = if project_path.trim().is_empty() {
-        canonical_project_path(backend_workspace())
+        canonical_project_path(app_workspace())
     } else {
         canonical_project_path(project_path.trim())
     };
@@ -1757,18 +2526,56 @@ fn get_slash_commands(project_path: String) -> Vec<SlashCommandEntry> {
 }
 
 #[tauri::command]
-fn run_local_command(name: String, args: String) -> Result<String, String> {
+fn get_tool_catalog(permission_mode: String) -> Vec<ToolEntry> {
+    load_tool_catalog(&permission_mode)
+}
+
+#[tauri::command]
+fn run_local_command(
+    name: String,
+    args: String,
+    project_path: Option<String>,
+) -> Result<String, String> {
     start_spark_backend();
+    let cwd = project_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(canonical_project_path)
+        .unwrap_or_else(|| canonical_project_path(app_workspace()));
     let body = serde_json::json!({
         "name": name.trim(),
         "args": args.trim(),
+        "cwd": cwd,
     });
     let value = post_local_backend_json("/local-command", &body)?;
     Ok(value_string(value.get("content")).unwrap_or_else(|| "已完成".to_string()))
 }
 
+#[tauri::command]
+fn submit_feedback(
+    description: String,
+    project_path: Option<String>,
+    messages: Option<Vec<ChatMessage>>,
+) -> Result<String, String> {
+    start_spark_backend();
+    let cwd = project_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(canonical_project_path)
+        .unwrap_or_else(|| canonical_project_path(app_workspace()));
+    let body = serde_json::json!({
+        "description": description.trim(),
+        "cwd": cwd,
+        "messages": messages.unwrap_or_default(),
+    });
+    let value = post_local_backend_json("/feedback", &body)?;
+    Ok(value_string(value.get("feedback_id")).unwrap_or_else(|| "unknown".to_string()))
+}
+
 fn ensure_default_sessions(remote: bool) -> Vec<Session> {
-    let project_path = canonical_project_path(backend_workspace());
+    let project_path = canonical_project_path(app_workspace());
     let Ok(mut sessions) = app_sessions().lock() else {
         return vec![create_app_session(
             "当前会话".to_string(),
@@ -1796,10 +2603,13 @@ fn ensure_default_sessions(remote: bool) -> Vec<Session> {
         ));
     }
 
+    prune_empty_current_sessions(&mut sessions);
     sessions.clone()
 }
 
 fn start_spark_backend() {
+    STALE_BACKEND_CLEANUP_DONE.get_or_init(cleanup_stale_app_backends);
+
     let mut guard = match backend_process().lock() {
         Ok(guard) => guard,
         Err(_) => {
@@ -1872,6 +2682,10 @@ fn start_spark_backend() {
     }
 }
 
+fn start_spark_backend_async() {
+    thread::spawn(start_spark_backend);
+}
+
 fn stop_spark_backend() {
     let Some(process) = BACKEND_PROCESS.get() else {
         return;
@@ -1891,6 +2705,86 @@ fn stop_spark_backend() {
     }
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.show();
+    }
+
+    let window_labels = app
+        .webview_windows()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(",");
+    app_log(format!("window:available [{window_labels}]"));
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: 1180.0,
+            height: 760.0,
+        }));
+        let _ = window.center();
+        match window.show() {
+            Ok(_) => app_log("window:main-show-ok"),
+            Err(error) => app_log(format!("window:main-show-error {error}")),
+        }
+        match window.unminimize() {
+            Ok(_) => app_log("window:main-unminimize-ok"),
+            Err(error) => app_log(format!("window:main-unminimize-error {error}")),
+        }
+        match window.set_focus() {
+            Ok(_) => app_log("window:main-focus-ok"),
+            Err(error) => app_log(format!("window:main-focus-error {error}")),
+        }
+        app_log(format!(
+            "window:main-state visible={:?} minimized={:?}",
+            window.is_visible(),
+            window.is_minimized()
+        ));
+        return;
+    }
+
+    let Some(config) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .cloned()
+    else {
+        app_log("window:main-config-missing");
+        return;
+    };
+
+    match tauri::WebviewWindowBuilder::from_config(app, &config).and_then(|builder| builder.build())
+    {
+        Ok(window) => {
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: 1180.0,
+                height: 760.0,
+            }));
+            let _ = window.center();
+            match window.show() {
+                Ok(_) => app_log("window:main-create-show-ok"),
+                Err(error) => app_log(format!("window:main-create-show-error {error}")),
+            }
+            match window.set_focus() {
+                Ok(_) => app_log("window:main-create-focus-ok"),
+                Err(error) => app_log(format!("window:main-create-focus-error {error}")),
+            }
+            app_log(format!(
+                "window:main-created visible={:?} minimized={:?}",
+                window.is_visible(),
+                window.is_minimized()
+            ));
+        }
+        Err(error) => {
+            app_log(format!("window:create-error {error}"));
+        }
+    }
+}
+
 fn register_bundled_backend_resource(app: &tauri::AppHandle) {
     if cfg!(debug_assertions) {
         return;
@@ -1898,67 +2792,226 @@ fn register_bundled_backend_resource(app: &tauri::AppHandle) {
     let Ok(resource_dir) = app.path().resource_dir() else {
         return;
     };
+    let backend_archive = resource_dir.join("spark-code-backend.tar.gz");
+    if backend_archive.is_file() {
+        env::set_var(BUNDLED_BACKEND_ROOT_ENV_KEY, backend_archive);
+        return;
+    }
     let backend_root = resource_dir.join("spark-code-backend");
     if path_has_spark_source(&backend_root) {
         env::set_var(BUNDLED_BACKEND_ROOT_ENV_KEY, backend_root);
     }
 }
 
-fn has_git_metadata(path: &Path) -> bool {
-    path.ancestors()
-        .take(8)
-        .any(|candidate| candidate.join(".git").exists())
+fn git_metadata_path(path: &Path) -> Option<PathBuf> {
+    path.ancestors().take(8).find_map(|candidate| {
+        let git_path = candidate.join(".git");
+        if git_path.is_dir() {
+            return Some(git_path);
+        }
+        if git_path.is_file() {
+            let content = fs::read_to_string(&git_path).ok()?;
+            let git_dir = content.trim().strip_prefix("gitdir:")?.trim();
+            let resolved = PathBuf::from(git_dir);
+            return Some(if resolved.is_absolute() {
+                resolved
+            } else {
+                candidate.join(resolved)
+            });
+        }
+        None
+    })
+}
+
+fn current_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+fn source_repo_root() -> Option<PathBuf> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let source_root = manifest_dir.parent()?.parent()?.to_path_buf();
+    if git_metadata_path(&source_root).is_some() {
+        return Some(source_root);
+    }
+    None
+}
+
+fn short_revision(value: &str) -> String {
+    value.chars().take(8).collect()
+}
+
+fn git_output(repo: &Path, args: &[&str]) -> Result<String, String> {
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "echo")
+        .output()
+        .map_err(|error| format!("无法执行 git：{error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            format!("git 命令失败：{}", output.status)
+        } else {
+            stderr
+        });
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn git_remote_url(repo: &Path) -> Option<String> {
+    git_output(repo, &["remote", "get-url", "origin"]).ok()
+}
+
+fn git_current_revision(repo: &Path) -> Result<String, String> {
+    git_output(repo, &["rev-parse", "HEAD"])
+}
+
+fn git_current_branch(repo: &Path) -> Result<String, String> {
+    git_output(repo, &["rev-parse", "--abbrev-ref", "HEAD"])
+}
+
+fn git_latest_revision(repo: &Path, branch: &str) -> Result<String, String> {
+    let target = if branch == "HEAD" || branch == "detached" {
+        "HEAD".to_string()
+    } else {
+        format!("refs/heads/{branch}")
+    };
+    let output = git_output(
+        repo,
+        &[
+            "-c",
+            "credential.helper=",
+            "-c",
+            "core.askPass=",
+            "-c",
+            "http.lowSpeedLimit=1",
+            "-c",
+            "http.lowSpeedTime=3",
+            "ls-remote",
+            "origin",
+            &target,
+        ],
+    )?;
+    output
+        .lines()
+        .find_map(|line| line.split_whitespace().next())
+        .map(ToString::to_string)
+        .filter(|revision| !revision.is_empty())
+        .ok_or_else(|| "远端没有返回版本信息".to_string())
+}
+
+fn check_update_status() -> UpdateStatus {
+    let checked_at = current_unix_ms();
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    let Some(repo) = source_repo_root() else {
+        return UpdateStatus {
+            current_version,
+            current_revision: None,
+            latest_revision: None,
+            checked_at,
+            update_available: false,
+            source: "bundle".to_string(),
+            detail: "未找到本机源码 Git 仓库，只能读取当前应用版本。".to_string(),
+            release_url: None,
+            error: None,
+        };
+    };
+
+    let current_revision = match git_current_revision(&repo) {
+        Ok(value) => value,
+        Err(error) => {
+            return UpdateStatus {
+                current_version,
+                current_revision: None,
+                latest_revision: None,
+                checked_at,
+                update_available: false,
+                source: repo.display().to_string(),
+                detail: "读取当前版本失败。".to_string(),
+                release_url: git_remote_url(&repo),
+                error: Some(error),
+            };
+        }
+    };
+    let branch = git_current_branch(&repo).unwrap_or_else(|_| "HEAD".to_string());
+    let latest_revision = match git_latest_revision(&repo, &branch) {
+        Ok(value) => value,
+        Err(error) => {
+            return UpdateStatus {
+                current_version,
+                current_revision: Some(current_revision.clone()),
+                latest_revision: None,
+                checked_at,
+                update_available: false,
+                source: repo.display().to_string(),
+                detail: format!(
+                    "已读取当前版本 {}，暂时无法读取远端更新。",
+                    short_revision(&current_revision)
+                ),
+                release_url: git_remote_url(&repo),
+                error: Some(error),
+            };
+        }
+    };
+    let update_available = current_revision != latest_revision;
+    let detail = if update_available {
+        format!(
+            "当前 {}，远端 {}，分支 {} 有更新。",
+            short_revision(&current_revision),
+            short_revision(&latest_revision),
+            branch
+        )
+    } else {
+        format!(
+            "当前 {}，分支 {} 已是最新。",
+            short_revision(&current_revision),
+            branch
+        )
+    };
+
+    UpdateStatus {
+        current_version,
+        current_revision: Some(current_revision),
+        latest_revision: Some(latest_revision),
+        checked_at,
+        update_available,
+        source: repo.display().to_string(),
+        detail,
+        release_url: git_remote_url(&repo),
+        error: None,
+    }
 }
 
 fn read_git_branch(path: &Path) -> Option<String> {
-    if is_internal_backend_path(path) || !has_git_metadata(path) {
+    if is_internal_backend_path(path) {
         return None;
     }
 
-    let mut child = ProcessCommand::new("git")
-        .arg("branch")
-        .arg("--show-current")
-        .current_dir(path)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let start = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if start.elapsed() >= Duration::from_millis(300) {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return None;
-                }
-                thread::sleep(Duration::from_millis(20));
-            }
-            Err(_) => return None,
-        }
+    let git_path = git_metadata_path(path)?;
+    let head = fs::read_to_string(git_path.join("HEAD")).ok()?;
+    let head = head.trim();
+    if let Some(reference) = head.strip_prefix("ref: refs/heads/") {
+        return Some(reference.to_string());
     }
-    let output = child.wait_with_output().ok()?;
-    if !output.status.success() {
-        return None;
+    if head.len() >= 7 && head.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Some(format!("detached@{}", &head[..7]));
     }
-    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if branch.is_empty() {
-        None
-    } else {
-        Some(branch)
-    }
+    None
 }
 
 fn workspace_info() -> WorkspaceInfo {
-    let root = backend_workspace();
+    let root = app_workspace();
     let folder = root
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("Spark Code")
+        .unwrap_or("当前项目")
         .to_string();
 
     WorkspaceInfo {
@@ -1978,7 +3031,7 @@ fn load_projects(app: &tauri::AppHandle) -> Vec<ProjectEntry> {
         }
     }
     let current = project_entry(
-        backend_workspace().display().to_string(),
+        app_workspace().display().to_string(),
         Some("current".to_string()),
     );
     if !projects.iter().any(|project| project.path == current.path) {
@@ -1993,6 +3046,8 @@ fn load_projects(app: &tauri::AppHandle) -> Vec<ProjectEntry> {
 
 #[tauri::command]
 fn get_app_snapshot(app: tauri::AppHandle) -> AppSnapshot {
+    start_spark_backend();
+    let _ = wait_for_local_backend_url();
     let spark_config = read_spark_config();
     let remote = load_remote_config(&app);
     if let Ok(mut config) = remote_config().lock() {
@@ -2002,6 +3057,7 @@ fn get_app_snapshot(app: tauri::AppHandle) -> AppSnapshot {
     if let Ok(mut config) = model_config().lock() {
         *config = model.clone();
     }
+    let preferences = load_preferences(&spark_config);
     let workspace = workspace_info();
     let projects = load_projects(&app);
     let sessions = ensure_default_sessions(remote.configured);
@@ -2009,18 +3065,93 @@ fn get_app_snapshot(app: tauri::AppHandle) -> AppSnapshot {
     AppSnapshot {
         version: env!("CARGO_PKG_VERSION").to_string(),
         remote: remote.clone(),
-        spark_user: load_spark_user_profile(&spark_config),
+        spark_user: refresh_spark_user_profile(&spark_config),
         remote_device: load_remote_device_binding(&app, &spark_config),
-        preferences: load_preferences(&spark_config),
+        preferences: preferences.clone(),
         model,
         workspace,
         skills: load_user_skills(),
         mcp_servers: load_user_mcp_servers(),
+        tools: load_tool_catalog(&preferences.permission_mode),
         projects,
         recent_changes: load_recent_changes(&app),
-        slash_commands: load_slash_commands(&sessions[0].project_path),
+        slash_commands: Vec::new(),
+        backend_runtime: backend_runtime_snapshot(),
+        update_status: check_update_status(),
         sessions,
     }
+}
+
+#[tauri::command]
+fn check_app_update() -> UpdateStatus {
+    check_update_status()
+}
+
+fn escape_applescript_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+#[tauri::command]
+fn pick_project_folder(base_path: String) -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let base = if base_path.trim().is_empty() {
+            app_workspace()
+        } else {
+            PathBuf::from(base_path.trim())
+        };
+        let base = if base.is_dir() {
+            base
+        } else {
+            base.parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(app_workspace)
+        };
+        let default_location = fs::canonicalize(&base)
+            .ok()
+            .filter(|path| path.is_dir())
+            .map(|path| {
+                format!(
+                    " default location POSIX file \"{}\"",
+                    escape_applescript_string(&path.display().to_string())
+                )
+            })
+            .unwrap_or_default();
+        let script = format!(
+            "POSIX path of (choose folder with prompt \"选择项目文件夹\"{default_location})"
+        );
+        let output = ProcessCommand::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|error| format!("无法打开文件夹选择器：{error}"))?;
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            return Ok((!path.is_empty()).then_some(path));
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("-128") || stderr.to_lowercase().contains("user canceled") {
+            return Ok(None);
+        }
+        return Err(format!("文件夹选择失败：{}", stderr.trim()));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = base_path;
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+fn get_project_metadata(project_path: String) -> Result<ProjectEntry, String> {
+    let trimmed = project_path.trim();
+    if trimmed.is_empty() {
+        return Err("路径不能为空".to_string());
+    }
+    let canonical = canonical_project_path(trimmed);
+    Ok(project_entry(canonical, None))
 }
 
 #[tauri::command]
@@ -2188,14 +3319,38 @@ fn logout_spark() -> Result<SparkUserProfile, String> {
     Ok(load_spark_user_profile(&config))
 }
 
+#[tauri::command]
+fn save_backend_base_url(raw_value: String) -> Result<String, String> {
+    let normalized = normalize_backend_base_url(&raw_value)?;
+    let previous = env_string(&read_spark_config(), SPARK_BASE_URL_ENV_KEY);
+    let mut config = read_spark_config();
+    {
+        let env_root = env_object_mut(&mut config)?;
+        env_root.insert(
+            SPARK_BASE_URL_ENV_KEY.to_string(),
+            Value::String(normalized.clone()),
+        );
+        if previous.as_deref() != Some(normalized.as_str()) {
+            env_root.remove(SPARK_AUTH_TOKEN_ENV_KEY);
+            env_root.remove(SPARK_REFRESH_TOKEN_ENV_KEY);
+        }
+    }
+    if previous.as_deref() != Some(normalized.as_str()) {
+        if let Some(root) = config.as_object_mut() {
+            root.remove("oauthAccount");
+        }
+    }
+    write_spark_config(&config)?;
+    stop_spark_backend();
+    start_spark_backend_async();
+    Ok(normalized)
+}
+
 fn save_spark_login(
     access_token: String,
-    refresh_token: String,
     profile: Option<Value>,
 ) -> Result<SparkUserProfile, String> {
     let mut config = read_spark_config();
-    let _ = get_or_create_android_device(&mut config)?;
-
     {
         let env_root = env_object_mut(&mut config)?;
         env_root.insert(
@@ -2206,53 +3361,30 @@ fn save_spark_login(
             SPARK_AUTH_TOKEN_ENV_KEY.to_string(),
             Value::String(access_token),
         );
-        env_root.insert(
-            SPARK_REFRESH_TOKEN_ENV_KEY.to_string(),
-            Value::String(refresh_token),
-        );
+        env_root.remove(SPARK_REFRESH_TOKEN_ENV_KEY);
     }
 
     let mut oauth_account: Option<Map<String, Value>> = None;
     if let Some(profile) = profile {
-        let account = profile.get("account").and_then(Value::as_object);
-        let organization = profile.get("organization").and_then(Value::as_object);
-        let account_uuid = account
-            .and_then(|item| value_string(item.get("uuid")))
-            .or_else(|| account.and_then(|item| value_string(item.get("account_uuid"))));
-        let email = account
-            .and_then(|item| value_string(item.get("email")))
-            .or_else(|| account.and_then(|item| value_string(item.get("email_address"))));
+        let account_uuid = value_string(profile.get("sub"));
+        let email = value_string(profile.get("email"));
 
         if let (Some(account_uuid), Some(email)) = (account_uuid, email) {
             let mut item = Map::new();
             item.insert("accountUuid".to_string(), Value::String(account_uuid));
             item.insert("emailAddress".to_string(), Value::String(email));
-            if let Some(value) = account.and_then(|item| value_string(item.get("display_name"))) {
+            if let Some(value) = value_string(profile.get("name"))
+                .or_else(|| value_string(profile.get("preferred_username")))
+            {
                 item.insert("displayName".to_string(), Value::String(value));
             }
-            if let Some(value) = account.and_then(|item| value_string(item.get("created_at"))) {
-                item.insert("accountCreatedAt".to_string(), Value::String(value));
-            }
-            if let Some(value) = organization.and_then(|item| value_string(item.get("uuid"))) {
-                item.insert("organizationUuid".to_string(), Value::String(value));
-            }
-            if let Some(value) = organization
-                .and_then(|item| value_string(item.get("name")))
-                .or_else(|| {
-                    organization.and_then(|item| value_string(item.get("organization_name")))
-                })
-            {
-                item.insert("organizationName".to_string(), Value::String(value));
-            }
-            if let Some(value) =
-                organization.and_then(|item| value_string(item.get("billing_type")))
-            {
-                item.insert("billingType".to_string(), Value::String(value));
-            }
-            if let Some(value) =
-                organization.and_then(|item| value_string(item.get("subscription_created_at")))
-            {
-                item.insert("subscriptionCreatedAt".to_string(), Value::String(value));
+            if let Some(value) = value_string(profile.get("picture")) {
+                let avatar_url = if value.starts_with('/') {
+                    format!("{FIXED_BACKEND_URL}{value}")
+                } else {
+                    value
+                };
+                item.insert("avatarUrl".to_string(), Value::String(avatar_url));
             }
             oauth_account = Some(item);
         }
@@ -2272,26 +3404,36 @@ fn save_spark_login(
 
 #[tauri::command]
 fn start_spark_login() -> Result<String, String> {
-    let mut config = read_spark_config();
-    let (install_id, device_id) = get_or_create_android_device(&mut config)?;
+    let config = read_spark_config();
+    let client_id = oauth_client_id(&config)?;
+    let client_secret = oauth_client_secret(&config);
+    let port = oauth_callback_port(&config);
     write_spark_config(&config)?;
 
-    let listener = TcpListener::bind("127.0.0.1:0")
+    let listener = TcpListener::bind(("127.0.0.1", port))
         .map_err(|error| format!("无法启动 OAuth 本地回调：{error}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|error| format!("无法读取 OAuth 回调端口：{error}"))?
-        .port();
-    let callback_url = format!("http://localhost:{port}{OAUTH_CALLBACK_PATH}");
+    let callback_url = oauth_redirect_url(port);
     let state = compact_id("spark-oauth-");
-    let auth_url = build_spark_oauth_url(&callback_url, &state, &install_id, &device_id);
+    let code_verifier = oauth_code_verifier();
+    let auth_url = build_spark_oauth_url(
+        FIXED_BACKEND_URL,
+        &client_id,
+        &callback_url,
+        &state,
+        &oauth_code_challenge(&code_verifier),
+    );
 
     open_browser(&auth_url)?;
-    let callback_refresh_token = wait_for_oauth_refresh_token(listener, &state)?;
-    let (access_token, refresh_token) =
-        refresh_android_token(&callback_refresh_token, &install_id, &device_id)?;
+    let callback_code = wait_for_oauth_code(listener, &state)?;
+    let access_token = exchange_oauth_code(
+        &callback_code,
+        &client_id,
+        client_secret.as_deref(),
+        &callback_url,
+        &code_verifier,
+    )?;
     let profile = fetch_spark_profile(&access_token);
-    let user = save_spark_login(access_token, refresh_token, profile)?;
+    let user = save_spark_login(access_token, profile)?;
 
     Ok(user
         .name
@@ -2324,14 +3466,52 @@ fn revert_change(app: tauri::AppHandle, change_id: String) -> Result<Vec<RecentC
 }
 
 #[tauri::command]
+fn get_model_config(app: tauri::AppHandle) -> Result<ModelConfig, String> {
+    let mut current = load_model_config(&app);
+    let backend_options = backend_model_options();
+    if !backend_options.is_empty() {
+        current.options = backend_options;
+        current = ensure_selected_model_option(current);
+        let _ = persist_model_config(&app, &current);
+    }
+    if let Ok(mut config) = model_config().lock() {
+        *config = current.clone();
+    }
+    Ok(current)
+}
+
+#[tauri::command]
 fn save_model_config(app: tauri::AppHandle, model: String) -> Result<ModelConfig, String> {
     let selected = model.trim();
     if selected.is_empty() {
         return Err("模型名称不能为空".to_string());
     }
-    let mut next = model_config_with_options(backend_model_options());
+    let mut options = model_config()
+        .lock()
+        .ok()
+        .map(|config| config.options.clone())
+        .unwrap_or_default();
+    if options.is_empty() {
+        options = load_model_config(&app).options;
+    }
+    if options.is_empty() {
+        options = backend_model_options();
+    }
+    if !options.is_empty() && !options.iter().any(|option| option.id == selected) {
+        return Err("只能选择 Spark 后端返回的模型".to_string());
+    }
+    let mut next = if options.is_empty() {
+        ModelConfig {
+            selected: selected.to_string(),
+            options: Vec::new(),
+        }
+    } else {
+        model_config_with_options(options)
+    };
     next.selected = selected.to_string();
-    next = ensure_selected_model_option(next);
+    if !next.options.is_empty() {
+        next = ensure_selected_model_option(next);
+    }
 
     let mut config = model_config()
         .lock()
@@ -2382,7 +3562,7 @@ fn remove_project_path(
         return Err("路径不能为空".to_string());
     }
     let canonical = canonical_project_path(trimmed);
-    let current = canonical_project_path(backend_workspace());
+    let current = canonical_project_path(app_workspace());
     if canonical == current {
         return Err("当前路径不能移除".to_string());
     }
@@ -2417,14 +3597,13 @@ fn add_project_path(
         input
     } else {
         let base = if base_path.trim().is_empty() {
-            backend_workspace()
+            app_workspace()
         } else {
             PathBuf::from(base_path.trim())
         };
         base.join(input)
     };
-    let canonical =
-        fs::canonicalize(&path).map_err(|error| format!("无法打开路径：{error}"))?;
+    let canonical = fs::canonicalize(&path).map_err(|error| format!("无法打开路径：{error}"))?;
     if !canonical.is_dir() {
         return Err("路径必须是文件夹".to_string());
     }
@@ -2441,14 +3620,7 @@ fn add_project_path(
 
 #[tauri::command]
 fn open_memory_file() -> Result<String, String> {
-    let home = home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
-    let path = home.join(".sparkc").join("CLAUDE.md");
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| format!("无法创建记忆目录：{error}"))?;
-    }
-    if !path.exists() {
-        fs::write(&path, "").map_err(|error| format!("无法创建记忆文件：{error}"))?;
-    }
+    let path = ensure_memory_file()?;
 
     #[cfg(target_os = "macos")]
     {
@@ -2473,6 +3645,58 @@ fn open_memory_file() -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+fn memory_file_path() -> Result<PathBuf, String> {
+    let home = home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
+    Ok(home.join(".sparkc").join("CLAUDE.md"))
+}
+
+fn ensure_memory_file() -> Result<PathBuf, String> {
+    let path = memory_file_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建记忆目录：{error}"))?;
+    }
+    if !path.exists() {
+        fs::write(&path, "").map_err(|error| format!("无法创建记忆文件：{error}"))?;
+    }
+    Ok(path)
+}
+
+#[tauri::command]
+fn read_memory_file() -> Result<MemoryDocument, String> {
+    let path = memory_file_path()?;
+    let exists = path.exists();
+    let content = if exists {
+        fs::read_to_string(&path).map_err(|error| format!("无法读取记忆文件：{error}"))?
+    } else {
+        String::new()
+    };
+    Ok(MemoryDocument {
+        path: path.display().to_string(),
+        content,
+        exists,
+    })
+}
+
+#[tauri::command]
+fn save_memory_file(content: String) -> Result<MemoryDocument, String> {
+    let path = ensure_memory_file()?;
+    fs::write(&path, content).map_err(|error| format!("无法保存记忆文件：{error}"))?;
+    read_memory_file()
+}
+
+#[tauri::command]
+fn delete_memory_file() -> Result<MemoryDocument, String> {
+    let path = memory_file_path()?;
+    if path.exists() {
+        fs::remove_file(&path).map_err(|error| format!("无法删除记忆文件：{error}"))?;
+    }
+    Ok(MemoryDocument {
+        path: path.display().to_string(),
+        content: String::new(),
+        exists: false,
+    })
+}
+
 #[tauri::command]
 fn export_session_text(
     file_name: String,
@@ -2487,7 +3711,7 @@ fn export_session_text(
     let mut target = PathBuf::from(trimmed);
     if !target.is_absolute() {
         let base = if project_path.trim().is_empty() {
-            backend_workspace()
+            app_workspace()
         } else {
             PathBuf::from(project_path.trim())
         };
@@ -2511,24 +3735,464 @@ fn start_session(title: String, project_path: String) -> Session {
         .map(|config| config.configured)
         .unwrap_or(false);
     let project_path = if project_path.trim().is_empty() {
-        canonical_project_path(backend_workspace())
+        canonical_project_path(app_workspace())
     } else {
         canonical_project_path(project_path.trim())
     };
-    let session = create_app_session(
-        if trimmed.is_empty() {
-            "新对话".to_string()
-        } else {
-            trimmed.to_string()
-        },
-        project_path,
-        remote,
-    );
+    let title = if trimmed.is_empty() {
+        "新对话".to_string()
+    } else {
+        trimmed.to_string()
+    };
 
     if let Ok(mut sessions) = app_sessions().lock() {
+        prune_empty_current_sessions(&mut sessions);
+        if title == "当前会话" {
+            if let Some(session) = sessions
+                .iter()
+                .find(|session| {
+                    is_empty_current_session(session)
+                        && normalized_session_project_key(&session.project_path)
+                            == normalized_session_project_key(&project_path)
+                })
+                .cloned()
+            {
+                return session;
+            }
+        }
+
+        let session = create_app_session(title, project_path, remote);
         sessions.insert(0, session.clone());
+        prune_empty_current_sessions(&mut sessions);
+        return session;
     }
-    session
+
+    create_app_session(title, project_path, remote)
+}
+
+#[tauri::command]
+fn list_project_files(project_path: String, query: String) -> Vec<ProjectFileEntry> {
+    let root = if project_path.trim().is_empty() {
+        app_workspace()
+    } else {
+        PathBuf::from(project_path.trim())
+    };
+    let root = fs::canonicalize(&root).unwrap_or(root);
+    if !root.is_dir() {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+    let mut visited = 0;
+    collect_project_files(&root, &root, query.trim(), &mut visited, &mut out);
+    out.sort_by(|a, b| {
+        a.path
+            .len()
+            .cmp(&b.path.len())
+            .then_with(|| a.path.to_lowercase().cmp(&b.path.to_lowercase()))
+    });
+    out
+}
+
+#[tauri::command]
+fn list_project_directory(
+    project_path: String,
+    directory_path: String,
+) -> Result<Vec<ProjectDirectoryEntry>, String> {
+    let (root, directory, _) = resolve_project_child_path(&project_path, &directory_path, false)?;
+    if !directory.is_dir() {
+        return Err("路径必须是文件夹".to_string());
+    }
+
+    let mut entries = Vec::new();
+    let read_dir = fs::read_dir(&directory).map_err(|error| format!("无法读取目录：{error}"))?;
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if should_skip_project_file_entry(&path) {
+            continue;
+        }
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        let name = entry.file_name().to_string_lossy().to_string();
+        entries.push(ProjectDirectoryEntry {
+            path: display_relative_path(&root, &path),
+            name,
+            is_dir: metadata.is_dir(),
+            size: metadata.len(),
+            modified_at: metadata_modified_millis(&metadata),
+        });
+    }
+    entries.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+#[tauri::command]
+fn create_project_directory(
+    project_path: String,
+    directory_path: String,
+) -> Result<Vec<ProjectDirectoryEntry>, String> {
+    let (_, directory, _) = resolve_project_child_path(&project_path, &directory_path, true)?;
+    if directory.exists() {
+        if directory.is_dir() {
+            return list_project_directory(project_path, directory_path);
+        }
+        return Err("同名文件已存在".to_string());
+    }
+    fs::create_dir_all(&directory).map_err(|error| format!("无法创建文件夹：{error}"))?;
+    let parent = directory
+        .parent()
+        .and_then(|path| {
+            let root = project_root_from_input(&project_path).ok()?;
+            Some(display_relative_path(&root, path))
+        })
+        .unwrap_or_default();
+    list_project_directory(project_path, parent)
+}
+
+#[tauri::command]
+fn rename_project_entry(
+    project_path: String,
+    from_path: String,
+    to_path: String,
+) -> Result<Vec<ProjectDirectoryEntry>, String> {
+    let (_, source, _) = resolve_project_child_path(&project_path, &from_path, false)?;
+    let (_, target, target_relative) = resolve_project_child_path(&project_path, &to_path, true)?;
+    if !source.exists() {
+        return Err("原路径不存在".to_string());
+    }
+    if target.exists() {
+        return Err("目标路径已存在".to_string());
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建目标目录：{error}"))?;
+    }
+    fs::rename(&source, &target).map_err(|error| format!("无法重命名：{error}"))?;
+    list_project_directory(project_path, parent_directory_rust(&target_relative))
+}
+
+fn parent_directory_rust(path: &str) -> String {
+    let normalized = path.trim_matches('/').replace('\\', "/");
+    normalized
+        .rsplit_once('/')
+        .map(|(parent, _)| parent.to_string())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn delete_project_directory(
+    project_path: String,
+    directory_path: String,
+) -> Result<Vec<ProjectDirectoryEntry>, String> {
+    let (_, directory, relative) =
+        resolve_project_child_path(&project_path, &directory_path, false)?;
+    if !directory.is_dir() {
+        return Err("只能删除文件夹".to_string());
+    }
+    if relative.trim().is_empty() {
+        return Err("不能删除项目根目录".to_string());
+    }
+    fs::remove_dir(&directory).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::DirectoryNotEmpty {
+            "文件夹非空，暂不支持递归删除".to_string()
+        } else {
+            format!("无法删除文件夹：{error}")
+        }
+    })?;
+    list_project_directory(project_path, parent_directory_rust(&relative))
+}
+
+#[tauri::command]
+fn read_project_file(
+    project_path: String,
+    file_path: String,
+) -> Result<ProjectFileDocument, String> {
+    let (root, path, relative) = resolve_project_child_path(&project_path, &file_path, false)?;
+    if !path.is_file() {
+        return Err("路径必须是文件".to_string());
+    }
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+    if metadata.len() > 2_000_000 {
+        return Err("文件过大，暂不在界面内直接打开".to_string());
+    }
+    let content =
+        fs::read_to_string(&path).map_err(|error| format!("无法读取文本文件：{error}"))?;
+    Ok(ProjectFileDocument {
+        name: path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&relative)
+            .to_string(),
+        path: display_relative_path(&root, &path),
+        content,
+        exists: true,
+        size: metadata.len(),
+        modified_at: metadata_modified_millis(&metadata),
+        recent_changes: Vec::new(),
+    })
+}
+
+fn current_timestamp_millis_string() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_millis().to_string())
+        .unwrap_or_else(|_| "0".to_string())
+}
+
+#[tauri::command]
+fn save_project_file(
+    app: tauri::AppHandle,
+    project_path: String,
+    file_path: String,
+    content: String,
+) -> Result<ProjectFileDocument, String> {
+    let (root, path, relative) = resolve_project_child_path(&project_path, &file_path, true)?;
+    if path.is_dir() {
+        return Err("不能把文件内容保存到文件夹".to_string());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建文件目录：{error}"))?;
+    }
+    let existed = path.exists();
+    let before_content = if existed {
+        fs::read_to_string(&path).map_err(|error| format!("无法读取原文件：{error}"))?
+    } else {
+        String::new()
+    };
+    fs::write(&path, &content).map_err(|error| format!("无法保存文件：{error}"))?;
+
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+    let (added_lines, removed_lines) = line_change_counts(&before_content, &content);
+    let mut recent_changes = load_recent_changes(&app);
+    recent_changes.insert(
+        0,
+        RecentChange {
+            id: compact_id("change-"),
+            title: if existed {
+                format!("编辑 {}", relative)
+            } else {
+                format!("新建 {}", relative)
+            },
+            path: path.display().to_string(),
+            summary: format!("通过 Spark Code 文件面板保存，+{added_lines} -{removed_lines}"),
+            timestamp: current_timestamp_millis_string(),
+            status: "active".to_string(),
+            can_revert: existed,
+            before_content: existed.then_some(before_content),
+            added_lines,
+            removed_lines,
+        },
+    );
+    recent_changes.truncate(100);
+    persist_recent_changes(&app, &recent_changes)?;
+
+    Ok(ProjectFileDocument {
+        name: path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&relative)
+            .to_string(),
+        path: display_relative_path(&root, &path),
+        content,
+        exists: true,
+        size: metadata.len(),
+        modified_at: metadata_modified_millis(&metadata),
+        recent_changes,
+    })
+}
+
+#[tauri::command]
+fn delete_project_file(
+    app: tauri::AppHandle,
+    project_path: String,
+    file_path: String,
+) -> Result<Vec<RecentChange>, String> {
+    let (_, path, relative) = resolve_project_child_path(&project_path, &file_path, false)?;
+    if !path.is_file() {
+        return Err("只能删除文件".to_string());
+    }
+    let before_content =
+        fs::read_to_string(&path).map_err(|error| format!("无法读取原文件：{error}"))?;
+    let removed_lines = before_content.lines().count().min(u32::MAX as usize) as u32;
+    fs::remove_file(&path).map_err(|error| format!("无法删除文件：{error}"))?;
+
+    let mut recent_changes = load_recent_changes(&app);
+    recent_changes.insert(
+        0,
+        RecentChange {
+            id: compact_id("change-"),
+            title: format!("删除 {}", relative),
+            path: path.display().to_string(),
+            summary: format!("通过 Spark Code 文件面板删除，+0 -{removed_lines}"),
+            timestamp: current_timestamp_millis_string(),
+            status: "active".to_string(),
+            can_revert: true,
+            before_content: Some(before_content),
+            added_lines: 0,
+            removed_lines,
+        },
+    );
+    recent_changes.truncate(100);
+    persist_recent_changes(&app, &recent_changes)?;
+    Ok(recent_changes)
+}
+
+fn xml_unescape(value: &str) -> String {
+    value
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+}
+
+fn plist_string_values(value: &str) -> Vec<String> {
+    let mut rest = value;
+    let mut out = Vec::new();
+
+    while let Some(start) = rest.find("<string>") {
+        let after_start = &rest[start + "<string>".len()..];
+        let Some(end) = after_start.find("</string>") else {
+            break;
+        };
+        let item = xml_unescape(after_start[..end].trim());
+        if !item.is_empty() {
+            out.push(item);
+        }
+        rest = &after_start[end + "</string>".len()..];
+    }
+
+    out
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let (Some(high), Some(low)) =
+                (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+            {
+                out.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn file_url_to_path(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(path) = trimmed.strip_prefix("file://localhost") {
+        return Some(percent_decode(path));
+    }
+    if let Some(path) = trimmed.strip_prefix("file://") {
+        return Some(percent_decode(path));
+    }
+    if trimmed.starts_with('/') {
+        return Some(trimmed.to_string());
+    }
+    None
+}
+
+fn push_unique_path(paths: &mut Vec<String>, path: String) {
+    if !path.trim().is_empty() && !paths.iter().any(|item| item == &path) {
+        paths.push(path);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_pasteboard_string(pasteboard_type: &str) -> Option<String> {
+    let escaped_type = pasteboard_type.replace('\\', "\\\\").replace('"', "\\\"");
+    let script = format!(
+        "ObjC.import('AppKit'); const value = $.NSPasteboard.generalPasteboard.stringForType(\"{}\"); value ? ObjC.unwrap(value) : '';",
+        escaped_type
+    );
+    let output = ProcessCommand::new("osascript")
+        .args(["-l", "JavaScript", "-e", &script])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_clipboard_file_paths() -> Vec<String> {
+    let mut paths = Vec::new();
+    let pasteboard_types = [
+        "NSFilenamesPboardType",
+        "public.file-url",
+        "com.trolltech.anymime.text--uri-list",
+        "Apple URL pasteboard type",
+    ];
+
+    for pasteboard_type in pasteboard_types {
+        let Some(value) = macos_pasteboard_string(pasteboard_type) else {
+            continue;
+        };
+        let candidates = if value.contains("<plist") {
+            plist_string_values(&value)
+        } else {
+            value
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with('#'))
+                .map(ToString::to_string)
+                .collect()
+        };
+
+        for candidate in candidates {
+            if let Some(path) = file_url_to_path(&candidate) {
+                push_unique_path(&mut paths, path);
+            }
+        }
+    }
+
+    paths
+}
+
+#[tauri::command]
+fn read_clipboard_file_paths() -> Vec<String> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos_clipboard_file_paths();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
 }
 
 #[tauri::command]
@@ -2539,22 +4203,39 @@ fn send_prompt(
     model: Option<String>,
     permission_mode: Option<String>,
     resume: Option<bool>,
+    images: Option<Vec<ImageAttachment>>,
 ) -> Result<ChatMessage, String> {
     let trimmed = prompt.trim();
-    if trimmed.is_empty() {
+    let images_empty = images
+        .as_ref()
+        .map(|items| items.is_empty())
+        .unwrap_or(true);
+    if trimmed.is_empty() && images_empty {
         return Err("请输入要发送的内容".to_string());
     }
+    let effective_prompt = if trimmed.is_empty() {
+        "请分析这些图片"
+    } else {
+        trimmed
+    };
 
     start_spark_backend();
     let project_path = if project_path.trim().is_empty() {
-        canonical_project_path(backend_workspace())
+        canonical_project_path(app_workspace())
     } else {
         canonical_project_path(project_path.trim())
     };
     let mut body = serde_json::json!({
-        "prompt": trimmed,
+        "prompt": effective_prompt,
         "cwd": project_path,
     });
+    if !session_id.trim().is_empty() {
+        body["session_id"] = serde_json::json!(session_id.trim());
+        body["session_key"] = serde_json::json!(format!(
+            "sparkcode-app:{project_path}:{}",
+            session_id.trim()
+        ));
+    }
     if let Some(model) = model
         .as_deref()
         .map(str::trim)
@@ -2572,12 +4253,10 @@ fn send_prompt(
     if let Some(resume) = resume {
         body["resume"] = serde_json::json!(resume);
     }
-    let path = if session_id.trim().is_empty() {
-        "/prompt".to_string()
-    } else {
-        format!("/sessions/{}/prompt", session_id.trim())
-    };
-    let value = match post_local_backend_json(&path, &body) {
+    if let Some(images) = images.filter(|items| !items.is_empty()) {
+        body["images"] = serde_json::json!(images);
+    }
+    let value = match post_local_backend_json("/prompt", &body) {
         Ok(value) => value,
         Err(error) => {
             if is_auth_expired_message(&error) {
@@ -2607,14 +4286,10 @@ pub fn run() {
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Regular);
                 let _ = app.set_dock_visibility(true);
-                let _ = app.app_handle().show();
             }
+            show_main_window(app.app_handle());
             register_bundled_backend_resource(app.app_handle());
-            start_spark_backend();
-            if let Some(window) = app.get_webview_window("main") {
-                window.show()?;
-                window.set_focus()?;
-            }
+            start_spark_backend_async();
             Ok(())
         })
         .on_window_event(|_, event| {
@@ -2623,27 +4298,57 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            ensure_local_backend,
+            set_active_project_path,
             get_app_snapshot,
             save_remote_config,
             save_preferences,
             bind_remote_device,
             unbind_remote_device,
             logout_spark,
+            save_backend_base_url,
             start_spark_login,
             revert_change,
+            get_model_config,
             save_model_config,
             rename_session,
             archive_session,
             remove_project_path,
             add_project_path,
+            pick_project_folder,
             open_memory_file,
+            read_memory_file,
+            save_memory_file,
+            delete_memory_file,
             export_session_text,
             get_slash_commands,
+            get_tool_catalog,
             run_local_command,
+            submit_feedback,
             start_session,
+            list_project_files,
+            list_project_directory,
+            create_project_directory,
+            rename_project_entry,
+            delete_project_directory,
+            read_project_file,
+            save_project_file,
+            delete_project_file,
+            read_clipboard_file_paths,
             send_prompt,
-            close_app
+            close_app,
+            get_project_metadata,
+            check_app_update
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Spark Code");
+        .build(tauri::generate_context!())
+        .expect("error while building Spark Code")
+        .run(|app, event| {
+            if matches!(
+                event,
+                tauri::RunEvent::Ready | tauri::RunEvent::Reopen { .. }
+            ) {
+                show_main_window(app);
+                start_spark_backend_async();
+            }
+        });
 }

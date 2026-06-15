@@ -66,6 +66,12 @@ function describeHttpError(error: unknown): string {
   return error.message
 }
 
+function backendModelRequestTimeoutMs(): number {
+  return process.env.SPARK_CODE_BACKEND_LAUNCHED_BY === 'sparkcode-app'
+    ? 2_500
+    : 15_000
+}
+
 function parseModelEntry(value: unknown): BackendModelEntry | null {
   if (!isRecord(value)) return null
 
@@ -156,9 +162,10 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
   }
 
   const baseUrl = normalizeApiBaseUrl(configuredBaseUrl)
+  const requestTimeoutMs = backendModelRequestTimeoutMs()
   let authToken = getConfiguredAuthToken()
   if (!authToken) {
-    authToken = await refreshConfiguredAndroidToken(baseUrl)
+    authToken = await refreshConfiguredAndroidToken(baseUrl, requestTimeoutMs)
   }
   if (!authToken) {
     throw new Error('请先运行 /login 获取后端登录令牌')
@@ -171,7 +178,7 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
         'Content-Type': 'application/json',
         'User-Agent': getUserAgent(),
       },
-      timeout: 15_000,
+      timeout: requestTimeoutMs,
     })
 
   let response: Awaited<ReturnType<typeof requestModelList>> | null = null
@@ -179,7 +186,7 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
     response = await requestModelList(authToken)
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const nextAuthToken = await refreshConfiguredAndroidToken(baseUrl)
+      const nextAuthToken = await refreshConfiguredAndroidToken(baseUrl, requestTimeoutMs)
       if (nextAuthToken) {
         try {
           response = await requestModelList(nextAuthToken)
