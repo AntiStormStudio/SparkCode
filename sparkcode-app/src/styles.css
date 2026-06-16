@@ -1922,6 +1922,43 @@ p {
   content: none;
 }
 
+.message-row.streaming .message-card .message-markdown,
+.message-row.streaming .message-card p:not(.thinking-text) {
+  animation: streamTextIn 120ms var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  animation-name: streamTextIn, streamTextPulse;
+  animation-duration: 120ms, 1ms;
+  animation-delay: 0ms, calc(var(--stream-tick, 0) * 1ms);
+}
+
+.message-row.streaming .message-card p.thinking-text {
+  animation: thinkingWave 1.25s ease-in-out infinite;
+}
+
+@keyframes streamTextIn {
+  from {
+    opacity: 0.72;
+    transform: translateY(2px);
+    filter: blur(0.5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes streamTextPulse {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-row.streaming .message-card .message-markdown,
+  .message-row.streaming .message-card p.thinking-text {
+    animation: none;
+  }
+}
+
 [data-spark-density="comfortable"] .message-card p {
   font-size: 17px;
   line-height: 1.78;

@@ -128,6 +128,9 @@ const MAX_STORED_MESSAGE_CHARS = 40_000
 const LONG_IDLE_DIVIDER_MS = 24 * 60 * 60 * 1000
 const UPDATE_POLL_INTERVAL_MS = 60 * 1000
 const TAURI_INVOKE_UNAVAILABLE_MESSAGE = '当前页面不是 Spark Code Tauri 运行环境，无法调用后端。请从 Spark Code.app 启动。'
+const STARTUP_BACKEND_TIMEOUT_MS = 4_500
+const STARTUP_SNAPSHOT_TIMEOUT_MS = 7_500
+const SPARK_LOGO_SRC = './spark_logo.png'
 
 type StoredConversationState = {
   activeSessionId: string
@@ -603,6 +606,11 @@ function formatIdleDivider(timestamp: number | null): string {
 
 function isAuthExpiredMessage(value: string): boolean {
   return /401|Invalid Android token|登录已过期|令牌无效|重新登录/i.test(value)
+}
+
+function streamRetryMessage(message: string, attempt: number, retryLimit: number): string {
+  const prefix = isAuthExpiredMessage(message) ? '401 授权失效，正在重新连接' : '正在重新连接'
+  return `${attempt + 1}/${retryLimit} ${prefix}: ${message}`
 }
 
 function backendPermissionMode(value: PermissionMode): string {
@@ -1153,6 +1161,7 @@ function renderMarkdownBlocks(content: string, keyPrefix: string): ReactNode {
 function shouldRenderAsTerminal(message: ChatMessage): boolean {
   if (message.id.startsWith('local-')) return true
   if (message.id.startsWith('terminal-output-')) return true
+  if (message.content.startsWith('__SPARK_TOOL_RESULT__')) return true
   if (looksLikeTerminalOutput(message.content)) return true
   return /^(Spark Code (Doctor|Status|Stats)|原 TUI 后台任务列表)/.test(message.content.trim())
 }
@@ -1190,13 +1199,18 @@ function orderedConversationMessages(messages: ChatMessage[]): ChatMessage[] {
 }
 
 function terminalResultTitle(content: string): string {
-  const lines = content.split('\n').map(line => line.trim()).filter(Boolean)
+  const metadata = parseToolResultMetadata(content)
+  const visibleContent = stripToolResultMetadata(content)
+  const lines = visibleContent.split('\n').map(line => line.trim()).filter(Boolean)
   const commandLine = lines.find(line => line.startsWith('$ '))
   const running = lines.some(line => line === '正在执行...')
-  const toolLine = lines[0] ?? ''
+  const toolLine = metadata?.tool_name || lines[0] || ''
   if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|TodoWrite|WebFetch|WebSearch)\b/.test(toolLine)) {
     const payload = lines[1] && lines[1].startsWith('{') ? ` ${lines[1]}` : ''
     return `${running ? '正在调用' : '已调用'} ${toolLine}${payload}`
+  }
+  if (/^[a-z][\w.-]*:\s/.test(lines[0] ?? '')) {
+    return `${running ? '正在调用' : '已调用'} Bash`
   }
   if (!commandLine) return running ? '正在调用 工具' : '已调用 工具'
   const command = commandLine.slice(2).replace(/\s+/g, ' ').trim() || '未知指令'
@@ -1204,7 +1218,8 @@ function terminalResultTitle(content: string): string {
 }
 
 function terminalResultBody(content: string): string {
-  const lines = content.split('\n')
+  const visibleContent = stripToolResultMetadata(content)
+  const lines = visibleContent.split('\n')
   if (lines[0]?.trim().startsWith('$ ')) {
     const nextLines = lines.slice(1)
     while (nextLines[0]?.trim() === '') {
@@ -1212,7 +1227,28 @@ function terminalResultBody(content: string): string {
     }
     return nextLines.join('\n') || '指令已执行'
   }
-  return content
+  return visibleContent
+}
+
+function serializeToolResult(toolName: string, body: string): string {
+  return `__SPARK_TOOL_RESULT__${JSON.stringify({ tool_name: toolName || '工具' })}\n${body}`
+}
+
+function parseToolResultMetadata(content: string): { tool_name?: string } | null {
+  const firstLine = content.split('\n', 1)[0] ?? ''
+  const raw = firstLine.match(/^__SPARK_TOOL_RESULT__(.+)$/)?.[1]
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { tool_name?: unknown }
+    return typeof parsed.tool_name === 'string' ? { tool_name: parsed.tool_name } : null
+  } catch {
+    return null
+  }
+}
+
+function stripToolResultMetadata(content: string): string {
+  if (!content.startsWith('__SPARK_TOOL_RESULT__')) return content
+  return content.split('\n').slice(1).join('\n')
 }
 
 function looksLikeTerminalOutput(text: string): boolean {
@@ -1248,6 +1284,47 @@ function looksLikeToolOnlyOutput(text: string): boolean {
     /^[\w@./~:+-]+\.(ts|tsx|js|jsx|json|md|css|scss|html|rs|toml|lock|yml|yaml)$/.test(line)
   )
   return listingLines.length / lines.length >= 0.8
+}
+
+function projectSuggestions(projectName: string): Array<{ icon: 'chat' | 'branch'; label: string; prompt: string }> {
+  const name = projectName.trim() || '当前项目'
+  const lower = name.toLowerCase()
+  if (lower.includes('spark')) {
+    return [
+      {
+        icon: 'chat',
+        label: `优化 ${name} 的登录与配对流程`,
+        prompt: `优化 ${name} 的登录与配对流程`,
+      },
+      {
+        icon: 'chat',
+        label: `补一个可直接跑的 ${name} 最小客户端示例`,
+        prompt: `补一个可直接跑的 ${name} 最小客户端示例`,
+      },
+      {
+        icon: 'branch',
+        label: '审查当前分支的未提交改动',
+        prompt: '审查当前分支的未提交改动',
+      },
+    ]
+  }
+  return [
+    {
+      icon: 'chat',
+      label: `梳理 ${name} 的核心功能和入口`,
+      prompt: `梳理 ${name} 的核心功能和入口`,
+    },
+    {
+      icon: 'chat',
+      label: `为 ${name} 补一个可直接运行的最小示例`,
+      prompt: `为 ${name} 补一个可直接运行的最小示例`,
+    },
+    {
+      icon: 'branch',
+      label: '审查当前分支的未提交改动',
+      prompt: '审查当前分支的未提交改动',
+    },
+  ]
 }
 
 function markdownTableCells(line: string): string[] {
@@ -1683,6 +1760,22 @@ async function safeInvoke<T>(command: string, args?: Record<string, unknown>): P
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise.then(
+      value => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        window.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
 function SettingToggle({
   label,
   description,
@@ -1725,6 +1818,10 @@ function App() {
   })
   const creatingSessionRef = useRef(false)
   const modelSyncRetryRef = useRef(0)
+  const toolNameByUseIdRef = useRef<Record<string, string>>({})
+  const skippedInitialProjectSyncRef = useRef(false)
+  const skippedInitialSlashRefreshRef = useRef(false)
+  const skippedInitialProjectMetadataRef = useRef(false)
   const [initialConversationState] = useState(readStoredConversationState)
   const [snapshot, setSnapshot] = useState<AppSnapshot>(() => ({
     ...fallbackSnapshot,
@@ -1822,9 +1919,7 @@ function App() {
   })
 
   async function refreshSnapshot() {
-    try {
-      await safeInvoke<BackendRuntime>('ensure_local_backend').catch(() => null)
-      const next = await safeInvoke<AppSnapshot>('get_app_snapshot')
+    const applySnapshot = (next: AppSnapshot) => {
       setSnapshot(current => ({
         ...next,
         sessions: mergeSessions(next.sessions, current.sessions),
@@ -1834,6 +1929,25 @@ function App() {
         if (current && current !== fallbackSnapshot.workspace.path) return current
         return next.workspace.path
       })
+      setNotice(null)
+    }
+
+    try {
+      await withTimeout(
+        safeInvoke<BackendRuntime>('ensure_local_backend'),
+        STARTUP_BACKEND_TIMEOUT_MS,
+        '本地后端启动超时，已先进入界面',
+      ).catch(() => null)
+      const snapshotPromise = safeInvoke<AppSnapshot>('get_app_snapshot')
+      snapshotPromise.then(applySnapshot).catch(() => {})
+      const next = await withTimeout(
+        snapshotPromise,
+        STARTUP_SNAPSHOT_TIMEOUT_MS,
+        '本地后端响应超时，已先进入界面',
+      )
+      applySnapshot(next)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error))
     } finally {
       setSnapshotReady(true)
     }
@@ -1926,15 +2040,27 @@ function App() {
   }
 
   useEffect(() => {
-    refreshSnapshot().catch(() => {})
+    setSnapshotReady(true)
+    const timer = window.setTimeout(() => {
+      refreshSnapshot().catch(() => {})
+    }, 250)
+    return () => window.clearTimeout(timer)
   }, [])
 
   useEffect(() => {
+    if (!skippedInitialProjectSyncRef.current) {
+      skippedInitialProjectSyncRef.current = true
+      return
+    }
     const projectPath = activeProjectPath === NO_PROJECT_SELECTION ? '' : activeProjectPath
     void syncActiveProjectToBackend(projectPath)
   }, [activeProjectPath])
 
   useEffect(() => {
+    if (!skippedInitialSlashRefreshRef.current) {
+      skippedInitialSlashRefreshRef.current = true
+      return
+    }
     refreshSlashCommands(activeProjectPath).catch(() => {})
   }, [activeProjectPath])
 
@@ -2436,6 +2562,10 @@ function App() {
   }, [activeFileMention?.query, activeFileMention?.start, activeProjectPathForRequest])
 
   useEffect(() => {
+    if (!skippedInitialProjectMetadataRef.current) {
+      skippedInitialProjectMetadataRef.current = true
+      return
+    }
     let cancelled = false
     const projectPath = activeProjectPathForRequest.trim()
     if (!projectPath) return
@@ -3612,12 +3742,13 @@ function App() {
 	      }))
 	    }
 
-	    const upsertToolOutput = (toolUseId: string, content: string) => {
+	    const upsertToolOutput = (toolUseId: string, toolName: string, content: string) => {
 	      const id = `terminal-output-${toolUseId || runtimeEventId('tool-result')}`
+      const resultContent = serializeToolResult(toolName, content)
 	      setSessionMessages(input.targetSession.id, current => {
 	        if (current.some(message => message.id === id)) {
 	          return keepAssistantAtEnd(current.map(message =>
-	            message.id === id ? { ...message, content } : message,
+	            message.id === id ? { ...message, content: resultContent } : message,
 	          ))
 	        }
 	        return keepAssistantAtEnd([
@@ -3625,7 +3756,7 @@ function App() {
 	          {
 	            id,
 	            role: 'assistant',
-	            content,
+	            content: resultContent,
 	            created_at: Date.now(),
 	          },
 	        ])
@@ -3666,6 +3797,20 @@ function App() {
 	        current.filter(message => message.id !== assistantId && message.id !== thinkingChainId),
 	      )
 	    }
+    const refreshAuthBeforeRetry = async (message: string) => {
+      if (!isAuthExpiredMessage(message)) return
+      try {
+        const user = await safeInvoke<SparkUserProfile>('refresh_spark_auth')
+        setSnapshot(current => ({ ...current, spark_user: user }))
+      } catch (error) {
+        appendThinkingEvent({
+          id: runtimeEventId('auth-refresh-failed'),
+          label: 'Reconnecting',
+          value: error instanceof Error ? error.message : String(error),
+          tone: 'warning',
+        })
+      }
+    }
     const setAssistantStatus = (status: string | null, immediate = false) => {
       writeAssistant(status ? `正在思考\n${status}` : '正在思考\n', immediate)
     }
@@ -3691,6 +3836,7 @@ function App() {
 	        hasToolOutput = true
 	        const toolUseId = typeof block.id === 'string' ? block.id : runtimeEventId('tool-use')
 	        const name = typeof block.name === 'string' ? block.name : '工具'
+        toolNameByUseIdRef.current[toolUseId] = name
 	        const title = toolInputTitle(name, block.input)
 	        const body = toolInputBody(name, block.input)
 	        appendThinkingEvent({
@@ -3703,8 +3849,9 @@ function App() {
 		      for (const block of toolResultBlocksFromBackendMessage(record)) {
 		        hasToolOutput = true
 		        const toolUseId = typeof block.tool_use_id === 'string' ? block.tool_use_id : ''
+            const toolName = toolNameByUseIdRef.current[toolUseId] || '工具'
 		        const result = toolResultText(block.content || block.tool_use_result || block)
-		        upsertToolOutput(toolUseId, result || '工具已完成')
+		        upsertToolOutput(toolUseId, toolName, result || '工具已完成')
 		      }
       if (record.type === 'error') {
         throw new StreamPromptError(
@@ -3807,7 +3954,11 @@ function App() {
         })
 
         if (!response.ok) {
-          throw new StreamPromptError(`本地流式接口不可用：${response.status}`, false)
+          const errorText = await response.text().catch(() => '')
+          throw new StreamPromptError(
+            errorText ? `本地流式接口不可用：${response.status} ${errorText}` : `本地流式接口不可用：${response.status}`,
+            true,
+          )
         }
         if (!response.body) {
           throw new StreamPromptError('本地流式接口没有返回数据流', false)
@@ -3859,22 +4010,26 @@ function App() {
           return true
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          if (isAuthExpiredMessage(message) || (error instanceof StreamPromptError && error.backendError)) {
-            removeAssistant()
-            throw error
-	          }
 	          if (attempt < retryLimit) {
 	            appendThinkingEvent({
 	              id: runtimeEventId('reconnect'),
 	              label: 'Reconnecting',
-	              value: `${attempt + 1}/${retryLimit}`,
+	              value: streamRetryMessage(message, attempt, retryLimit),
 	              tone: 'warning',
 	            })
 	            setAssistantStatus(null, true)
+              await refreshAuthBeforeRetry(message)
 	            await new Promise(resolve => window.setTimeout(resolve, 700))
 	            continue
 	          }
-          removeAssistant()
+          appendThinkingEvent({
+            id: runtimeEventId('reconnect-failed'),
+            label: 'Reconnecting',
+            value: `已重试 ${retryLimit} 次仍失败：${message}`,
+            tone: 'warning',
+          })
+          setAssistantStatus(`连接失败，已重试 ${retryLimit} 次`, true)
+          finishThinkingChain()
           throw new StreamPromptError(
             `流式传输失败，已重试 ${retryLimit} 次：${message}`,
             false,
@@ -4028,7 +4183,7 @@ function App() {
       const message = error instanceof Error ? error.message : String(error)
       addSystemMessage(message, targetSession.id)
       if (isAuthExpiredMessage(message)) {
-        setNotice('登录已过期，请使用 /login 重新登录')
+        setNotice('连接授权暂时失效，已保留登录态，请重试或重新登录')
         await refreshSnapshot().catch(() => {})
       }
     } finally {
@@ -5308,18 +5463,16 @@ function App() {
               <h2>我们应该在 {activeProjectName} 中构建什么？</h2>
               {renderComposer('center')}
               <div className="home-suggestion-list" aria-label="建议">
-                <button onClick={() => setPrompt('把 Spark Code 配对页补成二维码和 deep link')} type="button">
-                  <MessageSquareText size={18} aria-hidden="true" />
-                  <span>把 Spark Code 配对页补成二维码和 deep link</span>
-                </button>
-                <button onClick={() => setPrompt('补一个可直接跑的 Spark Code 最小客户端示例')} type="button">
-                  <MessageSquareText size={18} aria-hidden="true" />
-                  <span>补一个可直接跑的 Spark Code 最小客户端示例</span>
-                </button>
-                <button onClick={() => setPrompt('审查当前分支的未提交改动')} type="button">
-                  <GitBranch size={18} aria-hidden="true" />
-                  <span>审查当前分支的未提交改动</span>
-                </button>
+                {projectSuggestions(activeProjectName).map(item => (
+                  <button key={item.label} onClick={() => setPrompt(item.prompt)} type="button">
+                    {item.icon === 'branch' ? (
+                      <GitBranch size={18} aria-hidden="true" />
+                    ) : (
+                      <MessageSquareText size={18} aria-hidden="true" />
+                    )}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
               </div>
             </section>
           ) : (
@@ -5336,7 +5489,10 @@ function App() {
                     </div>
                   ) : null}
                   <article className={`message-row ${message.role}${streaming ? ' streaming' : ''}${terminal ? ' terminal' : ''}`}>
-                    <div className="message-card">
+                    <div
+                      className="message-card"
+                      style={streaming ? { '--stream-tick': String(message.content.length) } as React.CSSProperties : undefined}
+                    >
                       <span>{message.role === 'user' ? 'You' : 'Spark Code'}</span>
                       {renderMessageContent(message, thinking)}
                       {message.images?.length ? (
@@ -5826,7 +5982,7 @@ function App() {
               </span>
               <button className="secondary-button" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
                 {isStartingLogin ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
-                {sparkUser.logged_in ? '重新登录' : '登录 Spark'}
+                {sparkUser.logged_in ? '重新登录' : '旧版登录'}
               </button>
               {sparkUser.logged_in ? (
                 <button className="secondary-button danger" disabled={isLoggingOut} onClick={handleSparkLogout} type="button">
@@ -5836,8 +5992,8 @@ function App() {
               ) : null}
             </div>
             <div className="oauth-hint">
-              <strong>网页 OAuth 配置</strong>
-              <p>在 Spark-EDU 创建 OAuth2 App，Redirect URI 填 <code>http://127.0.0.1:42872/spark/oauth/callback</code>，再把 <code>SPARK_OAUTH_CLIENT_ID</code> 写进 <code>~/.sparkc/spark.json</code> 的 <code>env</code>。如果是 confidential client，再加 <code>SPARK_OAUTH_CLIENT_SECRET</code>。</p>
+              <strong>旧版登录模式</strong>
+              <p>使用移动端授权流，回调端口由本机临时生成，并保存 Android refresh token。</p>
             </div>
             <div className="settings-kv-grid">
               <div>
@@ -6440,7 +6596,7 @@ function App() {
       <main className="splash-screen" aria-label="Spark Code 正在启动">
         <section className="splash-panel">
           <div className="splash-logo-wrap">
-            <img alt="Spark" src="/spark_logo.png" />
+            <img alt="Spark" src={SPARK_LOGO_SRC} />
             <i aria-hidden="true" />
           </div>
           <div className="splash-copy">
@@ -6451,23 +6607,6 @@ function App() {
           <div className="splash-progress" aria-hidden="true">
             <span />
           </div>
-        </section>
-      </main>
-    )
-  }
-
-  if (!sparkUser.logged_in) {
-    return (
-      <main className="auth-gate">
-        <section className="auth-panel">
-          <img alt="Spark" src="/spark_logo.png" />
-          <strong>SPARK</strong>
-          <h1>登录到 Spark Code</h1>
-          <button className="primary-button" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
-            {isStartingLogin ? <Loader2 className="spin" size={17} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}
-            使用 Spark Atlas 授权登录
-          </button>
-          {notice ? <p className="notice">{notice}</p> : null}
         </section>
       </main>
     )
@@ -6622,7 +6761,7 @@ function App() {
               </button>
               <button className="sidebar-settings" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
                 {isStartingLogin ? <Loader2 className="spin" size={17} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}
-                {sparkUser.logged_in ? '重新登录' : '登录 Spark'}
+                {sparkUser.logged_in ? '重新登录' : '旧版登录'}
               </button>
               {sparkUser.logged_in ? (
                 <button className="sidebar-settings danger" disabled={isLoggingOut} onClick={handleSparkLogout} type="button">

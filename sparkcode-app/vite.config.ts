@@ -3,7 +3,27 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'sparkcode-tauri-html',
+      transformIndexHtml: {
+        order: 'post',
+        handler(html) {
+          const scripts: string[] = []
+          let next = html.replace(/\s*<script type="module"([^>]*)><\/script>/g, (match) => {
+            scripts.push(match.replace(/\s+crossorigin(="[^"]*")?/g, ''))
+            return ''
+          })
+          next = next.replace(/\s+crossorigin(="[^"]*")?/g, '')
+          if (scripts.length > 0) {
+            next = next.replace('</body>', `${scripts.join('\n')}\n  </body>`)
+          }
+          return next
+        },
+      },
+    },
+  ],
   clearScreen: false,
   esbuild: {
     target: 'safari15',

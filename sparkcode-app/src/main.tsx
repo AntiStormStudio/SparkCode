@@ -8,3 +8,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <App />
   </React.StrictMode>,
 )
+
+window.setTimeout(() => {
+  window.dispatchEvent(new Event('spark-code-mounted'))
+}, 0)

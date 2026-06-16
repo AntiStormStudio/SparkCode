@@ -7,8 +7,32 @@
       name="description"
       content="Spark Code"
     />
-    <link rel="icon" type="image/png" href="/spark_logo.png" />
+    <link rel="icon" type="image/png" href="./spark_logo.png" />
     <title>Spark Code</title>
+    <script>
+      window.__sparkCodeBootError = function (message) {
+        var status = document.querySelector("[data-boot-status]");
+        if (status) status.textContent = message;
+      };
+      window.addEventListener("error", function (event) {
+        window.__sparkCodeBootError("前端启动失败：" + (event.message || "未知错误"));
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        var reason = event.reason;
+        var message = reason && reason.message ? reason.message : String(reason || "未知错误");
+        window.__sparkCodeBootError("前端启动失败：" + message);
+      });
+      window.addEventListener("spark-code-mounted", function () {
+        window.__sparkCodeMounted = true;
+      });
+      window.setTimeout(function () {
+        if (window.__sparkCodeMounted) return;
+        window.__sparkCodeBootError("前端资源加载超时，正在尝试重新加载");
+        window.setTimeout(function () {
+          if (!window.__sparkCodeMounted) window.location.reload();
+        }, 800);
+      }, 2500);
+    </script>
     <style>
       html,
       body,
@@ -134,11 +158,11 @@
       <main class="boot-splash" aria-label="Spark Code 正在启动">
         <section class="boot-splash-inner">
           <div class="boot-logo">
-            <img alt="Spark" src="/spark_logo.png" />
+            <img alt="Spark" src="./spark_logo.png" />
           </div>
           <div class="boot-title">
             <strong>SPARK CODE</strong>
-            <span>正在启动本地运行时</span>
+            <span data-boot-status>正在启动本地运行时</span>
           </div>
         </section>
       </main>
