@@ -13,6 +13,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Clone, Serialize)]
 struct Session {
@@ -70,6 +78,8 @@ struct RemoteClientConfig {
 #[derive(Clone, Deserialize, Serialize)]
 struct AppPreferences {
     permission_mode: String,
+    sandbox_enabled: bool,
+    sandbox_auto_allow: bool,
     remote_control_at_startup: Option<bool>,
     auto_compact_enabled: bool,
     show_turn_duration: bool,
@@ -506,6 +516,17 @@ fn backend_permission_mode(value: &str) -> &'static str {
     }
 }
 
+fn hide_windows_command_window(command: &mut ProcessCommand) {
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = command;
+    }
+}
+
 fn load_project_overrides(app: &tauri::AppHandle) -> ProjectOverrides {
     let Ok(path) = config_path(app, "project-overrides.json") else {
         return ProjectOverrides::default();
@@ -533,7 +554,9 @@ fn spark_config_path() -> Result<PathBuf, String> {
     if let Some(config_dir) = env::var_os("SPARK_CONFIG_DIR") {
         return Ok(PathBuf::from(config_dir).join("spark.json"));
     }
-    let home = env::var_os("HOME").ok_or_else(|| "无法定位用户主目录".to_string())?;
+    let home = env::var_os("HOME")
+        .or_else(|| env::var_os("USERPROFILE"))
+        .ok_or_else(|| "无法定位用户主目录".to_string())?;
     Ok(PathBuf::from(home).join(".sparkc").join("spark.json"))
 }
 
@@ -1225,12 +1248,21 @@ fn load_remote_device_binding(app: &tauri::AppHandle, config: &Value) -> RemoteD
 }
 
 fn load_preferences(config: &Value) -> AppPreferences {
+    let sandbox = config.get("sandbox").and_then(Value::as_object);
     AppPreferences {
         permission_mode: normalize_permission_mode(
             &value_string(config.get("permissionMode"))
                 .or_else(|| value_string(config.get("backendPermissionMode")))
                 .unwrap_or_else(|| "limited".to_string()),
         ),
+        sandbox_enabled: sandbox
+            .and_then(|value| value.get("enabled"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        sandbox_auto_allow: sandbox
+            .and_then(|value| value.get("autoAllowBashIfSandboxed"))
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
         remote_control_at_startup: config
             .get("remoteControlAtStartup")
             .and_then(Value::as_bool),
@@ -1444,36 +1476,16 @@ fn write_oauth_html(stream: &mut TcpStream, title: &str, body: &str) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-fn open_browser(url: &str) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    let mut command = {
-        let mut command = ProcessCommand::new("open");
-        command.arg(url);
-        command
-    };
-
-    #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut command = ProcessCommand::new("cmd");
-        command.arg("/C").arg("start").arg("").arg(url);
-        command
-    };
-
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-    let mut command = {
-        let mut command = ProcessCommand::new("xdg-open");
-        command.arg(url);
-        command
-    };
-
-    command
-        .spawn()
-        .map(|_| ())
+fn open_browser(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<&str>)
         .map_err(|error| format!("无法打开浏览器，请手动访问：{url}\n{error}"))
 }
 
 fn curl_json(args: &[String]) -> Result<Value, String> {
-    let output = ProcessCommand::new("curl")
+    let mut command = ProcessCommand::new("curl");
+    hide_windows_command_window(&mut command);
+    let output = command
         .args(args)
         .output()
         .map_err(|error| format!("无法调用 curl：{error}"))?;
@@ -2185,6 +2197,7 @@ fn build_backend_command() -> Result<(ProcessCommand, String), String> {
             .or_else(|| find_in_path("bun"))
             .unwrap_or_else(|| PathBuf::from("bun"));
         let mut command = ProcessCommand::new(bun);
+        hide_windows_command_window(&mut command);
         let entrypoint = root.join("src").join("server").join("server-entry.ts");
         command
             .current_dir(&root)
@@ -2206,6 +2219,7 @@ fn build_backend_command() -> Result<(ProcessCommand, String), String> {
 
     let sparkc = find_in_path("sparkc").unwrap_or_else(|| PathBuf::from("sparkc"));
     let mut command = ProcessCommand::new(sparkc);
+    hide_windows_command_window(&mut command);
     command
         .arg("server")
         .arg("--host")
@@ -2680,6 +2694,7 @@ fn start_spark_backend() {
         .stdin(Stdio::null())
         .stdout(open_log_stdio())
         .stderr(open_log_stdio());
+    hide_windows_command_window(&mut command);
     configure_backend_environment(&mut command);
     if let Some(lock_path) = server_lock_path() {
         let _ = fs::remove_file(&lock_path);
@@ -2875,7 +2890,9 @@ fn short_revision(value: &str) -> String {
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Result<String, String> {
-    let output = ProcessCommand::new("git")
+    let mut command = ProcessCommand::new("git");
+    hide_windows_command_window(&mut command);
+    let output = command
         .arg("-C")
         .arg(repo)
         .args(args)
@@ -3111,61 +3128,34 @@ fn check_app_update() -> UpdateStatus {
     check_update_status()
 }
 
-fn escape_applescript_string(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
 #[tauri::command]
-fn pick_project_folder(base_path: String) -> Result<Option<String>, String> {
-    #[cfg(target_os = "macos")]
-    {
-        let base = if base_path.trim().is_empty() {
-            app_workspace()
-        } else {
-            PathBuf::from(base_path.trim())
-        };
-        let base = if base.is_dir() {
-            base
-        } else {
-            base.parent()
-                .map(PathBuf::from)
-                .unwrap_or_else(app_workspace)
-        };
-        let default_location = fs::canonicalize(&base)
-            .ok()
-            .filter(|path| path.is_dir())
-            .map(|path| {
-                format!(
-                    " default location POSIX file \"{}\"",
-                    escape_applescript_string(&path.display().to_string())
-                )
-            })
-            .unwrap_or_default();
-        let script = format!(
-            "POSIX path of (choose folder with prompt \"选择项目文件夹\"{default_location})"
-        );
-        let output = ProcessCommand::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .output()
-            .map_err(|error| format!("无法打开文件夹选择器：{error}"))?;
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            return Ok((!path.is_empty()).then_some(path));
-        }
+fn pick_project_folder(
+    app: tauri::AppHandle,
+    base_path: String,
+) -> Result<Option<String>, String> {
+    let base = if base_path.trim().is_empty() {
+        app_workspace()
+    } else {
+        PathBuf::from(base_path.trim())
+    };
+    let base = if base.is_dir() {
+        base
+    } else {
+        base.parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(app_workspace)
+    };
 
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("-128") || stderr.to_lowercase().contains("user canceled") {
-            return Ok(None);
+    let mut dialog = app.dialog().file().set_title("选择项目文件夹");
+    if let Ok(default_path) = fs::canonicalize(&base) {
+        if default_path.is_dir() {
+            dialog = dialog.set_directory(default_path);
         }
-        return Err(format!("文件夹选择失败：{}", stderr.trim()));
     }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = base_path;
-        Ok(None)
-    }
+    Ok(dialog
+        .blocking_pick_folder()
+        .map(|path| path.to_string()))
 }
 
 #[tauri::command]
@@ -3221,6 +3211,22 @@ fn save_preferences(preferences: AppPreferences) -> Result<AppPreferences, Strin
         permissions.insert(
             "defaultMode".to_string(),
             Value::String(backend_mode.to_string()),
+        );
+    }
+    let sandbox_value = root
+        .entry("sandbox".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !sandbox_value.is_object() {
+        *sandbox_value = Value::Object(Map::new());
+    }
+    if let Some(sandbox) = sandbox_value.as_object_mut() {
+        sandbox.insert(
+            "enabled".to_string(),
+            Value::Bool(preferences.sandbox_enabled),
+        );
+        sandbox.insert(
+            "autoAllowBashIfSandboxed".to_string(),
+            Value::Bool(preferences.sandbox_auto_allow),
         );
     }
 
@@ -3504,7 +3510,7 @@ fn save_spark_login(
 }
 
 #[tauri::command]
-fn start_spark_login() -> Result<String, String> {
+fn start_spark_login(app: tauri::AppHandle) -> Result<String, String> {
     let mut config = read_spark_config();
     let (install_id, device_id) = get_or_create_android_device(&mut config)?;
     write_spark_config(&config)?;
@@ -3525,7 +3531,7 @@ fn start_spark_login() -> Result<String, String> {
         &device_id,
     );
 
-    open_browser(&auth_url)?;
+    open_browser(&app, &auth_url)?;
     let refresh_token = wait_for_oauth_code(listener, &state)?;
     let token_response = exchange_android_refresh_token(&refresh_token, &install_id, &device_id)?;
     let access_token = value_string(token_response.get("access_token"))
@@ -4387,6 +4393,8 @@ fn close_app(app: tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             {

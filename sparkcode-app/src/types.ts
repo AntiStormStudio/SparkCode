@@ -39,6 +39,8 @@ export type RemoteDeviceBinding = {
 
 export type AppPreferences = {
   permission_mode: PermissionMode
+  sandbox_enabled: boolean
+  sandbox_auto_allow: boolean
   remote_control_at_startup: boolean | null
   auto_compact_enabled: boolean
   show_turn_duration: boolean

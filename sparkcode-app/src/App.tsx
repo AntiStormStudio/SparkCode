@@ -192,6 +192,8 @@ const fallbackSnapshot: AppSnapshot = {
   },
   preferences: {
     permission_mode: 'limited',
+    sandbox_enabled: false,
+    sandbox_auto_allow: true,
     remote_control_at_startup: null,
     auto_compact_enabled: true,
     show_turn_duration: true,
@@ -1924,6 +1926,10 @@ function App() {
         ...next,
         sessions: mergeSessions(next.sessions, current.sessions),
       }))
+      if (!next.spark_user.logged_in) {
+        setActiveView('settings')
+        setSettingsSection('profile')
+      }
       setUpdateStatus(next.update_status)
       setActiveProjectPath(current => {
         if (current && current !== fallbackSnapshot.workspace.path) return current
@@ -5981,7 +5987,7 @@ function App() {
               </span>
               <button className="secondary-button" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
                 {isStartingLogin ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
-                {sparkUser.logged_in ? '重新登录' : '旧版登录'}
+                {sparkUser.logged_in ? '重新登录' : '连接到 Spark'}
               </button>
               {sparkUser.logged_in ? (
                 <button className="secondary-button danger" disabled={isLoggingOut} onClick={handleSparkLogout} type="button">
@@ -6332,6 +6338,30 @@ function App() {
                 </button>
               ))}
             </div>
+            <label className="settings-toggle-row">
+              <span>
+                <strong>SandBox 模式</strong>
+                <small>启用后，支持的平台会限制 Bash 命令的文件和网络访问。</small>
+              </span>
+              <input
+                checked={preferences.sandbox_enabled}
+                disabled={isSavingPreferences}
+                onChange={event => updatePreference('sandbox_enabled', event.target.checked)}
+                type="checkbox"
+              />
+            </label>
+            <label className="settings-toggle-row">
+              <span>
+                <strong>沙箱内自动允许命令</strong>
+                <small>命令已被沙箱限制时，减少重复权限确认。</small>
+              </span>
+              <input
+                checked={preferences.sandbox_auto_allow}
+                disabled={isSavingPreferences || !preferences.sandbox_enabled}
+                onChange={event => updatePreference('sandbox_auto_allow', event.target.checked)}
+                type="checkbox"
+              />
+            </label>
           </section>
 
           <section className="settings-section pane-remote">
@@ -6760,7 +6790,7 @@ function App() {
               </button>
               <button className="sidebar-settings" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
                 {isStartingLogin ? <Loader2 className="spin" size={17} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}
-                {sparkUser.logged_in ? '重新登录' : '旧版登录'}
+                {sparkUser.logged_in ? '重新登录' : '连接到 Spark'}
               </button>
               {sparkUser.logged_in ? (
                 <button className="sidebar-settings danger" disabled={isLoggingOut} onClick={handleSparkLogout} type="button">
