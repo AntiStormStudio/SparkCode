@@ -80,6 +80,9 @@ function pruneTuiOnlyPaths() {
 }
 
 function findBunBinary() {
+  if (process.execPath && existsSync(process.execPath)) {
+    return realpathSync(process.execPath)
+  }
   const bunPath = commandOutput('which', ['bun'])
   if (!bunPath) {
     throw new Error('未找到 bun，无法内置后端运行时')
