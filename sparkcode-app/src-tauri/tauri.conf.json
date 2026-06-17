@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": ["app", "nsis"],
     "resources": {
       "resources/spark-code-backend.tar.gz": "spark-code-backend.tar.gz"
     },
