@@ -114,6 +114,6 @@ writeFileSync(
 )
 
 rmSync(archivePath, { force: true })
-runChecked('/usr/bin/tar', ['-czf', archivePath, '-C', stageRoot, 'spark-code-backend'], appRoot)
+runChecked('tar', ['-czf', archivePath, '-C', stageRoot, 'spark-code-backend'], appRoot)
 
 console.log(`Spark Code backend resource prepared: ${archivePath}`)

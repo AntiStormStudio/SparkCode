@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ---------- 打包 ----------
-  build:
+  # ---------- 源码分发包 ----------
+  build-source:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,14 +48,65 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: spark-code-release
+          name: spark-code-source-release
           path: dist/*
+          retention-days: 1
+
+  # ---------- Windows EXE ----------
+  build-windows-exe:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      BUN_VERSION: 1.3.5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install root dependencies
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Install app dependencies
+        shell: bash
+        working-directory: sparkcode-app
+        run: bun install --frozen-lockfile
+
+      - name: Build Windows installer
+        shell: bash
+        working-directory: sparkcode-app
+        run: bun run tauri build -- --bundles nsis
+
+      - name: Collect Windows EXE
+        shell: bash
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          cp sparkcode-app/src-tauri/target/release/bundle/nsis/*.exe dist/ 2>/dev/null || true
+          cp sparkcode-app/src-tauri/target/release/*.exe dist/ 2>/dev/null || true
+          ls -lah dist
+          test "$(find dist -maxdepth 1 -name '*.exe' -type f | wc -l)" -gt 0
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-code-windows-exe
+          path: dist/*.exe
           retention-days: 1
 
   # ---------- 汇总所有产物并创建 GitHub Release ----------
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: build
+    needs: [build-source, build-windows-exe]
     runs-on: ubuntu-latest
     permissions:
       contents: write
