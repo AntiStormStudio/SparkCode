@@ -103,10 +103,114 @@ jobs:
           path: dist/*.exe
           retention-days: 1
 
+  # ---------- Linux ----------
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BUN_VERSION: 1.3.5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install app dependencies
+        working-directory: sparkcode-app
+        run: bun install --frozen-lockfile
+
+      - name: Build Linux packages
+        working-directory: sparkcode-app
+        run: bun run tauri build --bundles deb,appimage
+
+      - name: Collect Linux packages
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          cp sparkcode-app/src-tauri/target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
+          cp sparkcode-app/src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
+          ls -lah dist
+          test "$(find dist -maxdepth 1 \( -name '*.deb' -o -name '*.AppImage' \) -type f | wc -l)" -gt 0
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: spark-code-linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+          retention-days: 1
+
+  # ---------- macOS ----------
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    env:
+      BUN_VERSION: 1.3.5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install app dependencies
+        working-directory: sparkcode-app
+        run: bun install --frozen-lockfile
+
+      - name: Build macOS package
+        working-directory: sparkcode-app
+        run: bun run tauri build --bundles dmg
+
+      - name: Collect macOS package
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          cp sparkcode-app/src-tauri/target/release/bundle/dmg/*.dmg dist/ 2>/dev/null || true
+          ls -lah dist
+          test "$(find dist -maxdepth 1 -name '*.dmg' -type f | wc -l)" -gt 0
+
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: spark-code-macos
+          path: dist/*.dmg
+          retention-days: 1
+
   # ---------- 汇总所有产物并创建 GitHub Release ----------
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-source, build-windows-exe]
+    needs: [build-source, build-windows-exe, build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

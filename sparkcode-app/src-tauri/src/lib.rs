@@ -296,7 +296,6 @@ const SPARK_CERT_SHA256: &str =
 const OAUTH_CALLBACK_PATH: &str = "/spark/oauth/callback";
 const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth/mobile/authorize";
 const SPARK_AUTH_REFRESH_PATH: &str = "/api/v1/android/auth/refresh";
-const SPARK_OAUTH_USERINFO_PATH: &str = "/oauth2/userinfo";
 const SPARK_CODE_API_PATH: &str = "/api/v1/spark-code";
 const SPARK_MODEL_LIST_PATH: &str = "/api/v1/android/models";
 const UPDATE_CHECK_BRANCH: &str = "main";
@@ -1648,7 +1647,6 @@ fn fetch_spark_profile(access_token: &str) -> Option<Value> {
         "/api/v1/android/user",
         "/api/v1/android/profile",
         "/api/v1/android/account",
-        SPARK_OAUTH_USERINFO_PATH,
     ] {
         let url = format!("{FIXED_BACKEND_URL}{path}");
         if let Ok(value) = curl_json(&[
@@ -4452,10 +4450,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Spark Code")
         .run(|app, event| {
-            if matches!(
-                event,
-                tauri::RunEvent::Ready | tauri::RunEvent::Reopen { .. }
-            ) {
+            let should_show = matches!(event, tauri::RunEvent::Ready);
+            #[cfg(target_os = "macos")]
+            let should_show = should_show || matches!(event, tauri::RunEvent::Reopen { .. });
+
+            if should_show {
                 show_main_window(app);
                 start_spark_backend_async();
             }
