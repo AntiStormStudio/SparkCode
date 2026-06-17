@@ -2040,7 +2040,6 @@ function App() {
   }
 
   useEffect(() => {
-    setSnapshotReady(true)
     const timer = window.setTimeout(() => {
       refreshSnapshot().catch(() => {})
     }, 250)
