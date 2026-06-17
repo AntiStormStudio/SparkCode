@@ -84,7 +84,7 @@ jobs:
       - name: Build Windows installer
         shell: bash
         working-directory: sparkcode-app
-        run: bun run tauri build -- --bundles nsis
+        run: bun run tauri build --bundles nsis
 
       - name: Collect Windows EXE
         shell: bash
