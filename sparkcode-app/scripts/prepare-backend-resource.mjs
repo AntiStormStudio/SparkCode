@@ -48,6 +48,14 @@ function commandOutput(command, args) {
   return result.stdout.trim()
 }
 
+function toTarPath(path) {
+  if (process.platform !== 'win32') return path
+  const normalized = path.replaceAll('\\', '/')
+  const match = normalized.match(/^([A-Za-z]):\/(.*)$/)
+  if (!match) return normalized
+  return `/${match[1].toLowerCase()}/${match[2]}`
+}
+
 function ensureDir(path) {
   mkdirSync(path, { recursive: true })
 }
@@ -117,6 +125,6 @@ writeFileSync(
 )
 
 rmSync(archivePath, { force: true })
-runChecked('tar', ['-czf', archivePath, '-C', stageRoot, 'spark-code-backend'], appRoot)
+runChecked('tar', ['-czf', toTarPath(archivePath), '-C', toTarPath(stageRoot), 'spark-code-backend'], appRoot)
 
 console.log(`Spark Code backend resource prepared: ${archivePath}`)
