@@ -96,7 +96,8 @@ jobs:
         working-directory: sparkcode-app
         run: |
           test -f src-tauri/resources/spark-code-backend.tar.gz
-          tar -tf src-tauri/resources/spark-code-backend.tar.gz | grep -qx 'spark-code-backend/runtime/bun.exe'
+          tar -tf src-tauri/resources/spark-code-backend.tar.gz > backend-files.txt
+          grep -qx 'spark-code-backend/runtime/bun.exe' backend-files.txt
           tar -xOf src-tauri/resources/spark-code-backend.tar.gz spark-code-backend/backend-resource.json
 
       - name: Collect Windows EXE
