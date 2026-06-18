@@ -1883,6 +1883,7 @@ function App() {
   const [isSavingFileDocument, setIsSavingFileDocument] = useState(false)
   const [isComposerDragging, setIsComposerDragging] = useState(false)
   const [remoteBindCode, setRemoteBindCode] = useState('')
+  const [remoteBindDialogOpen, setRemoteBindDialogOpen] = useState(false)
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0)
   const [query, setQuery] = useState('')
   const [snapshotReady, setSnapshotReady] = useState(false)
@@ -2819,6 +2820,7 @@ function App() {
       const device = await safeInvoke<RemoteDeviceBinding>('bind_remote_device', { bindingCode })
       setSnapshot(current => ({ ...current, remote_device: device }))
       setRemoteBindCode('')
+      setRemoteBindDialogOpen(false)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error))
     } finally {
@@ -6402,35 +6404,30 @@ function App() {
                   <span>{remoteDevice.bound ? displayValue(remoteDevice.client_name, '当前设备') : '输入绑定码完成设备绑定'}</span>
                 </div>
               </div>
-              <div className="device-bind-row">
-                <input
-                  aria-label="Remote 绑定码"
-                  disabled={isBindingRemoteDevice || remoteDevice.bound}
-                  onChange={event => setRemoteBindCode(event.target.value)}
-                  placeholder="输入 Remote 绑定码"
-                  value={remoteBindCode}
-                />
-                <button
-                  className="secondary-button"
-                  disabled={isBindingRemoteDevice || remoteDevice.bound || !remoteBindCode.trim()}
-                  onClick={handleBindRemoteDevice}
-                  type="button"
-                >
-                  {isBindingRemoteDevice ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
-                  绑定设备
-                </button>
+              <div className="device-actions">
+                {!remoteDevice.bound ? (
+                  <button
+                    className="secondary-button"
+                    disabled={isBindingRemoteDevice}
+                    onClick={() => setRemoteBindDialogOpen(true)}
+                    type="button"
+                  >
+                    <KeyRound size={16} aria-hidden="true" />
+                    绑定设备
+                  </button>
+                ) : null}
+                {remoteDevice.bound ? (
+                  <button
+                    className="secondary-button danger"
+                    disabled={isBindingRemoteDevice}
+                    onClick={handleUnbindRemoteDevice}
+                    type="button"
+                  >
+                    <X size={16} aria-hidden="true" />
+                    解绑设备
+                  </button>
+                ) : null}
               </div>
-              {remoteDevice.bound ? (
-                <button
-                  className="secondary-button danger"
-                  disabled={isBindingRemoteDevice}
-                  onClick={handleUnbindRemoteDevice}
-                  type="button"
-                >
-                  <X size={16} aria-hidden="true" />
-                  解绑设备
-                </button>
-              ) : null}
             </div>
             <div className="settings-kv-grid two">
               <div>
@@ -6516,6 +6513,58 @@ function App() {
           ) : (
             <div className="empty-compact">没有找到结果</div>
           )}
+        </section>
+      </div>
+    )
+  }
+
+  function renderRemoteBindDialog() {
+    if (!remoteBindDialogOpen) return null
+
+    function closeDialog() {
+      if (isBindingRemoteDevice) return
+      setRemoteBindDialogOpen(false)
+    }
+
+    function submitRemoteBind(event: FormEvent<HTMLFormElement>) {
+      event.preventDefault()
+      void handleBindRemoteDevice()
+    }
+
+    return (
+      <div className="modal-backdrop" onMouseDown={closeDialog}>
+        <section className="search-modal remote-bind-modal" onMouseDown={event => event.stopPropagation()} aria-label="绑定 Remote 设备">
+          <header className="remote-bind-header">
+            <div>
+              <strong>绑定 Remote 设备</strong>
+              <span>输入移动端生成的绑定码。</span>
+            </div>
+            <button className="icon-button" aria-label="关闭绑定窗口" disabled={isBindingRemoteDevice} onClick={closeDialog} type="button">
+              <X size={16} aria-hidden="true" />
+            </button>
+          </header>
+          <form className="remote-bind-form" onSubmit={submitRemoteBind}>
+            <label className="remote-bind-field">
+              <span>Remote 绑定码</span>
+              <input
+                autoFocus
+                aria-label="Remote 绑定码"
+                disabled={isBindingRemoteDevice}
+                onChange={event => setRemoteBindCode(event.target.value)}
+                placeholder="输入 Remote 绑定码"
+                value={remoteBindCode}
+              />
+            </label>
+            <div className="remote-bind-actions">
+              <button className="secondary-button" disabled={isBindingRemoteDevice} onClick={closeDialog} type="button">
+                取消
+              </button>
+              <button className="primary-button" disabled={isBindingRemoteDevice || !remoteBindCode.trim()} type="submit">
+                {isBindingRemoteDevice ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
+                绑定设备
+              </button>
+            </div>
+          </form>
         </section>
       </div>
     )
@@ -6982,6 +7031,7 @@ function App() {
         </aside>
       ) : null}
       {renderSearchModal()}
+      {renderRemoteBindDialog()}
       {renderContextMenu()}
     </div>
   )

@@ -4179,6 +4179,14 @@ button.resource-row:hover,
   min-width: min(100%, 360px);
 }
 
+.device-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
 .device-bind-row input {
   min-width: 0;
   height: 32px;
@@ -4242,6 +4250,10 @@ button.resource-row:hover,
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pane-remote .device-card {
+  align-items: center;
 }
 
 .settings-select-row {
@@ -4659,6 +4671,67 @@ button.resource-row:hover,
   background: rgba(13, 16, 22, 0.98);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
   animation: popoverIn 150ms ease both;
+}
+
+.remote-bind-modal {
+  width: min(520px, 92vw);
+}
+
+.remote-bind-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.remote-bind-header strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.remote-bind-header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.remote-bind-form {
+  display: grid;
+  gap: 12px;
+}
+
+.remote-bind-field {
+  display: grid;
+  gap: 6px;
+}
+
+.remote-bind-field span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.remote-bind-field input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.remote-bind-field input::placeholder {
+  color: var(--muted);
+}
+
+.remote-bind-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .search-modal-input {
