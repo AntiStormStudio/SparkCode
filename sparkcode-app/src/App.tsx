@@ -2047,7 +2047,9 @@ function App() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      refreshSnapshot().catch(() => {})
+      const projectPath = activeProjectPath === NO_PROJECT_SELECTION ? '' : activeProjectPath
+      syncActiveProjectToBackend(projectPath)
+        .finally(() => refreshSnapshot().catch(() => {}))
     }, 250)
     return () => window.clearTimeout(timer)
   }, [])
@@ -6636,6 +6638,23 @@ function App() {
           <div className="splash-progress" aria-hidden="true">
             <span />
           </div>
+        </section>
+      </main>
+    )
+  }
+
+  if (!snapshot.spark_user.logged_in) {
+    return (
+      <main className="auth-gate" aria-label="Spark 登录授权页">
+        <section className="auth-panel">
+          <img alt="Spark" src={SPARK_LOGO_SRC} />
+          <strong>SPARK</strong>
+          <h1>Spark Code</h1>
+          <p>先连接到 Spark，才能同步真实邮箱、头像和登录状态。</p>
+          <button className="primary-button" disabled={isStartingLogin} onClick={handleStartLogin} type="button">
+            {isStartingLogin ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
+            连接到 Spark
+          </button>
         </section>
       </main>
     )

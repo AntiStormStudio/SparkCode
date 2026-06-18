@@ -91,6 +91,14 @@ jobs:
         working-directory: sparkcode-app
         run: bun run tauri build --bundles nsis
 
+      - name: Verify Windows backend runtime
+        shell: bash
+        working-directory: sparkcode-app
+        run: |
+          test -f src-tauri/resources/spark-code-backend.tar.gz
+          tar -tf src-tauri/resources/spark-code-backend.tar.gz | grep -qx 'spark-code-backend/runtime/bun.exe'
+          tar -xOf src-tauri/resources/spark-code-backend.tar.gz spark-code-backend/backend-resource.json
+
       - name: Collect Windows EXE
         shell: bash
         run: |

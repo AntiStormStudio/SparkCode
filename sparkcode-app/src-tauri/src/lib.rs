@@ -301,8 +301,7 @@ const SPARK_BASE_URL_ENV_KEY: &str = "ANTHROPIC_BASE_URL";
 const BUNDLED_BACKEND_ROOT_ENV_KEY: &str = "SPARK_CODE_BUNDLED_BACKEND_ROOT";
 const SPARK_PACKAGE_NAME: &str = "com.sparkatlas.app";
 const SPARK_APP_VERSION: &str = "9.0.3";
-const SPARK_CERT_SHA256: &str =
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const SPARK_CERT_SHA256: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const OAUTH_CALLBACK_PATH: &str = "/spark/oauth/callback";
 const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth/mobile/authorize";
 const SPARK_AUTH_REFRESH_PATH: &str = "/api/v1/android/auth/refresh";
@@ -570,6 +569,28 @@ fn read_spark_config() -> Value {
     serde_json::from_str(&content).unwrap_or_else(|_| Value::Object(Map::new()))
 }
 
+fn active_local_settings_path() -> PathBuf {
+    app_workspace().join(".sparkc").join("settings.local.json")
+}
+
+fn read_active_local_settings() -> Value {
+    let path = active_local_settings_path();
+    let Ok(content) = fs::read_to_string(path) else {
+        return Value::Object(Map::new());
+    };
+    serde_json::from_str(&content).unwrap_or_else(|_| Value::Object(Map::new()))
+}
+
+fn write_active_local_settings(config: &Value) -> Result<(), String> {
+    let path = active_local_settings_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建项目本地设置目录：{error}"))?;
+    }
+    let content = serde_json::to_string_pretty(config)
+        .map_err(|error| format!("无法序列化项目本地设置：{error}"))?;
+    fs::write(path, content).map_err(|error| format!("无法保存项目本地设置：{error}"))
+}
+
 fn write_spark_config(config: &Value) -> Result<(), String> {
     let path = spark_config_path()?;
     if let Some(parent) = path.parent() {
@@ -696,7 +717,12 @@ fn config_bool(config: &Value, key: &str, default: bool) -> bool {
 }
 
 fn home_dir() -> Option<PathBuf> {
-    env::var_os("HOME").map(PathBuf::from)
+    if let Some(home) = env::var_os("HOME").or_else(|| env::var_os("USERPROFILE")) {
+        return Some(PathBuf::from(home));
+    }
+    let drive = env::var_os("HOMEDRIVE")?;
+    let path = env::var_os("HOMEPATH")?;
+    Some(PathBuf::from(drive).join(path))
 }
 
 fn read_json_file(path: &Path) -> Option<Value> {
@@ -966,7 +992,11 @@ fn project_entry_without_branch(path: String, trust_level: Option<String>) -> Pr
     project_entry_inner(path, trust_level, false)
 }
 
-fn project_entry_inner(path: String, trust_level: Option<String>, include_branch: bool) -> ProjectEntry {
+fn project_entry_inner(
+    path: String,
+    trust_level: Option<String>,
+    include_branch: bool,
+) -> ProjectEntry {
     let path_buf = PathBuf::from(&path);
     let name = path_buf
         .file_name()
@@ -1248,7 +1278,8 @@ fn load_remote_device_binding(app: &tauri::AppHandle, config: &Value) -> RemoteD
 }
 
 fn load_preferences(config: &Value) -> AppPreferences {
-    let sandbox = config.get("sandbox").and_then(Value::as_object);
+    let local_settings = read_active_local_settings();
+    let sandbox = local_settings.get("sandbox").and_then(Value::as_object);
     AppPreferences {
         permission_mode: normalize_permission_mode(
             &value_string(config.get("permissionMode"))
@@ -1570,11 +1601,7 @@ fn wait_for_oauth_code(listener: TcpListener, expected_state: &str) -> Result<St
                 }
 
                 if route != OAUTH_CALLBACK_PATH {
-                    write_oauth_html(
-                        &mut stream,
-                        "等待 Spark 授权",
-                        "请在后端授权页面完成登录。",
-                    );
+                    write_oauth_html(&mut stream, "等待 Spark 授权", "请在后端授权页面完成登录。");
                     continue;
                 }
 
@@ -1587,7 +1614,11 @@ fn wait_for_oauth_code(listener: TcpListener, expected_state: &str) -> Result<St
                 let state =
                     query_value(query, "state").ok_or_else(|| "授权回调缺少 state".to_string())?;
                 if state != expected_state {
-                    write_oauth_html(&mut stream, "登录失败", "授权状态校验失败，请重新运行 /login。");
+                    write_oauth_html(
+                        &mut stream,
+                        "登录失败",
+                        "授权状态校验失败，请重新运行 /login。",
+                    );
                     return Err("授权状态校验失败，请重新运行 /login".to_string());
                 }
 
@@ -1621,8 +1652,8 @@ fn exchange_android_refresh_token(
         "cert_sha256": SPARK_CERT_SHA256,
         "app_version": SPARK_APP_VERSION,
     });
-    let body_text = serde_json::to_string(&body)
-        .map_err(|error| format!("无法序列化登录请求：{error}"))?;
+    let body_text =
+        serde_json::to_string(&body).map_err(|error| format!("无法序列化登录请求：{error}"))?;
     let url = format!("{FIXED_BACKEND_URL}{SPARK_AUTH_REFRESH_PATH}");
     let value = curl_json(&[
         "-sS".to_string(),
@@ -1795,11 +1826,8 @@ fn fallback_session_uuid() -> String {
 }
 
 fn app_log(message: impl AsRef<str>) {
-    if let Ok(mut file) = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/sparkcode-app.log")
-    {
+    let path = env::temp_dir().join("sparkcode-app.log");
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(file, "{}", message.as_ref());
     }
 }
@@ -1855,47 +1883,60 @@ fn find_spark_code_root() -> Option<PathBuf> {
 }
 
 fn bundled_bun_for_root(root: &Path) -> Option<PathBuf> {
-    let candidate = root.join("runtime").join("bun");
-    candidate.is_file().then_some(candidate)
+    for name in ["bun", "bun.exe"] {
+        let candidate = root.join("runtime").join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 fn is_app_resource_backend(path: &Path) -> bool {
     path.to_string_lossy()
+        .replace('\\', "/")
         .contains(".app/Contents/Resources/spark-code-backend")
 }
 
 fn is_app_resource_backend_archive(path: &Path) -> bool {
     path.file_name().and_then(|name| name.to_str()) == Some("spark-code-backend.tar.gz")
-        && path
-            .to_string_lossy()
-            .contains(".app/Contents/Resources/spark-code-backend.tar.gz")
 }
 
 fn is_staged_backend_path(path: &Path) -> bool {
-    path.to_string_lossy().contains("/.sparkc/backend/")
+    path.to_string_lossy()
+        .replace('\\', "/")
+        .contains("/.sparkc/backend/")
 }
 
 fn is_internal_backend_path(path: &Path) -> bool {
     is_app_resource_backend(path) || is_staged_backend_path(path)
 }
 
+fn copy_dir_all(source: &Path, target: &Path) -> Result<(), String> {
+    fs::create_dir_all(target).map_err(|error| format!("无法创建后端缓存目录：{error}"))?;
+    for entry in fs::read_dir(source).map_err(|error| format!("无法读取内置后端：{error}"))?
+    {
+        let entry = entry.map_err(|error| format!("无法读取内置后端条目：{error}"))?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("无法读取内置后端条目类型：{error}"))?;
+        if file_type.is_dir() {
+            copy_dir_all(&source_path, &target_path)?;
+        } else if file_type.is_file() {
+            fs::copy(&source_path, &target_path)
+                .map_err(|error| format!("无法复制内置后端文件：{error}"))?;
+        }
+    }
+    Ok(())
+}
+
 fn copy_backend_resource(source: &Path, target: &Path) -> Result<(), String> {
     if target.exists() {
         fs::remove_dir_all(target).map_err(|error| format!("无法清理后端缓存：{error}"))?;
     }
-    fs::create_dir_all(target).map_err(|error| format!("无法创建后端缓存目录：{error}"))?;
-
-    let source_contents = source.join(".");
-    let status = ProcessCommand::new("/bin/cp")
-        .arg("-R")
-        .arg(&source_contents)
-        .arg(target)
-        .status()
-        .map_err(|error| format!("无法复制内置后端：{error}"))?;
-    if !status.success() {
-        return Err(format!("复制内置后端失败：{status}"));
-    }
-    Ok(())
+    copy_dir_all(source, target)
 }
 
 fn backend_stage_target() -> Option<PathBuf> {
@@ -1938,7 +1979,14 @@ fn extract_backend_archive(archive: &Path, target: &Path) -> Result<(), String> 
     }
     fs::create_dir_all(&tmp).map_err(|error| format!("无法创建后端缓存目录：{error}"))?;
 
-    let status = ProcessCommand::new("/usr/bin/tar")
+    let tar = if cfg!(target_os = "windows") {
+        "tar"
+    } else {
+        "/usr/bin/tar"
+    };
+    let mut command = ProcessCommand::new(tar);
+    hide_windows_command_window(&mut command);
+    let status = command
         .arg("-xzf")
         .arg(archive)
         .arg("-C")
@@ -2050,6 +2098,15 @@ fn find_in_path(name: &str) -> Option<PathBuf> {
         if candidate.is_file() {
             return Some(candidate);
         }
+        #[cfg(target_os = "windows")]
+        {
+            if !name.to_ascii_lowercase().ends_with(".exe") {
+                let candidate = dir.join(format!("{name}.exe"));
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+        }
     }
     None
 }
@@ -2058,7 +2115,7 @@ fn open_log_stdio() -> Stdio {
     fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/sparkcode-app-backend.log")
+        .open(env::temp_dir().join("sparkcode-app-backend.log"))
         .map(Stdio::from)
         .unwrap_or_else(|_| Stdio::null())
 }
@@ -3129,10 +3186,7 @@ fn check_app_update() -> UpdateStatus {
 }
 
 #[tauri::command]
-fn pick_project_folder(
-    app: tauri::AppHandle,
-    base_path: String,
-) -> Result<Option<String>, String> {
+fn pick_project_folder(app: tauri::AppHandle, base_path: String) -> Result<Option<String>, String> {
     let base = if base_path.trim().is_empty() {
         app_workspace()
     } else {
@@ -3153,9 +3207,7 @@ fn pick_project_folder(
         }
     }
 
-    Ok(dialog
-        .blocking_pick_folder()
-        .map(|path| path.to_string()))
+    Ok(dialog.blocking_pick_folder().map(|path| path.to_string()))
 }
 
 #[tauri::command]
@@ -3213,23 +3265,6 @@ fn save_preferences(preferences: AppPreferences) -> Result<AppPreferences, Strin
             Value::String(backend_mode.to_string()),
         );
     }
-    let sandbox_value = root
-        .entry("sandbox".to_string())
-        .or_insert_with(|| Value::Object(Map::new()));
-    if !sandbox_value.is_object() {
-        *sandbox_value = Value::Object(Map::new());
-    }
-    if let Some(sandbox) = sandbox_value.as_object_mut() {
-        sandbox.insert(
-            "enabled".to_string(),
-            Value::Bool(preferences.sandbox_enabled),
-        );
-        sandbox.insert(
-            "autoAllowBashIfSandboxed".to_string(),
-            Value::Bool(preferences.sandbox_auto_allow),
-        );
-    }
-
     match preferences.remote_control_at_startup {
         Some(value) => {
             root.insert("remoteControlAtStartup".to_string(), Value::Bool(value));
@@ -3260,6 +3295,33 @@ fn save_preferences(preferences: AppPreferences) -> Result<AppPreferences, Strin
     );
 
     write_spark_config(&config)?;
+    let mut local_settings = read_active_local_settings();
+    if !local_settings.is_object() {
+        local_settings = Value::Object(Map::new());
+    }
+    let local_root = local_settings
+        .as_object_mut()
+        .ok_or_else(|| "项目本地设置格式无效".to_string())?;
+    let sandbox_value = local_root
+        .entry("sandbox".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !sandbox_value.is_object() {
+        *sandbox_value = Value::Object(Map::new());
+    }
+    if let Some(sandbox) = sandbox_value.as_object_mut() {
+        sandbox.insert(
+            "enabled".to_string(),
+            Value::Bool(preferences.sandbox_enabled),
+        );
+        sandbox.insert(
+            "autoAllowBashIfSandboxed".to_string(),
+            Value::Bool(preferences.sandbox_auto_allow),
+        );
+    }
+    write_active_local_settings(&local_settings)?;
+    if let Err(error) = post_local_backend_json("/settings/reload", &serde_json::json!({})) {
+        app_log(format!("settings:reload-failed {error}"));
+    }
     Ok(AppPreferences {
         permission_mode,
         ..preferences
@@ -3408,48 +3470,59 @@ fn save_spark_login(
 
     let mut oauth_account: Option<Map<String, Value>> = None;
     if let Some(profile) = profile {
-        let account_uuid = nested_string(&profile, &[
-            &["sub"],
-            &["uuid"],
-            &["id"],
-            &["account_uuid"],
-            &["accountUuid"],
-            &["account", "uuid"],
-            &["account", "id"],
-        ]);
-        let email = nested_string(&profile, &[
-            &["email"],
-            &["email_address"],
-            &["emailAddress"],
-            &["account", "email"],
-            &["account", "email_address"],
-            &["account", "emailAddress"],
-        ]);
+        let account_uuid = nested_string(
+            &profile,
+            &[
+                &["sub"],
+                &["uuid"],
+                &["id"],
+                &["account_uuid"],
+                &["accountUuid"],
+                &["account", "uuid"],
+                &["account", "id"],
+            ],
+        );
+        let email = nested_string(
+            &profile,
+            &[
+                &["email"],
+                &["email_address"],
+                &["emailAddress"],
+                &["account", "email"],
+                &["account", "email_address"],
+                &["account", "emailAddress"],
+            ],
+        );
 
         if let (Some(account_uuid), Some(email)) = (account_uuid, email) {
             let mut item = Map::new();
             item.insert("accountUuid".to_string(), Value::String(account_uuid));
             item.insert("emailAddress".to_string(), Value::String(email));
-            if let Some(value) = nested_string(&profile, &[
-                &["name"],
-                &["display_name"],
-                &["displayName"],
-                &["preferred_username"],
-                &["account", "display_name"],
-                &["account", "displayName"],
-                &["account", "name"],
-            ])
-            {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["name"],
+                    &["display_name"],
+                    &["displayName"],
+                    &["preferred_username"],
+                    &["account", "display_name"],
+                    &["account", "displayName"],
+                    &["account", "name"],
+                ],
+            ) {
                 item.insert("displayName".to_string(), Value::String(value));
             }
-            if let Some(value) = nested_string(&profile, &[
-                &["picture"],
-                &["avatar_url"],
-                &["avatarUrl"],
-                &["account", "picture"],
-                &["account", "avatar_url"],
-                &["account", "avatarUrl"],
-            ]) {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["picture"],
+                    &["avatar_url"],
+                    &["avatarUrl"],
+                    &["account", "picture"],
+                    &["account", "avatar_url"],
+                    &["account", "avatarUrl"],
+                ],
+            ) {
                 let avatar_url = if value.starts_with('/') {
                     format!("{FIXED_BACKEND_URL}{value}")
                 } else {
@@ -3457,36 +3530,48 @@ fn save_spark_login(
                 };
                 item.insert("avatarUrl".to_string(), Value::String(avatar_url));
             }
-            if let Some(value) = nested_string(&profile, &[
-                &["organization_uuid"],
-                &["organizationUuid"],
-                &["organization", "uuid"],
-                &["organization", "id"],
-            ]) {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["organization_uuid"],
+                    &["organizationUuid"],
+                    &["organization", "uuid"],
+                    &["organization", "id"],
+                ],
+            ) {
                 item.insert("organizationUuid".to_string(), Value::String(value));
             }
-            if let Some(value) = nested_string(&profile, &[
-                &["organization_name"],
-                &["organizationName"],
-                &["organization", "name"],
-                &["organization", "display_name"],
-            ]) {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["organization_name"],
+                    &["organizationName"],
+                    &["organization", "name"],
+                    &["organization", "display_name"],
+                ],
+            ) {
                 item.insert("organizationName".to_string(), Value::String(value));
             }
-            if let Some(value) = nested_string(&profile, &[
-                &["billing_type"],
-                &["billingType"],
-                &["organization", "billing_type"],
-                &["organization", "billingType"],
-            ]) {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["billing_type"],
+                    &["billingType"],
+                    &["organization", "billing_type"],
+                    &["organization", "billingType"],
+                ],
+            ) {
                 item.insert("billingType".to_string(), Value::String(value));
             }
-            if let Some(value) = nested_string(&profile, &[
-                &["created_at"],
-                &["createdAt"],
-                &["account", "created_at"],
-                &["account", "createdAt"],
-            ]) {
+            if let Some(value) = nested_string(
+                &profile,
+                &[
+                    &["created_at"],
+                    &["createdAt"],
+                    &["account", "created_at"],
+                    &["account", "createdAt"],
+                ],
+            ) {
                 item.insert("accountCreatedAt".to_string(), Value::String(value));
             }
             oauth_account = Some(item);
@@ -3498,8 +3583,14 @@ fn save_spark_login(
         root.insert("hasCompletedOnboarding".to_string(), Value::Bool(true));
         let account = oauth_account.unwrap_or_else(|| {
             let mut item = Map::new();
-            item.insert("accountUuid".to_string(), Value::String("spark-oauth".to_string()));
-            item.insert("displayName".to_string(), Value::String("Spark 用户".to_string()));
+            item.insert(
+                "accountUuid".to_string(),
+                Value::String("spark-oauth".to_string()),
+            );
+            item.insert(
+                "displayName".to_string(),
+                Value::String("Spark 用户".to_string()),
+            );
             item
         });
         root.insert("oauthAccount".to_string(), Value::Object(account));

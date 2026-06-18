@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
@@ -20,14 +20,6 @@ const tuiOnlyPaths = [
   join('src', 'replLauncher.tsx'),
   join('src', 'screens'),
 ]
-
-function run(command, args) {
-  const result = spawnSync(command, args, {
-    cwd: projectRoot,
-    stdio: 'inherit',
-  })
-  return result.status === 0
-}
 
 function runChecked(command, args, cwd = projectRoot) {
   const result = spawnSync(command, args, {
@@ -60,15 +52,25 @@ function ensureDir(path) {
   mkdirSync(path, { recursive: true })
 }
 
+function run(command, args) {
+  const result = spawnSync(command, args, {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  })
+  return result.status === 0
+}
+
 function syncDir(name) {
   const source = join(projectRoot, name)
   const target = join(targetRoot, name)
   if (!existsSync(source)) return
   ensureDir(dirname(target))
-
-  if (run('rsync', ['-a', '--delete', `${source}/`, `${target}/`])) return
-
   rmSync(target, { force: true, recursive: true })
+  if (process.platform === 'win32') {
+    cpSync(source, target, { force: true, recursive: true })
+    return
+  }
+  if (run('rsync', ['-a', '--delete', `${source}/`, `${target}/`])) return
   mkdirSync(target, { recursive: true })
   run('cp', ['-R', `${source}/.`, target])
 }
@@ -108,9 +110,11 @@ pruneTuiOnlyPaths()
 
 const bunBinary = findBunBinary()
 const runtimeDir = join(targetRoot, 'runtime')
+const bundledBunName = process.platform === 'win32' ? 'bun.exe' : 'bun'
+const bundledBunPath = join(runtimeDir, bundledBunName)
 ensureDir(runtimeDir)
-copyFileSync(bunBinary, join(runtimeDir, 'bun'))
-chmodSync(join(runtimeDir, 'bun'), 0o755)
+copyFileSync(bunBinary, bundledBunPath)
+chmodSync(bundledBunPath, 0o755)
 
 writeFileSync(
   join(targetRoot, 'backend-resource.json'),
@@ -119,6 +123,7 @@ writeFileSync(
     generated_at: new Date().toISOString(),
     bun: {
       source: bunBinary,
+      bundled: bundledBunName,
       size: statSync(bunBinary).size,
     },
   }, null, 2)}\n`,

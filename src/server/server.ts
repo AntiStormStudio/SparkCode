@@ -18,6 +18,7 @@ import stickersCommand from '../commands/stickers/index.js'
 import { getModelOptions } from '../utils/model/modelOptions.js'
 import { getDoctorDiagnostic, type DiagnosticInfo } from '../utils/doctorDiagnostic.js'
 import { aggregateClaudeCodeStatsForRange, type ClaudeCodeStats } from '../utils/stats.js'
+import { settingsChangeDetector } from '../utils/settings/changeDetector.js'
 import {
   checkAndRefreshOAuthTokenIfNeeded,
   clearConfiguredAndroidAuth,
@@ -960,6 +961,11 @@ export function startServer(
 
       if (req.method === 'POST' && url.pathname === '/auth/clear') {
         clearConfiguredAndroidAuth()
+        return json({ ok: true })
+      }
+
+      if (req.method === 'POST' && url.pathname === '/settings/reload') {
+        settingsChangeDetector.notifyChange('localSettings')
         return json({ ok: true })
       }
 
