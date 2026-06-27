@@ -2149,7 +2149,8 @@ async function safeInvoke<T>(command: string, args?: Record<string, unknown>): P
     if (/undefined.*invoke|reading 'invoke'|__TAURI__|__TAURI_INTERNALS__/i.test(message)) {
       throw new Error(TAURI_INVOKE_UNAVAILABLE_MESSAGE)
     }
-    throw error
+    const cleaned = message.replace(/^Error invoking remote method 'sparkcode:invoke': Error:\s*/i, '').trim()
+    throw new Error(cleaned || message)
   }
 }
 
@@ -4709,6 +4710,14 @@ function App() {
       }
 
       if (!usedStream) {
+        const fallbackAssistantId = `a-fallback-${Date.now()}`
+        setStreamingMessageId(fallbackAssistantId)
+        setSessionMessages(targetSession.id, current => [...current, {
+          id: fallbackAssistantId,
+          role: 'assistant',
+          content: '正在思考\n',
+          created_at: Date.now(),
+        }])
         const response = await safeInvoke<ChatMessage>('send_prompt', {
           prompt: effectivePrompt,
           sessionId: targetSession.id,
@@ -4719,10 +4728,16 @@ function App() {
           messages: historyMessages,
           images,
         })
-        setSessionMessages(targetSession.id, current => [...current, {
-          ...response,
-          created_at: response.created_at ?? Date.now(),
-        }])
+        setSessionMessages(targetSession.id, current => current.map(message =>
+          message.id === fallbackAssistantId
+            ? {
+                ...response,
+                id: response.id || fallbackAssistantId,
+                created_at: response.created_at ?? Date.now(),
+              }
+            : message,
+        ))
+        setStreamingMessageId(null)
         appendRuntimeEvent({
           id: runtimeEventId('fallback-result'),
           label: '完成',
@@ -4735,10 +4750,27 @@ function App() {
       if (isAuthExpiredMessage(message)) {
         setAuthExpiredMessage(message)
         setNotice(null)
-      } else {
-        addSystemMessage(message, targetSession.id)
       }
+      setSessionMessages(targetSession.id, current => {
+        const pending = [...current].reverse().find(item => item.role === 'assistant' && item.content.startsWith('正在思考'))
+        if (!pending) {
+          return [...current, {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: message,
+            created_at: Date.now(),
+          }]
+        }
+        return current.map(item => item.id === pending.id ? { ...item, content: message } : item)
+      })
+      appendRuntimeEvent({
+        id: runtimeEventId('request-error'),
+        label: '请求失败',
+        value: message,
+        tone: 'warning',
+      })
     } finally {
+      setStreamingMessageId(null)
       setIsSending(false)
     }
   }
