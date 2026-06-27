@@ -2869,20 +2869,15 @@ function App() {
     }
 
     projects.forEach(addProject)
-    addProject({
-      id: workspace.path,
-      name: workspace.folder,
-      path: workspace.path,
-      git_branch: workspace.git_branch,
-      trust_level: null,
-    })
-    addProject({
-      id: activeProjectPathForRequest,
-      name: activeProjectName,
-      path: activeProjectPathForRequest,
-      git_branch: activeProjectGitBranch,
-      trust_level: activeProjectEntry?.trust_level ?? null,
-    })
+    if (activeProjectEntry) {
+      addProject({
+        id: activeProjectPathForRequest,
+        name: activeProjectName,
+        path: activeProjectPathForRequest,
+        git_branch: activeProjectGitBranch,
+        trust_level: activeProjectEntry.trust_level,
+      })
+    }
 
     return Array.from(entries.values())
   }, [activeProjectEntry?.trust_level, activeProjectGitBranch, activeProjectName, activeProjectPathForRequest, projects, workspace])
@@ -3759,10 +3754,10 @@ function App() {
       if (activeSession.project_path === project.path) {
         const nextSession = sessions.find(session => session.project_path !== project.path)
         setActiveSessionId(nextSession?.id ?? fallbackSnapshot.sessions[0].id)
-        const nextProjectPath = nextSession?.project_path || workspace.path || ''
+        const nextProjectPath = nextSession?.project_path || NO_PROJECT_SELECTION
         setActiveProjectPath(nextProjectPath)
         persistActiveProjectPath(nextProjectPath)
-        void syncActiveProjectToBackend(nextProjectPath)
+        void syncActiveProjectToBackend('')
       }
       await refreshSnapshot().catch(() => {})
     } catch (error) {
@@ -3848,12 +3843,13 @@ function App() {
 
   async function handleAddProjectPath() {
     let path: string | null = null
+    const basePath = activeProjectPathForRequest || workspace.path || undefined
     try {
       path = await safeInvoke<string | null>('pick_project_folder', {
-        basePath: activeProjectPathForRequest,
+        basePath,
       })
     } catch {
-      path = window.prompt('输入项目文件夹路径', activeProjectPathForRequest)
+      path = window.prompt('输入项目文件夹路径', basePath || '')
     }
     if (!path?.trim()) return
 
@@ -3862,7 +3858,7 @@ function App() {
     try {
       const project = await safeInvoke<ProjectEntry>('add_project_path', {
         path: path.trim(),
-        basePath: activeProjectPathForRequest,
+        basePath,
       })
       await activateProject(project)
     } catch (error) {
@@ -6619,9 +6615,8 @@ function App() {
                     <button
                       aria-label={`移除项目 ${project.name}`}
                       className="text-button danger"
-                      disabled={isCurrentProject}
                       onClick={() => handleRemoveProject(project)}
-                      title={isCurrentProject ? '当前项目不能移除' : '移除项目'}
+                      title="移除项目"
                       type="button"
                     >
                       <Trash2 size={14} aria-hidden="true" />
@@ -7176,10 +7171,6 @@ function App() {
       const session = sessions.find(item => item.id === contextMenu.sessionId)
       if (!session) return null
       const removableProject = projectEntryForPath(session.project_path)
-      const canRemoveProject =
-        Boolean(removableProject) &&
-        removableProject?.path !== activeProjectPathForRequest &&
-        removableProject?.path !== workspace.path
 
       return (
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={event => event.stopPropagation()}>
@@ -7214,12 +7205,11 @@ function App() {
           {removableProject ? (
             <button
               className="danger"
-              disabled={!canRemoveProject}
               onClick={() => {
                 setContextMenu(null)
                 void handleRemoveProject(removableProject)
               }}
-              title={canRemoveProject ? '移除项目' : '当前项目不能移除'}
+              title="移除项目"
               type="button"
             >
               <Trash2 size={15} aria-hidden="true" />

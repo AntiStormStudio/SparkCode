@@ -526,12 +526,7 @@ async function modelConfig() {
 
 function listProjects() {
   const config = readJson(appConfigPath('projects.json'), { projects: [] })
-  const projects = Array.isArray(config.projects) ? config.projects : []
-  const cwd = workspacePath()
-  if (!projects.some(project => project.path === cwd)) {
-    projects.unshift(projectEntry(cwd))
-  }
-  return projects
+  return Array.isArray(config.projects) ? config.projects : []
 }
 
 function projectEntry(projectPath) {
@@ -862,7 +857,11 @@ async function invoke(command, args = {}) {
       return ensureFreshSparkAuth()
     }
     case 'pick_project_folder': {
-      const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], defaultPath: args.basePath || workspacePath() })
+      const requestedPath = valueString(args.basePath)
+      const defaultPath = requestedPath && requestedPath !== '__sparkcode_no_project__' && fs.existsSync(requestedPath)
+        ? requestedPath
+        : workspacePath()
+      const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], defaultPath })
       return result.canceled ? null : result.filePaths[0]
     }
     case 'get_project_metadata':
@@ -879,6 +878,7 @@ async function invoke(command, args = {}) {
       const projects = listProjects().filter(item => item.path !== removePath)
       saveProjects(projects)
       sessions = sessions.filter(session => session.project_path !== removePath)
+      if (activeProjectPath === removePath) activeProjectPath = null
       return projects
     }
     case 'start_session': {
