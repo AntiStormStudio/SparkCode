@@ -22,6 +22,7 @@
   "build": {
     "appId": "top.spark-ai.sparkcode-app",
     "productName": "Spark Code",
+    "icon": "src-tauri/icons/icon.png",
     "directories": {
       "output": "release"
     },

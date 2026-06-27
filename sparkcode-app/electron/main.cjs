@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -25,6 +25,16 @@ let mainWindow = null
 let backendProcess = null
 let activeProjectPath = null
 let sessions = []
+
+function appIconPath() {
+  if (process.platform === 'darwin') return path.resolve(__dirname, '..', 'src-tauri', 'icons', 'icon.icns')
+  if (process.platform === 'win32') return path.resolve(__dirname, '..', 'src-tauri', 'icons', 'icon.ico')
+  return path.resolve(__dirname, '..', 'src-tauri', 'icons', 'icon.png')
+}
+
+function appPngIconPath() {
+  return path.resolve(__dirname, '..', 'src-tauri', 'icons', 'icon.png')
+}
 
 function homeDir() {
   return os.homedir()
@@ -936,13 +946,17 @@ async function invoke(command, args = {}) {
 }
 
 function createWindow() {
+  if (process.platform === 'darwin' && app.dock) {
+    const dockIcon = nativeImage.createFromPath(appPngIconPath())
+    if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon)
+  }
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 980,
     minHeight: 640,
     title: PRODUCT_NAME,
-    icon: path.resolve(__dirname, '..', 'src-tauri', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    icon: appIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
