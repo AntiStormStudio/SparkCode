@@ -12,6 +12,7 @@ const FIXED_BACKEND_URL = 'https://chat.spark-ai.top'
 const LOCAL_BACKEND_AUTH_TOKEN = 'sparkcode-app-local'
 const DEFAULT_CONTEXT_LIMIT = 256_000
 const LARGE_CONTEXT_LIMIT = 1_000_000
+const LOCAL_PROMPT_TIMEOUT_MS = 45_000
 const SPARK_CODE_API_PATH = '/api/v1/spark-code'
 const OAUTH_CALLBACK_HOST = '127.0.0.1'
 const OAUTH_CALLBACK_PORT = 17654
@@ -60,6 +61,10 @@ function sparkConfigPath() {
   return path.join(homeDir(), '.spark.json')
 }
 
+function sparkBackendConfigPath() {
+  return path.join(configDir(), 'spark.json')
+}
+
 function localSettingsPath() {
   return path.join(configDir(), 'settings.json')
 }
@@ -90,11 +95,21 @@ function writeJson(file, value) {
 }
 
 function readSparkConfig() {
-  return readJson(sparkConfigPath(), {})
+  const primary = readJson(sparkConfigPath(), {})
+  const backend = readJson(sparkBackendConfigPath(), {})
+  return {
+    ...backend,
+    ...primary,
+    env: {
+      ...(backend.env || {}),
+      ...(primary.env || {}),
+    },
+  }
 }
 
 function writeSparkConfig(value) {
   writeJson(sparkConfigPath(), value)
+  writeJson(sparkBackendConfigPath(), value)
 }
 
 function loadRemoteClientConfig() {
@@ -287,6 +302,10 @@ function ensureExtractedBackend() {
 }
 
 function findBackendRoot() {
+  const sourceRoot = path.resolve(__dirname, '..', '..')
+  if (!app.isPackaged && fs.existsSync(path.join(sourceRoot, 'src', 'server', 'server-entry.ts'))) {
+    return sourceRoot
+  }
   const extracted = ensureExtractedBackend()
   if (extracted) return extracted
   return backendRootCandidates().find(candidate =>
@@ -320,6 +339,10 @@ function serverLockPath() {
   return path.join(configDir(), `sparkcode-app-electron-${process.pid}.lock`)
 }
 
+function backendLogPath() {
+  return path.join(configDir(), 'sparkcode-app-backend.log')
+}
+
 function readLocalBackendUrl() {
   return valueString(readJson(serverLockPath(), {}).httpUrl)
 }
@@ -337,8 +360,12 @@ function configureBackendEnv(env) {
   const config = readSparkConfig()
   const next = {
     ...env,
+    SPARK_CONFIG_DIR: configDir(),
+    CLAUDE_CONFIG_DIR: configDir(),
     SPARK_CODE_BACKEND_LAUNCHED_BY: 'sparkcode-app',
     SPARK_CODE_REMOTE_BACKEND_URL: FIXED_BACKEND_URL,
+    API_TIMEOUT_MS: '45000',
+    CLAUDE_CODE_MAX_RETRIES: '0',
     XDG_CACHE_HOME: cacheDir(),
     BUN_INSTALL_CACHE_DIR: path.join(cacheDir(), 'bun-install'),
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(cacheDir(), 'bun-transpiler'),
@@ -361,6 +388,8 @@ function configureBackendEnv(env) {
 function ensureLocalBackend() {
   ensureDir(configDir())
   ensureDir(cacheDir())
+  writeSparkConfig(readSparkConfig())
+  cleanupLegacyBackendLocks()
   if (backendProcess && !backendProcess.killed) {
     return backendRuntimeSnapshot()
   }
@@ -368,6 +397,8 @@ function ensureLocalBackend() {
   if (!root) throw new Error('无法找到 Spark Code 后端资源')
   const bun = bundledBun(root)
   const entry = path.join(root, 'src', 'server', 'server-entry.ts')
+  const logFd = fs.openSync(backendLogPath(), 'a')
+  fs.writeSync(logFd, `\n[${new Date().toISOString()}] starting backend root=${root} workspace=${workspacePath()}\n`)
   const args = [
     '--no-orphans',
     'run',
@@ -386,10 +417,15 @@ function ensureLocalBackend() {
     cwd: root,
     env: configureBackendEnv(process.env),
     detached: false,
-    stdio: ['ignore', 'ignore', 'ignore'],
+    stdio: ['ignore', logFd, logFd],
     windowsHide: true,
   })
   backendProcess.once('exit', () => {
+    try {
+      fs.closeSync(logFd)
+    } catch {
+      // Ignore log cleanup failures.
+    }
     backendProcess = null
   })
   return backendRuntimeSnapshot()
@@ -402,6 +438,18 @@ function stopLocalBackend() {
   backendProcess = null
   try {
     fs.rmSync(serverLockPath(), { force: true })
+  } catch {
+    // Ignore cleanup failures.
+  }
+}
+
+function cleanupLegacyBackendLocks() {
+  try {
+    for (const entry of fs.readdirSync(configDir())) {
+      if (/^sparkcode-app-\d+\.lock$/.test(entry)) {
+        fs.rmSync(path.join(configDir(), entry), { force: true })
+      }
+    }
   } catch {
     // Ignore cleanup failures.
   }
@@ -421,14 +469,27 @@ async function postLocalBackendJson(route, body) {
   ensureLocalBackend()
   const base = await waitForLocalBackendUrl()
   if (!base) throw new Error('本地 Spark Code 后端尚未就绪')
-  const response = await fetch(`${base}${route}`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${LOCAL_BACKEND_AUTH_TOKEN}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), LOCAL_PROMPT_TIMEOUT_MS)
+  let response
+  try {
+    response = await fetch(`${base}${route}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${LOCAL_BACKEND_AUTH_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('请求超时：后端 45 秒内没有返回，请稍后重试')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
   const text = await response.text()
   let value = {}
   try {
@@ -522,6 +583,7 @@ async function getCreditStatus() {
       if (!nextToken) throw error
       const profile = await fetchProfile(nextToken).catch(() => null)
       saveSparkLogin(refreshed, profile)
+      stopLocalBackend()
       return fetchStatus(nextToken)
     })
     const dailyLimit = Number(value.daily_limit || 0)
@@ -897,9 +959,10 @@ async function fetchProfile(accessToken) {
 function saveSparkLogin(token, profile) {
   const config = readSparkConfig()
   config.env = config.env || {}
+  const previousRefreshToken = config.env[SPARK_REFRESH_TOKEN_ENV_KEY]
   const accessToken = token.access_token || token.accessToken
   if (accessToken) config.env[SPARK_AUTH_TOKEN_ENV_KEY] = accessToken
-  if (token.refresh_token || token.refreshToken) config.env[SPARK_REFRESH_TOKEN_ENV_KEY] = token.refresh_token || token.refreshToken
+  config.env[SPARK_REFRESH_TOKEN_ENV_KEY] = token.refresh_token || token.refreshToken || previousRefreshToken
   config.env[SPARK_BASE_URL_ENV_KEY] = FIXED_BACKEND_URL
   if (profile) config.oauthAccount = profile
   writeSparkConfig(config)
@@ -1048,6 +1111,7 @@ async function invoke(command, args = {}) {
         const message = error instanceof Error ? error.message : String(error)
         if (!/未登录|401|unauthorized/i.test(message)) throw error
         await ensureFreshSparkAuth()
+        stopLocalBackend()
         ensureLocalBackend()
         return postLocalBackendJson('/prompt', body)
       })
