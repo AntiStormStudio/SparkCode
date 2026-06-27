@@ -495,7 +495,8 @@ async function postLocalBackendJson(route, body) {
     if (error?.name === 'AbortError') {
       throw new Error('请求超时：后端 45 秒内没有返回，请稍后重试')
     }
-    throw error
+    const reason = error?.cause?.message || error?.message || String(error)
+    throw new Error(`本地后端请求失败：${reason}`)
   } finally {
     clearTimeout(timeout)
   }

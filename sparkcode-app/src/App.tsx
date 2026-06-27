@@ -2149,7 +2149,10 @@ async function safeInvoke<T>(command: string, args?: Record<string, unknown>): P
     if (/undefined.*invoke|reading 'invoke'|__TAURI__|__TAURI_INTERNALS__/i.test(message)) {
       throw new Error(TAURI_INVOKE_UNAVAILABLE_MESSAGE)
     }
-    const cleaned = message.replace(/^Error invoking remote method 'sparkcode:invoke': Error:\s*/i, '').trim()
+    const cleaned = message
+      .replace(/^Error invoking remote method 'sparkcode:invoke':\s*/i, '')
+      .replace(/^(Error|TypeError):\s*/i, '')
+      .trim()
     throw new Error(cleaned || message)
   }
 }
@@ -3171,6 +3174,7 @@ function App() {
     try {
       const next = normalizeBackendModelConfig(await safeInvoke<ModelConfig>('save_model_config', { model: selected }))
       setSnapshot(current => ({ ...current, model: next }))
+      setChangeNotice('切换模型可能会使效率下降')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error))
     } finally {
