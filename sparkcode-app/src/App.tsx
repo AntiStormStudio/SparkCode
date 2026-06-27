@@ -5657,7 +5657,7 @@ function App() {
                     setBranchMenuOpen(false)
                     setModelMenuOpen(value => {
                       const next = !value
-                      if (next && snapshot.model.options.length === 0 && !isLoadingModelConfig) {
+                      if (next && !isLoadingModelConfig) {
                         void refreshModelConfig()
                       }
                       return next
@@ -5672,6 +5672,9 @@ function App() {
                   <div aria-busy={isLoadingModelConfig} className="model-menu-popover" role="listbox" aria-label="模型名称">
                     {hasModelOptions ? (
                       <>
+                        <div className="model-menu-count" role="presentation">
+                          {isLoadingModelConfig ? '正在同步模型列表' : `已同步 ${modelOptions.length} 个模型`}
+                        </div>
                         {modelOptions.map(option => (
                           <button
                             aria-selected={snapshot.model.selected === option.id}
@@ -5706,7 +5709,7 @@ function App() {
                           </span>
                           <span className="model-option-copy">
                             <strong>刷新模型列表</strong>
-                            <small>{modelSyncError || '从后端重新同步'}</small>
+                            <small>{modelSyncError || `当前 ${modelOptions.length} 个模型`}</small>
                           </span>
                         </button>
                       </>

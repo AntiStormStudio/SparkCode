@@ -513,7 +513,13 @@ async function postLocalBackendJson(route, body) {
 }
 
 async function curlJson(url, options = {}) {
-  const response = await fetch(url, options)
+  let response
+  try {
+    response = await fetch(url, options)
+  } catch (error) {
+    const reason = error?.cause?.message || error?.message || String(error)
+    throw new Error(`网络请求失败：${url} · ${reason}`)
+  }
   const text = await response.text()
   let value = {}
   try {

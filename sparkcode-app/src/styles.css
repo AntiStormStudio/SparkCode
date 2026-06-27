@@ -3659,6 +3659,12 @@ p {
   background: rgba(141, 184, 255, 0.1);
 }
 
+.model-menu-count {
+  padding: 5px 8px 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .model-menu-popover button {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
