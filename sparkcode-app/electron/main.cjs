@@ -7,6 +7,7 @@ const crypto = require('crypto')
 const { spawn, execFileSync } = require('child_process')
 
 const PRODUCT_NAME = 'Spark Code'
+const APP_USER_MODEL_ID = 'top.spark-ai.sparkcode-app'
 const FIXED_BACKEND_URL = 'https://chat.spark-ai.top'
 const LOCAL_BACKEND_AUTH_TOKEN = 'sparkcode-app-local'
 const DEFAULT_CONTEXT_LIMIT = 256_000
@@ -25,6 +26,10 @@ let mainWindow = null
 let backendProcess = null
 let activeProjectPath = null
 let sessions = []
+
+app.name = PRODUCT_NAME
+app.setName(PRODUCT_NAME)
+app.setAppUserModelId(APP_USER_MODEL_ID)
 
 function appIconPath() {
   if (process.platform === 'darwin') return path.resolve(__dirname, '..', 'src-tauri', 'icons', 'icon.icns')
