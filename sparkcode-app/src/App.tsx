@@ -405,7 +405,7 @@ function creditIsLow(status: CreditStatus): boolean {
 }
 
 function creditLine(status: CreditStatus): string {
-  if (status.error) return `额度读取失败：${status.error}`
+  if (status.error) return status.error
   return `今日 ${formatCredit(status.daily_remaining)} / ${formatCredit(status.daily_limit)} · 永久 ${formatCredit(status.credit)}`
 }
 
@@ -7475,7 +7475,7 @@ function App() {
                   <div className="credit-status-head">
                     <Gauge size={16} aria-hidden="true" />
                     <span>剩余额度</span>
-                    <strong>{formatCredit(creditStatus.available)}</strong>
+                    <strong>{creditStatus.error ? '--' : formatCredit(creditStatus.available)}</strong>
                   </div>
                   <p>{creditLine(creditStatus)}</p>
                   {creditIsLow(creditStatus) ? (

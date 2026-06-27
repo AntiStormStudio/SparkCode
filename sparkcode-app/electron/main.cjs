@@ -574,6 +574,14 @@ function emptyCreditStatus(error = null) {
   }
 }
 
+function normalizeCreditError(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/401|unauthorized/i.test(message)) {
+    return '计费接口未授权：Spark Code OAuth 已登录，但主平台额度接口尚未放行该令牌'
+  }
+  return message
+}
+
 async function getCreditStatus() {
   const config = readSparkConfig()
   const token = envString(config, SPARK_AUTH_TOKEN_ENV_KEY)
@@ -614,7 +622,7 @@ async function getCreditStatus() {
       error: null,
     }
   } catch (error) {
-    return emptyCreditStatus(error instanceof Error ? error.message : String(error))
+    return emptyCreditStatus(normalizeCreditError(error))
   }
 }
 
