@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -40,6 +40,7 @@ jobs:
         run: bun run ./src/dev-entry.ts --version
 
       - name: Verify package script
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           bash scripts/package-release.sh
@@ -47,3 +48,9 @@ jobs:
         env:
           DIST_DIR: ${{ github.workspace }}/dist
           INCLUDE_WINDOWS_BUN: "0"
+
+      - name: Verify Electron app build
+        working-directory: sparkcode-app
+        run: |
+          bun install --frozen-lockfile
+          bun run build

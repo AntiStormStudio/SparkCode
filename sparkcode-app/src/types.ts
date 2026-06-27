@@ -25,6 +25,21 @@ export type SparkUserProfile = {
   account_created_at: string | null
 }
 
+export type CreditStatus = {
+  available: number
+  credit: number
+  daily_limit: number
+  daily_used: number
+  daily_remaining: number
+  daily_reset_at: number | null
+  emergency_remaining: number
+  emergency_reset_at: number | null
+  subscription_name: string | null
+  subscription_expires_at: number | null
+  topup_url: string
+  error: string | null
+}
+
 export type RemoteDeviceBinding = {
   configured: boolean
   bound: boolean
@@ -43,6 +58,7 @@ export type AppPreferences = {
   sandbox_auto_allow: boolean
   remote_control_at_startup: boolean | null
   auto_compact_enabled: boolean
+  context_limit: number
   show_turn_duration: boolean
   terminal_progress_bar_enabled: boolean
   file_checkpointing_enabled: boolean
@@ -195,6 +211,7 @@ export type AppSnapshot = {
   version: string
   remote: RemoteConfig
   spark_user: SparkUserProfile
+  credit_status: CreditStatus
   remote_device: RemoteDeviceBinding
   preferences: AppPreferences
   model: ModelConfig

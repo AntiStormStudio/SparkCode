@@ -7,10 +7,10 @@ import {
   normalizeApiBaseUrl,
 } from '../../utils/auth.js'
 import { getUserAgent } from '../../utils/http.js'
-import { refreshConfiguredAndroidToken } from '../../utils/sparkAndroidAuth.js'
+import { refreshConfiguredSparkOAuthToken } from '../../utils/sparkOAuthAuth.js'
 
-const ANDROID_CHAT_COMPLETIONS_PATH = '/api/v1/android/chat/completions'
-const ANDROID_AUTH_EXPIRED_MESSAGE =
+const SPARK_CODE_OAUTH_CHAT_COMPLETIONS_PATH = '/api/v1/spark-code/oauth/chat/completions'
+const SPARK_OAUTH_AUTH_EXPIRED_MESSAGE =
   '登录已过期或令牌无效，请运行 /login 重新登录'
 
 type JsonObject = Record<string, unknown>
@@ -189,12 +189,12 @@ function convertAnthropicContentToOpenAI(
     }
   }
 
-  const messages: OpenAIMessage[] = []
+  const primaryMessages: OpenAIMessage[] = []
   const reasoningContent = role === 'assistant' && reasoningParts.length > 0
     ? reasoningParts.join('\n')
     : undefined
   if (toolCalls.length > 0) {
-    messages.push({
+    primaryMessages.push({
       role,
       content: textParts.join('\n'),
       ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
@@ -202,21 +202,76 @@ function convertAnthropicContentToOpenAI(
     })
   } else if (multimodalParts.length > 0) {
     const onlyText = multimodalParts.every(part => part.type === 'text')
-    messages.push({
+    primaryMessages.push({
       role,
       content: onlyText ? textParts.join('\n') : multimodalParts,
       ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
     })
   } else if (reasoningContent) {
-    messages.push({
+    primaryMessages.push({
       role,
       content: '',
       reasoning_content: reasoningContent,
     })
   }
 
-  messages.push(...toolMessages)
+  const messages =
+    role === 'user' && toolMessages.length > 0
+      ? [...toolMessages, ...primaryMessages]
+      : [...primaryMessages, ...toolMessages]
   return messages.length > 0 ? messages : [{ role, content: '' }]
+}
+
+function openAIToolCallIds(message: OpenAIMessage): string[] {
+  if (!Array.isArray(message.tool_calls)) return []
+  return message.tool_calls.flatMap(call => {
+    if (!isRecord(call)) return []
+    const id = getString(call.id)
+    return id ? [id] : []
+  })
+}
+
+function sanitizeOpenAIToolPairs(messages: OpenAIMessage[]): OpenAIMessage[] {
+  const result: OpenAIMessage[] = []
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]!
+
+    if (message.role === 'tool') {
+      continue
+    }
+
+    result.push(message)
+
+    if (message.role !== 'assistant') {
+      continue
+    }
+
+    const requiredIds = openAIToolCallIds(message)
+    if (requiredIds.length === 0) {
+      continue
+    }
+
+    const pendingIds = new Set(requiredIds)
+    while (messages[index + 1]?.role === 'tool') {
+      const toolMessage = messages[index + 1]!
+      index += 1
+      const toolCallId = getString(toolMessage.tool_call_id)
+      if (!toolCallId || !pendingIds.has(toolCallId)) {
+        continue
+      }
+      result.push(toolMessage)
+      pendingIds.delete(toolCallId)
+    }
+
+    for (const missingId of pendingIds) {
+      result.push({
+        role: 'tool',
+        tool_call_id: missingId,
+        content: '[Tool result missing after conversation recovery]',
+      })
+    }
+  }
+  return result
 }
 
 function convertAnthropicToOpenAI(payload: JsonObject): JsonObject {
@@ -239,7 +294,7 @@ function convertAnthropicToOpenAI(payload: JsonObject): JsonObject {
 
   const nextPayload: JsonObject = {
     model: getString(payload.model) ?? '',
-    messages,
+    messages: sanitizeOpenAIToolPairs(messages),
     stream: false,
   }
 
@@ -442,7 +497,7 @@ async function postAndroidChatCompletion(
   openAIPayload: JsonObject,
   signal: AbortSignal | null | undefined,
 ): Promise<Response> {
-  return fetch(`${baseUrl}${ANDROID_CHAT_COMPLETIONS_PATH}`, {
+  return fetch(`${baseUrl}${SPARK_CODE_OAUTH_CHAT_COMPLETIONS_PATH}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${authToken}`,
@@ -482,9 +537,9 @@ export async function maybeHandleSparkAndroidChatFetch(
   }
 
   if (!authToken) {
-    authToken = await refreshConfiguredAndroidToken(baseUrl)
+    authToken = await refreshConfiguredSparkOAuthToken(baseUrl)
     if (!authToken) {
-      return hadAndroidAuth ? errorResponse(ANDROID_AUTH_EXPIRED_MESSAGE, 401) : null
+      return hadAndroidAuth ? errorResponse(SPARK_OAUTH_AUTH_EXPIRED_MESSAGE, 401) : null
     }
   }
 
@@ -500,7 +555,7 @@ export async function maybeHandleSparkAndroidChatFetch(
   )
 
   if (response.status === 401) {
-    const nextAuthToken = await refreshConfiguredAndroidToken(baseUrl)
+    const nextAuthToken = await refreshConfiguredSparkOAuthToken(baseUrl)
     if (nextAuthToken) {
       response = await postAndroidChatCompletion(
         baseUrl,
@@ -511,7 +566,7 @@ export async function maybeHandleSparkAndroidChatFetch(
     }
     if (!nextAuthToken || response.status === 401) {
       clearConfiguredAndroidAuth()
-      return errorResponse(ANDROID_AUTH_EXPIRED_MESSAGE, 401)
+      return errorResponse(SPARK_OAUTH_AUTH_EXPIRED_MESSAGE, 401)
     }
   }
 

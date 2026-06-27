@@ -1,5 +1,8 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -53,6 +56,22 @@ struct SparkUserProfile {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+struct CreditStatus {
+    available: f64,
+    credit: f64,
+    daily_limit: f64,
+    daily_used: f64,
+    daily_remaining: f64,
+    daily_reset_at: Option<i64>,
+    emergency_remaining: i64,
+    emergency_reset_at: Option<i64>,
+    subscription_name: Option<String>,
+    subscription_expires_at: Option<i64>,
+    topup_url: String,
+    error: Option<String>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 struct RemoteDeviceBinding {
     configured: bool,
     bound: bool,
@@ -82,6 +101,7 @@ struct AppPreferences {
     sandbox_auto_allow: bool,
     remote_control_at_startup: Option<bool>,
     auto_compact_enabled: bool,
+    context_limit: u32,
     show_turn_duration: bool,
     terminal_progress_bar_enabled: bool,
     file_checkpointing_enabled: bool,
@@ -156,6 +176,7 @@ struct AppSnapshot {
     version: String,
     remote: RemoteConfig,
     spark_user: SparkUserProfile,
+    credit_status: CreditStatus,
     remote_device: RemoteDeviceBinding,
     preferences: AppPreferences,
     model: ModelConfig,
@@ -298,15 +319,24 @@ const SPARK_DEVICE_ID_ENV_KEY: &str = "SPARK_ANDROID_DEVICE_ID";
 const SPARK_REFRESH_TOKEN_ENV_KEY: &str = "SPARK_ANDROID_REFRESH_TOKEN";
 const SPARK_AUTH_TOKEN_ENV_KEY: &str = "ANTHROPIC_AUTH_TOKEN";
 const SPARK_BASE_URL_ENV_KEY: &str = "ANTHROPIC_BASE_URL";
+const SPARK_OAUTH_CLIENT_SECRET_ENV_KEY: &str = "SPARK_OAUTH_CLIENT_SECRET";
 const BUNDLED_BACKEND_ROOT_ENV_KEY: &str = "SPARK_CODE_BUNDLED_BACKEND_ROOT";
 const SPARK_PACKAGE_NAME: &str = "com.sparkatlas.app";
 const SPARK_APP_VERSION: &str = "9.0.3";
-const SPARK_CERT_SHA256: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const OAUTH_CALLBACK_PATH: &str = "/spark/oauth/callback";
-const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth/mobile/authorize";
-const SPARK_AUTH_REFRESH_PATH: &str = "/api/v1/android/auth/refresh";
+const OAUTH_CALLBACK_HOST: &str = "127.0.0.1";
+const OAUTH_CALLBACK_PORT: u16 = 17654;
+const SPARK_OAUTH_CLIENT_ID: &str = "spc_dHO3yMN-aKwgza37p2DNozfI47-SEXx9";
+const SPARK_OAUTH_SCOPE: &str = "openid profile email";
+const SPARK_OAUTH_AUTHORIZE_PATH: &str = "/oauth2/authorize";
+const SPARK_OAUTH_TOKEN_PATH: &str = "/oauth2/token";
+const SPARK_OAUTH_USERINFO_PATH: &str = "/oauth2/userinfo";
 const SPARK_CODE_API_PATH: &str = "/api/v1/spark-code";
-const SPARK_MODEL_LIST_PATH: &str = "/api/v1/android/models";
+const SPARK_MODEL_LIST_PATH: &str = "/api/v1/spark-code/oauth/models";
+const SPARK_CREDIT_STATUS_PATH: &str = "/api/v1/credit/status";
+const SPARK_CREDIT_TOPUP_URL: &str = "https://chat.spark-ai.top/?settings=credit";
+const DEFAULT_CONTEXT_LIMIT: u32 = 256_000;
+const LARGE_CONTEXT_LIMIT: u32 = 1_000_000;
 const UPDATE_CHECK_BRANCH: &str = "main";
 
 fn default_remote_config() -> RemoteConfig {
@@ -445,38 +475,52 @@ fn model_options_from_value(value: &Value) -> Vec<ModelOption> {
 
 fn remote_backend_model_options() -> Vec<ModelOption> {
     let config = read_spark_config();
-    let Some(auth_token) = env_string(&config, SPARK_AUTH_TOKEN_ENV_KEY) else {
+    let Some(mut auth_token) = env_string(&config, SPARK_AUTH_TOKEN_ENV_KEY) else {
         return Vec::new();
     };
     let url = format!("{FIXED_BACKEND_URL}{SPARK_MODEL_LIST_PATH}");
-    let Ok(value) = curl_json(&[
-        "-sS".to_string(),
-        "--max-time".to_string(),
-        "3".to_string(),
-        "-w".to_string(),
-        "\n%{http_code}".to_string(),
-        "-H".to_string(),
-        format!("Authorization: Bearer {auth_token}"),
-        "-H".to_string(),
-        "Content-Type: application/json".to_string(),
-        url,
-    ]) else {
-        return Vec::new();
+    let request_models = |token: &str| {
+        curl_json(&[
+            "-sS".to_string(),
+            "--max-time".to_string(),
+            "3".to_string(),
+            "-w".to_string(),
+            "\n%{http_code}".to_string(),
+            "-H".to_string(),
+            format!("Authorization: Bearer {token}"),
+            "-H".to_string(),
+            "Content-Type: application/json".to_string(),
+            url.clone(),
+        ])
+    };
+
+    let value = match request_models(&auth_token) {
+        Ok(value) => value,
+        Err(_) => {
+            let Some(refresh_token) = env_string(&config, SPARK_REFRESH_TOKEN_ENV_KEY) else {
+                return Vec::new();
+            };
+            let Ok(token_response) = exchange_oauth_refresh_token(&refresh_token) else {
+                return Vec::new();
+            };
+            let Some(next_token) = value_string(token_response.get("access_token"))
+                .or_else(|| value_string(token_response.get("accessToken")))
+            else {
+                return Vec::new();
+            };
+            let _ = save_spark_login(token_response, None);
+            auth_token = next_token;
+            let Ok(value) = request_models(&auth_token) else {
+                return Vec::new();
+            };
+            value
+        }
     };
     model_options_from_value(&value)
 }
 
 fn backend_model_options() -> Vec<ModelOption> {
-    let remote_options = remote_backend_model_options();
-    if !remote_options.is_empty() {
-        return remote_options;
-    }
-
-    start_spark_backend();
-    let Ok(value) = post_local_backend_json("/model-options", &serde_json::json!({})) else {
-        return Vec::new();
-    };
-    model_options_from_value(&value)
+    remote_backend_model_options()
 }
 
 fn model_config() -> &'static Mutex<ModelConfig> {
@@ -1230,6 +1274,107 @@ fn load_spark_user_profile(config: &Value) -> SparkUserProfile {
     }
 }
 
+fn empty_credit_status(error: Option<String>) -> CreditStatus {
+    CreditStatus {
+        available: 0.0,
+        credit: 0.0,
+        daily_limit: 0.0,
+        daily_used: 0.0,
+        daily_remaining: 0.0,
+        daily_reset_at: None,
+        emergency_remaining: 0,
+        emergency_reset_at: None,
+        subscription_name: None,
+        subscription_expires_at: None,
+        topup_url: SPARK_CREDIT_TOPUP_URL.to_string(),
+        error,
+    }
+}
+
+fn value_f64(value: Option<&Value>) -> Option<f64> {
+    value.and_then(|item| {
+        item.as_f64().or_else(|| {
+            item.as_str()
+                .and_then(|text| text.trim().parse::<f64>().ok())
+        })
+    })
+}
+
+fn value_i64(value: Option<&Value>) -> Option<i64> {
+    value.and_then(|item| {
+        item.as_i64().or_else(|| {
+            item.as_str()
+                .and_then(|text| text.trim().parse::<i64>().ok())
+        })
+    })
+}
+
+fn fetch_credit_status_for_token(access_token: &str) -> Result<CreditStatus, String> {
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_CREDIT_STATUS_PATH}");
+    let value = curl_json(&[
+        "-sS".to_string(),
+        "--max-time".to_string(),
+        "5".to_string(),
+        "-w".to_string(),
+        "\n%{http_code}".to_string(),
+        "-H".to_string(),
+        format!("Authorization: Bearer {access_token}"),
+        url,
+    ])?;
+    let credit = value_f64(value.get("credit")).unwrap_or_default();
+    let daily_limit = value_f64(value.get("daily_limit")).unwrap_or_default();
+    let daily_used = value_f64(value.get("daily_used")).unwrap_or_default();
+    let daily_remaining =
+        value_f64(value.get("daily_remaining")).unwrap_or_else(|| (daily_limit - daily_used).max(0.0));
+    let subscription = value.get("subscription").and_then(Value::as_object);
+    Ok(CreditStatus {
+        available: (daily_remaining + credit).max(0.0),
+        credit,
+        daily_limit,
+        daily_used,
+        daily_remaining,
+        daily_reset_at: value_i64(value.get("daily_reset_at")),
+        emergency_remaining: value_i64(value.get("emergency_remaining")).unwrap_or_default(),
+        emergency_reset_at: value_i64(value.get("emergency_reset_at")),
+        subscription_name: subscription.and_then(|item| {
+            value_string(item.get("product_name"))
+                .or_else(|| value_string(item.get("name")))
+                .or_else(|| value_string(item.get("title")))
+        }),
+        subscription_expires_at: subscription.and_then(|item| {
+            value_i64(item.get("expires_at"))
+                .or_else(|| value_i64(item.get("expiresAt")))
+        }),
+        topup_url: SPARK_CREDIT_TOPUP_URL.to_string(),
+        error: None,
+    })
+}
+
+fn load_credit_status(config: &Value) -> CreditStatus {
+    let Some(access_token) = env_string(config, SPARK_AUTH_TOKEN_ENV_KEY) else {
+        return empty_credit_status(Some("未登录".to_string()));
+    };
+    match fetch_credit_status_for_token(&access_token) {
+        Ok(status) => status,
+        Err(error) => {
+            let Some(refresh_token) = env_string(config, SPARK_REFRESH_TOKEN_ENV_KEY) else {
+                return empty_credit_status(Some(error));
+            };
+            let Ok(token_response) = exchange_oauth_refresh_token(&refresh_token) else {
+                return empty_credit_status(Some(error));
+            };
+            let Some(next_token) = value_string(token_response.get("access_token"))
+                .or_else(|| value_string(token_response.get("accessToken")))
+            else {
+                return empty_credit_status(Some(error));
+            };
+            let _ = save_spark_login(token_response, None);
+            fetch_credit_status_for_token(&next_token)
+                .unwrap_or_else(|retry_error| empty_credit_status(Some(retry_error)))
+        }
+    }
+}
+
 fn clear_spark_login_state() -> Result<Value, String> {
     let mut config = read_spark_config();
     if let Some(env_root) = config.get_mut("env").and_then(Value::as_object_mut) {
@@ -1298,6 +1443,10 @@ fn load_preferences(config: &Value) -> AppPreferences {
             .get("remoteControlAtStartup")
             .and_then(Value::as_bool),
         auto_compact_enabled: config_bool(config, "autoCompactEnabled", true),
+        context_limit: match value_u32(config.get("contextLimit")) {
+            Some(LARGE_CONTEXT_LIMIT) => LARGE_CONTEXT_LIMIT,
+            _ => DEFAULT_CONTEXT_LIMIT,
+        },
         show_turn_duration: config_bool(config, "showTurnDuration", true),
         terminal_progress_bar_enabled: config_bool(config, "terminalProgressBarEnabled", true),
         file_checkpointing_enabled: config_bool(config, "fileCheckpointingEnabled", true),
@@ -1548,26 +1697,35 @@ fn curl_json(args: &[String]) -> Result<Value, String> {
     serde_json::from_str(body).map_err(|error| format!("无法解析后端响应：{error}"))
 }
 
-fn build_oauth_callback_url(port: u16) -> String {
-    format!("http://localhost:{port}{OAUTH_CALLBACK_PATH}")
+fn build_oauth_callback_url() -> String {
+    format!("http://{OAUTH_CALLBACK_HOST}:{OAUTH_CALLBACK_PORT}{OAUTH_CALLBACK_PATH}")
+}
+
+fn pkce_verifier() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect()
+}
+
+fn pkce_challenge(verifier: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
 
 fn build_spark_oauth_url(
     base_url: &str,
     redirect_uri: &str,
     state: &str,
-    install_id: &str,
-    device_id: &str,
+    code_challenge: &str,
 ) -> String {
     format!(
-        "{base_url}{SPARK_OAUTH_AUTHORIZE_PATH}?redirect_uri={}&response_mode=query&install_id={}&device_id={}&package_name={}&cert_sha256={}&app_version={}&state={}",
+        "{base_url}{SPARK_OAUTH_AUTHORIZE_PATH}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256",
+        url_encode(SPARK_OAUTH_CLIENT_ID),
         url_encode(redirect_uri),
-        url_encode(install_id),
-        url_encode(device_id),
-        url_encode(SPARK_PACKAGE_NAME),
-        url_encode(SPARK_CERT_SHA256),
-        url_encode(SPARK_APP_VERSION),
+        url_encode(SPARK_OAUTH_SCOPE),
         url_encode(state),
+        url_encode(code_challenge),
     )
 }
 
@@ -1622,14 +1780,14 @@ fn wait_for_oauth_code(listener: TcpListener, expected_state: &str) -> Result<St
                     return Err("授权状态校验失败，请重新运行 /login".to_string());
                 }
 
-                let refresh_token = query_value(query, "refresh_token")
-                    .ok_or_else(|| "授权回调里没有刷新令牌".to_string())?;
+                let code = query_value(query, "code")
+                    .ok_or_else(|| "授权回调里没有授权码".to_string())?;
                 write_oauth_html(
                     &mut stream,
-                    "登录成功",
-                    "可以关闭这个页面，回到 Spark Code。",
+                    "授权已收到",
+                    "正在返回 Spark Code 完成登录，请稍候查看客户端状态。",
                 );
-                return Ok(refresh_token);
+                return Ok(code);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(100));
@@ -1639,22 +1797,26 @@ fn wait_for_oauth_code(listener: TcpListener, expected_state: &str) -> Result<St
     }
 }
 
-fn exchange_android_refresh_token(
-    refresh_token: &str,
-    install_id: &str,
-    device_id: &str,
+fn exchange_oauth_code(
+    code: &str,
+    redirect_uri: &str,
+    code_verifier: &str,
 ) -> Result<Value, String> {
-    let body = serde_json::json!({
-        "refresh_token": refresh_token,
-        "install_id": install_id,
-        "device_id": device_id,
-        "package_name": SPARK_PACKAGE_NAME,
-        "cert_sha256": SPARK_CERT_SHA256,
-        "app_version": SPARK_APP_VERSION,
-    });
-    let body_text =
-        serde_json::to_string(&body).map_err(|error| format!("无法序列化登录请求：{error}"))?;
-    let url = format!("{FIXED_BACKEND_URL}{SPARK_AUTH_REFRESH_PATH}");
+    let mut body_text = format!(
+        "grant_type=authorization_code&client_id={}&code={}&redirect_uri={}&code_verifier={}",
+        url_encode(SPARK_OAUTH_CLIENT_ID),
+        url_encode(code),
+        url_encode(redirect_uri),
+        url_encode(code_verifier),
+    );
+    if let Ok(secret) = env::var(SPARK_OAUTH_CLIENT_SECRET_ENV_KEY) {
+        let secret = secret.trim();
+        if !secret.is_empty() {
+            body_text.push_str("&client_secret=");
+            body_text.push_str(&url_encode(secret));
+        }
+    }
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_OAUTH_TOKEN_PATH}");
     let value = curl_json(&[
         "-sS".to_string(),
         "--max-time".to_string(),
@@ -1664,7 +1826,7 @@ fn exchange_android_refresh_token(
         "-X".to_string(),
         "POST".to_string(),
         "-H".to_string(),
-        "Content-Type: application/json".to_string(),
+        "Content-Type: application/x-www-form-urlencoded".to_string(),
         "-d".to_string(),
         body_text,
         url,
@@ -1675,35 +1837,59 @@ fn exchange_android_refresh_token(
     {
         return Err("后端没有返回访问令牌".to_string());
     }
-    if value_string(value.get("refresh_token"))
-        .or_else(|| value_string(value.get("refreshToken")))
+    Ok(value)
+}
+
+fn exchange_oauth_refresh_token(refresh_token: &str) -> Result<Value, String> {
+    let mut body_text = format!(
+        "grant_type=refresh_token&client_id={}&refresh_token={}",
+        url_encode(SPARK_OAUTH_CLIENT_ID),
+        url_encode(refresh_token),
+    );
+    if let Ok(secret) = env::var(SPARK_OAUTH_CLIENT_SECRET_ENV_KEY) {
+        let secret = secret.trim();
+        if !secret.is_empty() {
+            body_text.push_str("&client_secret=");
+            body_text.push_str(&url_encode(secret));
+        }
+    }
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_OAUTH_TOKEN_PATH}");
+    let value = curl_json(&[
+        "-sS".to_string(),
+        "--max-time".to_string(),
+        "20".to_string(),
+        "-w".to_string(),
+        "\n%{http_code}".to_string(),
+        "-X".to_string(),
+        "POST".to_string(),
+        "-H".to_string(),
+        "Content-Type: application/x-www-form-urlencoded".to_string(),
+        "-d".to_string(),
+        body_text,
+        url,
+    ])?;
+    if value_string(value.get("access_token"))
+        .or_else(|| value_string(value.get("accessToken")))
         .is_none()
     {
-        return Err("后端没有返回刷新令牌".to_string());
+        return Err("后端没有返回访问令牌".to_string());
     }
     Ok(value)
 }
 
 fn fetch_spark_profile(access_token: &str) -> Option<Value> {
-    for path in [
-        "/api/v1/android/me",
-        "/api/v1/android/user",
-        "/api/v1/android/profile",
-        "/api/v1/android/account",
-    ] {
-        let url = format!("{FIXED_BACKEND_URL}{path}");
-        if let Ok(value) = curl_json(&[
-            "-sS".to_string(),
-            "--max-time".to_string(),
-            "5".to_string(),
-            "-w".to_string(),
-            "\n%{http_code}".to_string(),
-            "-H".to_string(),
-            format!("Authorization: Bearer {access_token}"),
-            url,
-        ]) {
-            return Some(value);
-        }
+    let url = format!("{FIXED_BACKEND_URL}{SPARK_OAUTH_USERINFO_PATH}");
+    if let Ok(value) = curl_json(&[
+        "-sS".to_string(),
+        "--max-time".to_string(),
+        "5".to_string(),
+        "-w".to_string(),
+        "\n%{http_code}".to_string(),
+        "-H".to_string(),
+        format!("Authorization: Bearer {access_token}"),
+        url,
+    ]) {
+        return Some(value);
     }
     None
 }
@@ -1722,6 +1908,113 @@ fn nested_string(value: &Value, paths: &[&[&str]]) -> Option<String> {
         .find_map(|path| value_string(nested_value(value, path)))
 }
 
+fn build_oauth_account(profile: &Value) -> Option<Map<String, Value>> {
+    let account_uuid = nested_string(
+        profile,
+        &[
+            &["sub"],
+            &["uuid"],
+            &["id"],
+            &["account_uuid"],
+            &["accountUuid"],
+            &["account", "uuid"],
+            &["account", "id"],
+        ],
+    )?;
+    let email = nested_string(
+        profile,
+        &[
+            &["email"],
+            &["email_address"],
+            &["emailAddress"],
+            &["account", "email"],
+            &["account", "email_address"],
+            &["account", "emailAddress"],
+        ],
+    )?;
+
+    let mut item = Map::new();
+    item.insert("accountUuid".to_string(), Value::String(account_uuid));
+    item.insert("emailAddress".to_string(), Value::String(email));
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["name"],
+            &["display_name"],
+            &["displayName"],
+            &["preferred_username"],
+            &["account", "display_name"],
+            &["account", "displayName"],
+            &["account", "name"],
+        ],
+    ) {
+        item.insert("displayName".to_string(), Value::String(value));
+    }
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["picture"],
+            &["avatar_url"],
+            &["avatarUrl"],
+            &["account", "picture"],
+            &["account", "avatar_url"],
+            &["account", "avatarUrl"],
+        ],
+    ) {
+        let avatar_url = if value.starts_with('/') {
+            format!("{FIXED_BACKEND_URL}{value}")
+        } else {
+            value
+        };
+        item.insert("avatarUrl".to_string(), Value::String(avatar_url));
+    }
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["organization_uuid"],
+            &["organizationUuid"],
+            &["organization", "uuid"],
+            &["organization", "id"],
+        ],
+    ) {
+        item.insert("organizationUuid".to_string(), Value::String(value));
+    }
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["organization_name"],
+            &["organizationName"],
+            &["organization", "name"],
+            &["organization", "display_name"],
+        ],
+    ) {
+        item.insert("organizationName".to_string(), Value::String(value));
+    }
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["billing_type"],
+            &["billingType"],
+            &["organization", "billing_type"],
+            &["organization", "billingType"],
+        ],
+    ) {
+        item.insert("billingType".to_string(), Value::String(value));
+    }
+    if let Some(value) = nested_string(
+        profile,
+        &[
+            &["created_at"],
+            &["createdAt"],
+            &["account", "created_at"],
+            &["account", "createdAt"],
+        ],
+    ) {
+        item.insert("accountCreatedAt".to_string(), Value::String(value));
+    }
+    Some(item)
+}
+
 fn refresh_spark_user_profile(config: &Value) -> SparkUserProfile {
     let Some(auth_token) = env_string(config, SPARK_AUTH_TOKEN_ENV_KEY) else {
         return load_spark_user_profile(config);
@@ -1729,11 +2022,17 @@ fn refresh_spark_user_profile(config: &Value) -> SparkUserProfile {
     let Some(profile) = fetch_spark_profile(&auth_token) else {
         return load_spark_user_profile(config);
     };
-    save_spark_login(
-        serde_json::json!({ "access_token": auth_token }),
-        Some(profile),
-    )
-    .unwrap_or_else(|_| load_spark_user_profile(config))
+    let mut next_config = config.clone();
+    if let Some(account) = build_oauth_account(&profile) {
+        if let Some(root) = next_config.as_object_mut() {
+            root.insert("hasCompletedOnboarding".to_string(), Value::Bool(true));
+            root.insert("oauthAccount".to_string(), Value::Object(account));
+        }
+        if write_spark_config(&next_config).is_ok() {
+            return load_spark_user_profile(&next_config);
+        }
+    }
+    load_spark_user_profile(config)
 }
 
 fn line_change_counts(before: &str, after: &str) -> (u32, u32) {
@@ -2532,7 +2831,7 @@ fn create_app_session(title: String, project_path: String, remote: bool) -> Sess
         title,
         tokens: 0,
         context_used: 0,
-        context_limit: 1_000_000,
+        context_limit: DEFAULT_CONTEXT_LIMIT,
         project_path,
         remote,
     }
@@ -2606,7 +2905,7 @@ fn backend_runtime_snapshot() -> BackendRuntime {
         local_url: read_local_backend_url(),
         auth_token: LOCAL_BACKEND_AUTH_TOKEN.to_string(),
         streaming_enabled: true,
-        context_limit: 1_000_000,
+        context_limit: load_preferences(&read_spark_config()).context_limit,
     }
 }
 
@@ -3164,6 +3463,7 @@ fn get_app_snapshot(app: tauri::AppHandle) -> AppSnapshot {
         version: env!("CARGO_PKG_VERSION").to_string(),
         remote: remote.clone(),
         spark_user: refresh_spark_user_profile(&spark_config),
+        credit_status: load_credit_status(&spark_config),
         remote_device: load_remote_device_binding(&app, &spark_config),
         preferences: preferences.clone(),
         model,
@@ -3274,6 +3574,12 @@ fn save_preferences(preferences: AppPreferences) -> Result<AppPreferences, Strin
         }
     }
     set_bool(root, "autoCompactEnabled", preferences.auto_compact_enabled);
+    let context_limit = if preferences.context_limit == LARGE_CONTEXT_LIMIT {
+        LARGE_CONTEXT_LIMIT
+    } else {
+        DEFAULT_CONTEXT_LIMIT
+    };
+    root.insert("contextLimit".to_string(), Value::Number(context_limit.into()));
     set_bool(root, "showTurnDuration", preferences.show_turn_duration);
     set_bool(
         root,
@@ -3323,6 +3629,7 @@ fn save_preferences(preferences: AppPreferences) -> Result<AppPreferences, Strin
         app_log(format!("settings:reload-failed {error}"));
     }
     Ok(AppPreferences {
+        context_limit,
         permission_mode,
         ..preferences
     })
@@ -3468,120 +3775,13 @@ fn save_spark_login(
         }
     }
 
-    let mut oauth_account: Option<Map<String, Value>> = None;
-    if let Some(profile) = profile {
-        let account_uuid = nested_string(
-            &profile,
-            &[
-                &["sub"],
-                &["uuid"],
-                &["id"],
-                &["account_uuid"],
-                &["accountUuid"],
-                &["account", "uuid"],
-                &["account", "id"],
-            ],
-        );
-        let email = nested_string(
-            &profile,
-            &[
-                &["email"],
-                &["email_address"],
-                &["emailAddress"],
-                &["account", "email"],
-                &["account", "email_address"],
-                &["account", "emailAddress"],
-            ],
-        );
-
-        if let (Some(account_uuid), Some(email)) = (account_uuid, email) {
-            let mut item = Map::new();
-            item.insert("accountUuid".to_string(), Value::String(account_uuid));
-            item.insert("emailAddress".to_string(), Value::String(email));
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["name"],
-                    &["display_name"],
-                    &["displayName"],
-                    &["preferred_username"],
-                    &["account", "display_name"],
-                    &["account", "displayName"],
-                    &["account", "name"],
-                ],
-            ) {
-                item.insert("displayName".to_string(), Value::String(value));
-            }
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["picture"],
-                    &["avatar_url"],
-                    &["avatarUrl"],
-                    &["account", "picture"],
-                    &["account", "avatar_url"],
-                    &["account", "avatarUrl"],
-                ],
-            ) {
-                let avatar_url = if value.starts_with('/') {
-                    format!("{FIXED_BACKEND_URL}{value}")
-                } else {
-                    value
-                };
-                item.insert("avatarUrl".to_string(), Value::String(avatar_url));
-            }
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["organization_uuid"],
-                    &["organizationUuid"],
-                    &["organization", "uuid"],
-                    &["organization", "id"],
-                ],
-            ) {
-                item.insert("organizationUuid".to_string(), Value::String(value));
-            }
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["organization_name"],
-                    &["organizationName"],
-                    &["organization", "name"],
-                    &["organization", "display_name"],
-                ],
-            ) {
-                item.insert("organizationName".to_string(), Value::String(value));
-            }
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["billing_type"],
-                    &["billingType"],
-                    &["organization", "billing_type"],
-                    &["organization", "billingType"],
-                ],
-            ) {
-                item.insert("billingType".to_string(), Value::String(value));
-            }
-            if let Some(value) = nested_string(
-                &profile,
-                &[
-                    &["created_at"],
-                    &["createdAt"],
-                    &["account", "created_at"],
-                    &["account", "createdAt"],
-                ],
-            ) {
-                item.insert("accountCreatedAt".to_string(), Value::String(value));
-            }
-            oauth_account = Some(item);
-        }
-    }
-
     {
         let root = root_object_mut(&mut config)?;
         root.insert("hasCompletedOnboarding".to_string(), Value::Bool(true));
-        let account = oauth_account.unwrap_or_else(|| {
+        if let Some(account) = profile.as_ref().and_then(build_oauth_account) {
+            root.insert("oauthAccount".to_string(), Value::Object(account));
+        } else if !root.contains_key("oauthAccount") {
+            let account = {
             let mut item = Map::new();
             item.insert(
                 "accountUuid".to_string(),
@@ -3592,8 +3792,9 @@ fn save_spark_login(
                 Value::String("Spark 用户".to_string()),
             );
             item
-        });
-        root.insert("oauthAccount".to_string(), Value::Object(account));
+            };
+            root.insert("oauthAccount".to_string(), Value::Object(account));
+        }
     }
 
     write_spark_config(&config)?;
@@ -3602,29 +3803,17 @@ fn save_spark_login(
 
 #[tauri::command]
 fn start_spark_login(app: tauri::AppHandle) -> Result<String, String> {
-    let mut config = read_spark_config();
-    let (install_id, device_id) = get_or_create_android_device(&mut config)?;
-    write_spark_config(&config)?;
-
-    let listener = TcpListener::bind(("127.0.0.1", 0))
+    let listener = TcpListener::bind((OAUTH_CALLBACK_HOST, OAUTH_CALLBACK_PORT))
         .map_err(|error| format!("无法启动 OAuth 本地回调：{error}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|error| format!("无法读取 OAuth 回调端口：{error}"))?
-        .port();
-    let callback_url = build_oauth_callback_url(port);
+    let callback_url = build_oauth_callback_url();
     let state = compact_id("spark-oauth-");
-    let auth_url = build_spark_oauth_url(
-        FIXED_BACKEND_URL,
-        &callback_url,
-        &state,
-        &install_id,
-        &device_id,
-    );
+    let code_verifier = pkce_verifier();
+    let code_challenge = pkce_challenge(&code_verifier);
+    let auth_url = build_spark_oauth_url(FIXED_BACKEND_URL, &callback_url, &state, &code_challenge);
 
     open_browser(&app, &auth_url)?;
-    let refresh_token = wait_for_oauth_code(listener, &state)?;
-    let token_response = exchange_android_refresh_token(&refresh_token, &install_id, &device_id)?;
+    let code = wait_for_oauth_code(listener, &state)?;
+    let token_response = exchange_oauth_code(&code, &callback_url, &code_verifier)?;
     let access_token = value_string(token_response.get("access_token"))
         .or_else(|| value_string(token_response.get("accessToken")))
         .ok_or_else(|| "后端没有返回访问令牌".to_string())?;
@@ -3639,17 +3828,20 @@ fn start_spark_login(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn refresh_spark_auth() -> Result<SparkUserProfile, String> {
-    let mut config = read_spark_config();
+    let config = read_spark_config();
     let refresh_token = env_string(&config, SPARK_REFRESH_TOKEN_ENV_KEY)
         .ok_or_else(|| "没有可刷新的登录凭据，请重新登录".to_string())?;
-    let (install_id, device_id) = get_or_create_android_device(&mut config)?;
-    write_spark_config(&config)?;
-    let token_response = exchange_android_refresh_token(&refresh_token, &install_id, &device_id)?;
+    let token_response = exchange_oauth_refresh_token(&refresh_token)?;
     let access_token = value_string(token_response.get("access_token"))
         .or_else(|| value_string(token_response.get("accessToken")))
-        .ok_or_else(|| "后端没有返回新的访问令牌".to_string())?;
+        .ok_or_else(|| "后端没有返回访问令牌".to_string())?;
     let profile = fetch_spark_profile(&access_token);
     save_spark_login(token_response, profile)
+}
+
+#[tauri::command]
+fn get_credit_status() -> CreditStatus {
+    load_credit_status(&read_spark_config())
 }
 
 #[tauri::command]
@@ -3858,6 +4050,11 @@ fn open_memory_file() -> Result<String, String> {
 
 fn memory_file_path() -> Result<PathBuf, String> {
     let home = home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
+    Ok(home.join(".sparkc").join("SPARK.md"))
+}
+
+fn legacy_memory_file_path() -> Result<PathBuf, String> {
+    let home = home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
     Ok(home.join(".sparkc").join("CLAUDE.md"))
 }
 
@@ -3875,9 +4072,17 @@ fn ensure_memory_file() -> Result<PathBuf, String> {
 #[tauri::command]
 fn read_memory_file() -> Result<MemoryDocument, String> {
     let path = memory_file_path()?;
-    let exists = path.exists();
+    let legacy_path = legacy_memory_file_path()?;
+    let read_path = if path.exists() {
+        path.clone()
+    } else if legacy_path.exists() {
+        legacy_path
+    } else {
+        path.clone()
+    };
+    let exists = read_path.exists();
     let content = if exists {
-        fs::read_to_string(&path).map_err(|error| format!("无法读取记忆文件：{error}"))?
+        fs::read_to_string(&read_path).map_err(|error| format!("无法读取记忆文件：{error}"))?
     } else {
         String::new()
     };
@@ -3900,6 +4105,10 @@ fn delete_memory_file() -> Result<MemoryDocument, String> {
     let path = memory_file_path()?;
     if path.exists() {
         fs::remove_file(&path).map_err(|error| format!("无法删除记忆文件：{error}"))?;
+    }
+    let legacy_path = legacy_memory_file_path()?;
+    if legacy_path.exists() {
+        fs::remove_file(&legacy_path).map_err(|error| format!("无法删除旧记忆文件：{error}"))?;
     }
     Ok(MemoryDocument {
         path: path.display().to_string(),
@@ -4414,6 +4623,7 @@ fn send_prompt(
     model: Option<String>,
     permission_mode: Option<String>,
     resume: Option<bool>,
+    messages: Option<Vec<ChatMessage>>,
     images: Option<Vec<ImageAttachment>>,
 ) -> Result<ChatMessage, String> {
     let trimmed = prompt.trim();
@@ -4463,6 +4673,9 @@ fn send_prompt(
     }
     if let Some(resume) = resume {
         body["resume"] = serde_json::json!(resume);
+    }
+    if let Some(messages) = messages.filter(|items| !items.is_empty()) {
+        body["messages"] = serde_json::json!(messages);
     }
     if let Some(images) = images.filter(|items| !items.is_empty()) {
         body["images"] = serde_json::json!(images);
@@ -4514,6 +4727,7 @@ pub fn run() {
             save_backend_base_url,
             start_spark_login,
             refresh_spark_auth,
+            get_credit_status,
             revert_change,
             get_model_config,
             save_model_config,

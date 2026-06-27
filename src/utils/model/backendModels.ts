@@ -6,9 +6,9 @@ import {
   normalizeApiBaseUrl,
 } from '../auth.js'
 import { getUserAgent } from '../http.js'
-import { refreshConfiguredAndroidToken } from '../sparkAndroidAuth.js'
+import { refreshConfiguredSparkOAuthToken } from '../sparkOAuthAuth.js'
 
-const MODEL_LIST_PATH = '/api/v1/android/models'
+const MODEL_LIST_PATH = '/api/v1/spark-code/oauth/models'
 
 export type BackendModelEntry = {
   id: string
@@ -165,7 +165,7 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
   const requestTimeoutMs = backendModelRequestTimeoutMs()
   let authToken = getConfiguredAuthToken()
   if (!authToken) {
-    authToken = await refreshConfiguredAndroidToken(baseUrl, requestTimeoutMs)
+    authToken = await refreshConfiguredSparkOAuthToken(baseUrl, requestTimeoutMs)
   }
   if (!authToken) {
     throw new Error('请先运行 /login 获取后端登录令牌')
@@ -186,7 +186,7 @@ export async function fetchBackendModelList(): Promise<BackendModelList> {
     response = await requestModelList(authToken)
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const nextAuthToken = await refreshConfiguredAndroidToken(baseUrl, requestTimeoutMs)
+      const nextAuthToken = await refreshConfiguredSparkOAuthToken(baseUrl, requestTimeoutMs)
       if (nextAuthToken) {
         try {
           response = await requestModelList(nextAuthToken)

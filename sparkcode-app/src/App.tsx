@@ -13,6 +13,7 @@ import {
   Cpu,
   FilePenLine,
   FileText,
+  Gauge,
   FolderSymlink,
   FolderTree,
   GitBranch,
@@ -42,6 +43,7 @@ import {
   X,
   ListChecks,
 } from 'lucide-react'
+import hljs from 'highlight.js/lib/common'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent } from 'react'
@@ -50,6 +52,7 @@ import type {
   AppSnapshot,
   BackendRuntime,
   ChatMessage,
+  CreditStatus,
   GuiPermissionDecision,
   GuiPermissionRequest,
   ImageAttachment,
@@ -117,6 +120,8 @@ type TauriBridgeWindow = Window &
   }
 
 const FIXED_BACKEND_URL = 'https://chat.spark-ai.top'
+const DEFAULT_CONTEXT_LIMIT = 256_000
+const LARGE_CONTEXT_LIMIT = 1_000_000
 const ACTIVE_PROJECT_STORAGE_KEY = 'sparkcode-active-project-path'
 const CONVERSATION_STORAGE_KEY = 'sparkcode-conversation-state-v1'
 const ARCHIVED_SESSIONS_STORAGE_KEY = 'sparkcode-archived-sessions-v1'
@@ -149,6 +154,18 @@ type MemoryEntry = {
   text: string
 }
 
+type PromptPreset = {
+  id: 'daily' | 'coding'
+  title: string
+  description: string
+  entries: string[]
+}
+type BackendHistoryMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
 type ComposerMode = 'write' | 'plan' | 'goal'
 type ReviewDiffRow = {
   type: 'same' | 'added' | 'removed'
@@ -179,6 +196,20 @@ const fallbackSnapshot: AppSnapshot = {
     billing_type: null,
     account_created_at: null,
   },
+  credit_status: {
+    available: 0,
+    credit: 0,
+    daily_limit: 0,
+    daily_used: 0,
+    daily_remaining: 0,
+    daily_reset_at: null,
+    emergency_remaining: 0,
+    emergency_reset_at: null,
+    subscription_name: null,
+    subscription_expires_at: null,
+    topup_url: `${FIXED_BACKEND_URL}/?settings=credit`,
+    error: null,
+  },
   remote_device: {
     configured: false,
     bound: false,
@@ -196,6 +227,7 @@ const fallbackSnapshot: AppSnapshot = {
     sandbox_auto_allow: true,
     remote_control_at_startup: null,
     auto_compact_enabled: true,
+    context_limit: DEFAULT_CONTEXT_LIMIT,
     show_turn_duration: true,
     terminal_progress_bar_enabled: true,
     file_checkpointing_enabled: true,
@@ -224,7 +256,7 @@ const fallbackSnapshot: AppSnapshot = {
     local_url: null,
     auth_token: 'sparkcode-app-local',
     streaming_enabled: true,
-    context_limit: 1_000_000,
+    context_limit: DEFAULT_CONTEXT_LIMIT,
   },
   update_status: {
     current_version: '0.2.1',
@@ -243,7 +275,7 @@ const fallbackSnapshot: AppSnapshot = {
       title: '当前会话',
       tokens: 0,
       context_used: 0,
-      context_limit: 1_000_000,
+      context_limit: DEFAULT_CONTEXT_LIMIT,
       project_path: '',
       remote: true,
     },
@@ -260,6 +292,53 @@ function formatTokens(value: number): string {
     return Number.isInteger(rounded) ? `${rounded.toFixed(0)}K` : `${rounded}K`
   }
   return `${value}`
+}
+
+function contextPercent(session: Session): number {
+  const limit = Number.isFinite(session.context_limit) && session.context_limit > 0
+    ? session.context_limit
+    : DEFAULT_CONTEXT_LIMIT
+  const used = Number.isFinite(session.context_used) && session.context_used > 0
+    ? session.context_used
+    : 0
+  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)))
+}
+
+function contextTone(percent: number): 'normal' | 'warning' | 'danger' {
+  if (percent >= 95) return 'danger'
+  if (percent >= 70) return 'warning'
+  return 'normal'
+}
+
+function contextRingStyle(percent: number): React.CSSProperties {
+  const degrees = Math.min(100, Math.max(0, percent)) * 3.6
+  return {
+    '--context-ring-deg': `${degrees}deg`,
+  } as React.CSSProperties
+}
+
+function contextStatusLabel(percent: number, autoCompactEnabled: boolean): string {
+  if (percent >= 85 && autoCompactEnabled) return '自动压缩已准备'
+  if (percent >= 95) return '上下文接近上限'
+  if (percent >= 70) return '上下文偏高'
+  return '上下文正常'
+}
+
+function estimateMessageTokens(message: ChatMessage): number {
+  const textTokens = Math.ceil((message.content || '').length / 2)
+  const imageTokens = (message.images?.length ?? 0) * 120
+  return Math.max(0, textTokens + imageTokens)
+}
+
+function estimateConversationTokens(messages: ChatMessage[]): number {
+  const visibleTokens = messages
+    .filter(message => message.role !== 'system')
+    .reduce((total, message) => total + estimateMessageTokens(message), 0)
+  return visibleTokens > 0 ? visibleTokens + 480 : 0
+}
+
+function clampContextLimit(value: number | null | undefined): number {
+  return value === LARGE_CONTEXT_LIMIT ? LARGE_CONTEXT_LIMIT : DEFAULT_CONTEXT_LIMIT
 }
 
 function shortId(id: string): string {
@@ -286,6 +365,28 @@ function sparkUserSecondary(user: SparkUserProfile): string {
   return '后端未返回邮箱或用户名'
 }
 
+function formatCredit(value: number | null | undefined): string {
+  const safe = Number.isFinite(value ?? NaN) ? Math.max(Number(value), 0) : 0
+  if (safe >= 1_000_000) return `${(safe / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (safe >= 10_000) return `${(safe / 10_000).toFixed(1).replace(/\.0$/, '')}万`
+  if (safe >= 1_000) return `${Math.round(safe).toLocaleString('zh-CN')}`
+  return safe % 1 === 0 ? `${safe}` : safe.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+function creditIsLow(status: CreditStatus): boolean {
+  if (status.error) return false
+  if (status.available <= 0) return true
+  if (status.daily_limit > 0 && status.daily_remaining / status.daily_limit <= 0.1) {
+    return status.credit <= 0
+  }
+  return status.available <= 5
+}
+
+function creditLine(status: CreditStatus): string {
+  if (status.error) return `额度读取失败：${status.error}`
+  return `今日 ${formatCredit(status.daily_remaining)} / ${formatCredit(status.daily_limit)} · 永久 ${formatCredit(status.credit)}`
+}
+
 function parseMemoryEntries(content: string): MemoryEntry[] {
   return content
     .split(/\r?\n/)
@@ -302,6 +403,54 @@ function serializeMemoryEntries(entries: MemoryEntry[]): string {
     .filter(Boolean)
     .map(text => `- ${text}`)
     .join('\n')
+}
+
+const promptPresets: PromptPreset[] = [
+  {
+    id: 'daily',
+    title: '日常工作',
+    description: '适合写文档、整理信息、推进任务和做决策。',
+    entries: [
+      '默认使用简体中文，语气直接、自然、有判断力，避免空话和过度解释。',
+      '先理解目标和约束，再给出可执行的结论；信息不足时提出最少量的关键问题。',
+      '处理日常工作时，优先输出清晰的下一步、待办清单、风险点和可复用文本。',
+      '需要总结时，按结论、依据、行动项组织；不要把无关背景铺太长。',
+      '遇到复杂问题时，主动拆成阶段并持续推进，不只停留在建议层面。',
+      '涉及外部事实、时间敏感信息或高成本决策时，先核验来源再下结论。',
+      '尊重用户已有上下文和偏好，不重复解释显而易见的操作。',
+    ],
+  },
+  {
+    id: 'coding',
+    title: '专业编程',
+    description: '适合代码修改、调试、架构判断和交付验证。',
+    entries: [
+      '默认像资深工程师一样工作：先读代码和现有模式，再做最小、可审计的修改。',
+      '优先修复真实问题，不做无关重构；需要抽象时必须能降低实际复杂度。',
+      '改代码前明确影响范围，改完运行针对性验证；无法验证时说明原因和残余风险。',
+      '前端改动必须兼顾真实数据、空态、错误态、加载态、响应式和文本溢出。',
+      '后端和 API 改动必须确认认证、计费、错误处理、重试和兼容性路径。',
+      '不要提交密钥、令牌或本地隐私数据；涉及 OAuth、支付、鉴权时优先保守处理。',
+      '最终回复保持简洁，列出改了什么、验证了什么、还剩什么风险。',
+    ],
+  },
+]
+
+function normalizeMemoryText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ')
+}
+
+function entriesMatchPreset(entries: MemoryEntry[], preset: PromptPreset): boolean {
+  const current = entries.map(entry => normalizeMemoryText(entry.text)).filter(Boolean)
+  const expected = preset.entries.map(normalizeMemoryText)
+  return current.length === expected.length && current.every((entry, index) => entry === expected[index])
+}
+
+function presetToMemoryEntries(preset: PromptPreset): MemoryEntry[] {
+  return preset.entries.map((text, index) => ({
+    id: `preset-${preset.id}-${index}`,
+    text,
+  }))
 }
 
 function displayProjectName(projectPath: string, projects: ProjectEntry[], workspace: AppSnapshot['workspace']): string {
@@ -422,7 +571,7 @@ function validStoredSession(value: unknown): Session | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : '当前会话',
     tokens: typeof item.tokens === 'number' ? item.tokens : 0,
     context_used: typeof item.context_used === 'number' ? item.context_used : 0,
-    context_limit: typeof item.context_limit === 'number' ? item.context_limit : 1_000_000,
+    context_limit: typeof item.context_limit === 'number' ? item.context_limit : DEFAULT_CONTEXT_LIMIT,
     project_path: typeof item.project_path === 'string' ? item.project_path : '',
     remote: item.remote !== false,
   }
@@ -451,6 +600,28 @@ function sanitizeStoredMessages(messages: unknown): ChatMessage[] {
     .slice(-MAX_STORED_MESSAGES_PER_SESSION)
     .map(sanitizeStoredMessage)
     .filter((message): message is ChatMessage => Boolean(message))
+}
+
+function backendHistoryMessages(messages: ChatMessage[], pendingUserMessage?: ChatMessage): BackendHistoryMessage[] {
+  const pendingId = pendingUserMessage?.id
+  return [
+    ...messages,
+    ...(pendingUserMessage ? [pendingUserMessage] : []),
+  ]
+    .filter(message =>
+      message.id !== pendingId &&
+      message.role !== 'system' &&
+      !parseThinkingChain(message.content) &&
+      !shouldRenderAsTerminal(message) &&
+      !looksLikeHiddenToolOutput(message.content) &&
+      message.content.trim().length > 0,
+    )
+    .slice(-24)
+    .map(message => ({
+      id: message.id,
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: message.content,
+    }))
 }
 
 function mergeSessions(...sessionLists: Session[][]): Session[] {
@@ -612,7 +783,38 @@ function isAuthExpiredMessage(value: string): boolean {
 
 function streamRetryMessage(message: string, attempt: number, retryLimit: number): string {
   const prefix = isAuthExpiredMessage(message) ? '401 授权失效，正在重新连接' : '正在重新连接'
-  return `${attempt + 1}/${retryLimit} ${prefix}: ${message}`
+  return `${attempt}/${retryLimit} ${prefix}: ${message}`
+}
+
+function normalizeStreamError(error: unknown, stage: string, url: string): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const message = raw && raw !== 'Load failed'
+    ? raw
+    : '浏览器无法连接到流式接口，可能是本地后端未启动、端口不可达、CORS/网络拦截或请求被系统取消。'
+  return `${stage}失败：${message}\n接口：${url}`
+}
+
+async function streamHttpErrorMessage(response: Response, url: string): Promise<string> {
+  const body = await response.text().catch(() => '')
+  let detail = body.trim()
+  try {
+    const parsed = JSON.parse(detail) as { error?: unknown; message?: unknown; detail?: unknown }
+    const error = parsed.error && typeof parsed.error === 'object'
+      ? parsed.error as Record<string, unknown>
+      : null
+    detail =
+      (typeof error?.message === 'string' && error.message) ||
+      (typeof parsed.message === 'string' && parsed.message) ||
+      (typeof parsed.detail === 'string' && parsed.detail) ||
+      detail
+  } catch {
+    // Keep raw body text.
+  }
+  return [
+    `流式接口返回 ${response.status} ${response.statusText || ''}`.trim(),
+    detail ? `原因：${detail.slice(0, 1200)}` : '',
+    `接口：${url}`,
+  ].filter(Boolean).join('\n')
 }
 
 function backendPermissionMode(value: PermissionMode): string {
@@ -637,6 +839,59 @@ function textFromStreamContent(value: unknown): string {
   if (typeof record.content === 'string') return record.content
   if (Array.isArray(record.content)) return textFromStreamContent(record.content)
   return ''
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function highlightedCodeHtml(code: string, language?: string): { html: string; language: string } {
+  const normalizedLanguage = (language || '').trim().toLowerCase()
+  try {
+    if (normalizedLanguage && hljs.getLanguage(normalizedLanguage)) {
+      return {
+        html: hljs.highlight(code, { language: normalizedLanguage, ignoreIllegals: true }).value,
+        language: normalizedLanguage,
+      }
+    }
+    const detected = hljs.highlightAuto(code)
+    return {
+      html: detected.value,
+      language: detected.language || 'text',
+    }
+  } catch {
+    return {
+      html: escapeHtml(code),
+      language: normalizedLanguage || 'text',
+    }
+  }
+}
+
+function inferTerminalLanguage(content: string): string {
+  const trimmed = content.trim()
+  if (!trimmed) return 'text'
+  if (/^\s*[{[]/.test(trimmed)) return 'json'
+  if (/^\s*(\$|bun |npm |pnpm |yarn |cargo |git |cd |ls |rg |sed |cat |python |node )/m.test(trimmed)) return 'bash'
+  if (/^\s*(error|warning|failed|success|running|finished)\b/im.test(trimmed)) return 'log'
+  return ''
+}
+
+function renderHighlightedCode(content: string, keyPrefix: string, language?: string): ReactNode {
+  const highlighted = highlightedCodeHtml(content, language)
+  return (
+    <pre className="markdown-code-block syntax-code" key={`${keyPrefix}-code`}>
+      <code
+        className={`hljs${highlighted.language ? ` language-${highlighted.language}` : ''}`}
+        data-language={highlighted.language || undefined}
+        dangerouslySetInnerHTML={{ __html: highlighted.html }}
+      />
+    </pre>
+  )
 }
 
 function compactJsonValue(value: unknown): string {
@@ -702,8 +957,8 @@ function formatProcessingDuration(startedAt: number, endedAt: number | null): st
 function buildReviewDiff(beforeContent: string, afterContent: string): ReviewDiffRow[] {
   const before = beforeContent.split(/\r?\n/)
   const after = afterContent.split(/\r?\n/)
-  if (before.at(-1) === '') before.pop()
-  if (after.at(-1) === '') after.pop()
+  if (before[before.length - 1] === '') before.pop()
+  if (after[after.length - 1] === '') after.pop()
 
   const maxComparableLines = 650
   if (before.length * after.length > maxComparableLines * maxComparableLines) {
@@ -754,21 +1009,91 @@ function visibleReviewDiffRows(rows: ReviewDiffRow[], contextSize = 3): ReviewDi
   return rows.filter((_, index) => changed.has(index))
 }
 
-function toolInputTitle(name: string, input: unknown): string {
+function compactToolPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const homeMatch = normalized.match(/^\/Users\/[^/]+\/(.+)$/)
+  const withoutHome = homeMatch?.[1] ?? normalized
+  const parts = withoutHome.split('/').filter(Boolean)
+  if (parts.length <= 4) return withoutHome
+  return `.../${parts.slice(-4).join('/')}`
+}
+
+function toolInputTarget(name: string, input: unknown): string {
   if (!input || typeof input !== 'object') return name
   const record = input as Record<string, unknown>
-  if (name === 'Bash' && typeof record.command === 'string') return record.command
-  if (typeof record.command === 'string') return record.command
-  if (typeof record.path === 'string') return `${name} ${record.path}`
-  if (typeof record.file_path === 'string') return `${name} ${record.file_path}`
-  if (typeof record.pattern === 'string') return `${name} ${record.pattern}`
+  const path =
+    typeof record.file_path === 'string' ? record.file_path :
+    typeof record.path === 'string' ? record.path :
+    typeof record.notebook_path === 'string' ? record.notebook_path :
+    typeof record.source_path === 'string' ? record.source_path :
+    typeof record.destination_path === 'string' ? record.destination_path :
+    ''
+  if (path) return compactToolPath(path)
+  if (name === 'Bash' && typeof record.command === 'string') return record.command.replace(/\s+/g, ' ').trim()
+  if (typeof record.command === 'string') return record.command.replace(/\s+/g, ' ').trim()
+  if (typeof record.pattern === 'string') return record.pattern
   return name
+}
+
+function toolActionLabel(name: string): string {
+  switch (name) {
+    case 'Edit':
+      return '修改文件'
+    case 'MultiEdit':
+      return '批量修改'
+    case 'Write':
+      return '写入文件'
+    case 'NotebookEdit':
+      return '修改 Notebook'
+    case 'Read':
+      return '读取文件'
+    case 'Bash':
+      return '执行指令'
+    case 'TodoWrite':
+      return '更新 Todo'
+    case 'TodoRead':
+      return '读取 Todo'
+    case 'Grep':
+      return '搜索内容'
+    case 'Glob':
+      return '匹配文件'
+    case 'LS':
+      return '列出目录'
+    default:
+      return name
+  }
+}
+
+function isHiddenToolName(name: string): boolean {
+  return /^(TodoWrite|TodoRead|Todo)$/i.test(name.trim())
+}
+
+function toolInputTitle(name: string, input: unknown): string {
+  const action = toolActionLabel(name)
+  const target = toolInputTarget(name, input)
+  if (!target || target === name) return action
+  return `${action} ${target}`
 }
 
 function toolInputBody(name: string, input: unknown): string {
   if (!input || typeof input !== 'object') return ''
   const record = input as Record<string, unknown>
   if (name === 'Bash' && typeof record.command === 'string') return `$ ${record.command}`
+  if (['Edit', 'Write', 'NotebookEdit', 'Read'].includes(name)) {
+    const target = toolInputTarget(name, input)
+    return target && target !== name ? `文件：${target}` : ''
+  }
+  if (name === 'MultiEdit') {
+    const target = toolInputTarget(name, input)
+    const editCount = Array.isArray(record.edits) ? record.edits.length : 0
+    return [
+      target && target !== name ? `文件：${target}` : '',
+      editCount > 0 ? `修改：${editCount} 处` : '',
+    ].filter(Boolean).join('\n')
+  }
+  if (name === 'TodoWrite' && Array.isArray(record.todos)) {
+    return `任务：${record.todos.length} 条`
+  }
   const compact = compactJsonValue(input)
   return compact ? `${name}\n${compact}` : name
 }
@@ -849,11 +1174,12 @@ function runtimeEventFromBackendMessage(value: unknown): RuntimeEvent | null {
     ) as Record<string, unknown> | undefined
     if (toolUse) {
       const name = typeof toolUse.name === 'string' ? toolUse.name : '工具'
-      const input = compactJsonValue(toolUse.input)
+      const title = toolInputTitle(name, toolUse.input)
+      const body = toolInputBody(name, toolUse.input)
       return {
         id: runtimeEventId('tool'),
         label: '调用工具',
-        value: input ? `${name} ${input.slice(0, 180)}` : name,
+        value: (body || title).slice(0, 220),
         tone: 'info',
       }
     }
@@ -894,7 +1220,7 @@ function runtimeEventFromBackendMessage(value: unknown): RuntimeEvent | null {
       return {
         id: runtimeEventId('tool-start'),
         label: '准备工具',
-        value: name,
+        value: toolInputTitle(name, block.input),
         tone: 'info',
       }
     }
@@ -1037,11 +1363,7 @@ function renderMarkdownBlocks(content: string, keyPrefix: string): ReactNode {
         index += 1
       }
       index += 1
-      blocks.push(
-        <pre className="markdown-code-block" key={`${keyPrefix}-codeblock-${index}`}>
-          <code data-language={language || undefined}>{codeLines.join('\n')}</code>
-        </pre>,
-      )
+      blocks.push(renderHighlightedCode(codeLines.join('\n'), `${keyPrefix}-codeblock-${index}`, language || undefined))
       continue
     }
 
@@ -1163,6 +1485,7 @@ function renderMarkdownBlocks(content: string, keyPrefix: string): ReactNode {
 function shouldRenderAsTerminal(message: ChatMessage): boolean {
   if (message.id.startsWith('local-')) return true
   if (message.id.startsWith('terminal-output-')) return true
+  if (looksLikeHiddenToolOutput(message.content)) return false
   if (message.content.startsWith('__SPARK_TOOL_RESULT__')) return true
   if (looksLikeTerminalOutput(message.content)) return true
   return /^(Spark Code (Doctor|Status|Stats)|原 TUI 后台任务列表)/.test(message.content.trim())
@@ -1207,9 +1530,15 @@ function terminalResultTitle(content: string): string {
   const commandLine = lines.find(line => line.startsWith('$ '))
   const running = lines.some(line => line === '正在执行...')
   const toolLine = metadata?.tool_name || lines[0] || ''
-  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|TodoWrite|WebFetch|WebSearch)\b/.test(toolLine)) {
+  if (metadata?.action) {
+    const target = metadata.target && metadata.target !== metadata.tool_name ? ` ${metadata.target}` : ''
+    return `${running ? '正在调用' : '已调用'} ${metadata.action}${target}`
+  }
+  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|WebFetch|WebSearch)\b/.test(toolLine)) {
+    const toolName = toolLine.split(/\s+/, 1)[0] || toolLine
+    const target = toolLine.slice(toolName.length).trim()
     const payload = lines[1] && lines[1].startsWith('{') ? ` ${lines[1]}` : ''
-    return `${running ? '正在调用' : '已调用'} ${toolLine}${payload}`
+    return `${running ? '正在调用' : '已调用'} ${toolActionLabel(toolName)}${target ? ` ${target}` : payload}`
   }
   if (/^[a-z][\w.-]*:\s/.test(lines[0] ?? '')) {
     return `${running ? '正在调用' : '已调用'} Bash`
@@ -1232,17 +1561,34 @@ function terminalResultBody(content: string): string {
   return visibleContent
 }
 
-function serializeToolResult(toolName: string, body: string): string {
-  return `__SPARK_TOOL_RESULT__${JSON.stringify({ tool_name: toolName || '工具' })}\n${body}`
+function serializeToolResult(toolName: string, body: string, input?: unknown): string {
+  const name = toolName || '工具'
+  return `__SPARK_TOOL_RESULT__${JSON.stringify({
+    tool_name: name,
+    action: toolActionLabel(name),
+    target: toolInputTarget(name, input),
+  })}\n${body}`
 }
 
-function parseToolResultMetadata(content: string): { tool_name?: string } | null {
+function looksLikeHiddenToolOutput(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  const metadata = parseToolResultMetadata(trimmed)
+  if (metadata?.tool_name && isHiddenToolName(metadata.tool_name)) return true
+  return /Todos have been modified successfully|continue to use the todo list|todo list to track your progress|Here are the existing contents of your todo list/i.test(trimmed)
+}
+
+function parseToolResultMetadata(content: string): { tool_name?: string; action?: string; target?: string } | null {
   const firstLine = content.split('\n', 1)[0] ?? ''
   const raw = firstLine.match(/^__SPARK_TOOL_RESULT__(.+)$/)?.[1]
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as { tool_name?: unknown }
-    return typeof parsed.tool_name === 'string' ? { tool_name: parsed.tool_name } : null
+    const parsed = JSON.parse(raw) as { tool_name?: unknown; action?: unknown; target?: unknown }
+    return {
+      ...(typeof parsed.tool_name === 'string' ? { tool_name: parsed.tool_name } : {}),
+      ...(typeof parsed.action === 'string' ? { action: parsed.action } : {}),
+      ...(typeof parsed.target === 'string' ? { target: parsed.target } : {}),
+    }
   } catch {
     return null
   }
@@ -1255,9 +1601,10 @@ function stripToolResultMetadata(content: string): string {
 
 function looksLikeTerminalOutput(text: string): boolean {
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
+  if (looksLikeHiddenToolOutput(text)) return false
   if (lines.length < 4) return false
   if (lines.some(line => line.startsWith('$ '))) return true
-  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|TodoWrite|WebFetch|WebSearch)\b/.test(lines[0] ?? '')) return true
+  if (/^(Read|Edit|Write|Bash|Grep|Glob|LS|WebFetch|WebSearch)\b/.test(lines[0] ?? '')) return true
 
   const absolutePathLines = lines.filter(line =>
     /^\/Users\/[^ ]+/.test(line) ||
@@ -1279,6 +1626,7 @@ function looksLikeTerminalOutput(text: string): boolean {
 }
 
 function looksLikeToolOnlyOutput(text: string): boolean {
+  if (looksLikeHiddenToolOutput(text)) return true
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
   if (lines.length < 6) return false
   const listingLines = lines.filter(line =>
@@ -1387,6 +1735,7 @@ function renderMarkdownTable(
 }
 
 function renderMessageContent(message: ChatMessage, thinking: boolean): ReactNode {
+  if (looksLikeHiddenToolOutput(message.content)) return null
   const thinkingChain = parseThinkingChain(message.content)
   if (thinkingChain) {
     const done = Boolean(thinkingChain.ended_at)
@@ -1401,7 +1750,7 @@ function renderMessageContent(message: ChatMessage, thinking: boolean): ReactNod
             thinkingChain.events.map(event => (
               <article className={`runtime-event ${event.tone}`} key={event.id}>
                 <span>{event.label}</span>
-                <p>{event.value}</p>
+                <p>{looksLikeHiddenToolOutput(event.value) ? '已更新 Todo' : event.value}</p>
               </article>
             ))
           ) : (
@@ -1414,6 +1763,8 @@ function renderMessageContent(message: ChatMessage, thinking: boolean): ReactNod
   if (thinking) return <p className="thinking-text">{message.content || '正在思考'}</p>
   if (shouldRenderAsTerminal(message)) {
     if (shouldRenderAsExpandedTerminal(message)) {
+      const terminalLanguage = inferTerminalLanguage(message.content)
+      const terminalText = terminalResultBody(message.content)
       return (
         <div className="terminal-result expanded compact" role="group" aria-label="工具输出">
           <div className="terminal-result-header">
@@ -1421,7 +1772,7 @@ function renderMessageContent(message: ChatMessage, thinking: boolean): ReactNod
             <span>工具输出</span>
           </div>
           <div className="terminal-result-body">
-            <pre>{message.content}</pre>
+            {terminalText.includes('```') ? renderMarkdownBlocks(terminalText, `${message.id}-terminal`) : renderHighlightedCode(terminalText, `${message.id}-terminal`, terminalLanguage || undefined)}
           </div>
         </div>
       )
@@ -1433,7 +1784,13 @@ function renderMessageContent(message: ChatMessage, thinking: boolean): ReactNod
           <span>{terminalResultTitle(message.content)}</span>
         </summary>
         <div className="terminal-result-body">
-          <pre>{terminalResultBody(message.content)}</pre>
+          {(() => {
+            const body = terminalResultBody(message.content)
+            const language = inferTerminalLanguage(body)
+            return body.includes('```')
+              ? renderMarkdownBlocks(body, `${message.id}-terminal`)
+              : renderHighlightedCode(body, `${message.id}-terminal`, language || undefined)
+          })()}
         </div>
       </details>
     )
@@ -1447,21 +1804,33 @@ function streamTextUpdate(value: unknown): { text: string; mode: 'append' | 'rep
   const event = (record.event && typeof record.event === 'object')
     ? record.event as Record<string, unknown>
     : record
+  if (toolUseBlocksFromBackendMessage(record).length > 0 || toolResultBlocksFromBackendMessage(record).length > 0) return null
+  if (
+    event.type === 'tool_result' ||
+    event.type === 'tool_use' ||
+    event.type === 'tool_use_summary' ||
+    event.type === 'content_block_start' ||
+    event.type === 'content_block_stop'
+  ) return null
   const delta = (event.delta && typeof event.delta === 'object')
     ? event.delta as Record<string, unknown>
     : null
   const deltaText = typeof delta?.text === 'string' ? delta.text : ''
-  if (deltaText) return { text: deltaText, mode: 'append' }
+  if (deltaText) return looksLikeHiddenToolOutput(deltaText) || looksLikeToolOnlyOutput(deltaText) || looksLikeTerminalOutput(deltaText) ? null : { text: deltaText, mode: 'append' }
 
   const message = (record.message && typeof record.message === 'object')
     ? record.message as Record<string, unknown>
     : null
   const messageText = textFromStreamContent(message?.content)
-  if (messageText) return { text: messageText, mode: 'replace' }
+  if (messageText) return looksLikeHiddenToolOutput(messageText) || looksLikeToolOnlyOutput(messageText) || looksLikeTerminalOutput(messageText) ? null : { text: messageText, mode: 'replace' }
 
   const contentText = textFromStreamContent(record.content)
-  if (contentText) return { text: contentText, mode: 'replace' }
-  if (typeof record.result === 'string') return { text: record.result, mode: 'replace' }
+  if (contentText) return looksLikeHiddenToolOutput(contentText) || looksLikeToolOnlyOutput(contentText) || looksLikeTerminalOutput(contentText) ? null : { text: contentText, mode: 'replace' }
+  if (typeof record.result === 'string') {
+    return looksLikeHiddenToolOutput(record.result) || looksLikeToolOnlyOutput(record.result) || looksLikeTerminalOutput(record.result)
+      ? null
+      : { text: record.result, mode: 'replace' }
+  }
   return null
 }
 
@@ -1820,7 +2189,10 @@ function App() {
   })
   const creatingSessionRef = useRef(false)
   const modelSyncRetryRef = useRef(0)
+  const autoCompactSessionIdsRef = useRef<Set<string>>(new Set())
+  const intentionalLogoutRef = useRef(false)
   const toolNameByUseIdRef = useRef<Record<string, string>>({})
+  const toolInputByUseIdRef = useRef<Record<string, unknown>>({})
   const skippedInitialProjectSyncRef = useRef(false)
   const skippedInitialSlashRefreshRef = useRef(false)
   const skippedInitialProjectMetadataRef = useRef(false)
@@ -1897,6 +2269,7 @@ function App() {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [revertingChangeId, setRevertingChangeId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null)
   const [changeNotice, setChangeNotice] = useState<string | null>(null)
   const [modelSyncError, setModelSyncError] = useState<string | null>(null)
   const [runtimeEvents, setRuntimeEvents] = useState<RuntimeEvent[]>([])
@@ -1913,6 +2286,10 @@ function App() {
   const [memoryEntries, setMemoryEntries] = useState<MemoryEntry[]>([])
   const [isLoadingMemory, setIsLoadingMemory] = useState(false)
   const [isSavingMemory, setIsSavingMemory] = useState(false)
+  const activePromptPresetId = useMemo(
+    () => promptPresets.find(preset => entriesMatchPreset(memoryEntries, preset))?.id ?? null,
+    [memoryEntries],
+  )
   const [uiDensity, setUiDensity] = useState<'compact' | 'comfortable'>(() => {
     try {
       return window.localStorage.getItem(UI_DENSITY_STORAGE_KEY) === 'comfortable' ? 'comfortable' : 'compact'
@@ -1923,14 +2300,36 @@ function App() {
 
   async function refreshSnapshot() {
     const applySnapshot = (next: AppSnapshot) => {
-      setSnapshot(current => ({
-        ...next,
-        sessions: mergeSessions(next.sessions, current.sessions),
-      }))
-      if (!next.spark_user.logged_in) {
-        setActiveView('settings')
-        setSettingsSection('profile')
-      }
+      setSnapshot(current => {
+        if (!next.spark_user.logged_in && current.spark_user.logged_in && !intentionalLogoutRef.current) {
+          setAuthExpiredMessage('登录已过期或令牌无效，请退出登录后重新连接 Spark。')
+          return {
+            ...current,
+            sessions: mergeSessions(next.sessions, current.sessions),
+            remote: next.remote,
+            remote_device: next.remote_device,
+            preferences: next.preferences,
+            model: next.model,
+            workspace: next.workspace,
+            skills: next.skills,
+            mcp_servers: next.mcp_servers,
+            tools: next.tools,
+            projects: next.projects,
+            recent_changes: next.recent_changes,
+            slash_commands: next.slash_commands,
+            backend_runtime: next.backend_runtime,
+            update_status: next.update_status,
+          }
+        }
+        if (!next.spark_user.logged_in && !current.spark_user.logged_in) {
+          setActiveView('settings')
+          setSettingsSection('profile')
+        }
+        return {
+          ...next,
+          sessions: mergeSessions(next.sessions, current.sessions),
+        }
+      })
       setUpdateStatus(next.update_status)
       setActiveProjectPath(current => {
         if (current && current !== fallbackSnapshot.workspace.path) return current
@@ -1971,6 +2370,14 @@ function App() {
     } finally {
       setIsRefreshingBackend(false)
     }
+  }
+
+  async function refreshCreditStatus() {
+    const creditStatus = await safeInvoke<CreditStatus>('get_credit_status')
+    setSnapshot(current => ({
+      ...current,
+      credit_status: creditStatus,
+    }))
   }
 
   async function syncActiveProjectToBackend(projectPath: string) {
@@ -2090,6 +2497,15 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!snapshot.spark_user.logged_in) return
+    void refreshCreditStatus().catch(() => {})
+    const interval = window.setInterval(() => {
+      void refreshCreditStatus().catch(() => {})
+    }, 30_000)
+    return () => window.clearInterval(interval)
+  }, [snapshot.spark_user.logged_in])
+
+  useEffect(() => {
     void checkForUpdates()
     const interval = window.setInterval(() => {
       void checkForUpdates()
@@ -2130,10 +2546,50 @@ function App() {
     () => sessions.find(session => session.id === activeSessionId) ?? sessions[0] ?? fallbackSnapshot.sessions[0],
     [activeSessionId, sessions],
   )
+  const preferences = snapshot.preferences
   const messages = messagesBySession[activeSession.id] ?? []
   const visibleMessages = messages.filter(message => message.role !== 'system')
   const lastVisibleMessage = visibleMessages[visibleMessages.length - 1]
   const lastVisibleMessageContent = lastVisibleMessage?.content ?? ''
+  const activeContextLimit = clampContextLimit(activeSession.context_limit || preferences.context_limit)
+  const activeContextUsed = Math.min(activeContextLimit, Math.max(activeSession.context_used || 0, estimateConversationTokens(messages)))
+  const activeContextPercent = contextPercent({
+    ...activeSession,
+    context_used: activeContextUsed,
+    context_limit: activeContextLimit,
+  })
+  const activeContextTone = contextTone(activeContextPercent)
+
+  useEffect(() => {
+    if (activeContextPercent < 70) {
+      autoCompactSessionIdsRef.current.delete(activeSession.id)
+    }
+  }, [activeContextPercent, activeSession.id])
+
+  useEffect(() => {
+    setSnapshot(current => {
+      let changed = false
+      const nextSessions = current.sessions.map(session => {
+        const nextLimit = clampContextLimit(session.context_limit || current.preferences.context_limit)
+        const nextUsed = Math.min(nextLimit, estimateConversationTokens(messagesBySession[session.id] ?? []))
+        if (
+          session.context_limit === nextLimit &&
+          session.context_used === nextUsed &&
+          session.tokens === nextUsed
+        ) {
+          return session
+        }
+        changed = true
+        return {
+          ...session,
+          tokens: nextUsed,
+          context_used: nextUsed,
+          context_limit: nextLimit,
+        }
+      })
+      return changed ? { ...current, sessions: nextSessions } : current
+    })
+  }, [messagesBySession])
 
   function conversationScrollElement(): HTMLElement | null {
     const body = workspaceBodyRef.current
@@ -2278,18 +2734,22 @@ function App() {
   }, [snapshot.backend_runtime.auth_token, snapshot.backend_runtime.local_url])
 
   function setSessionMessages(sessionId: string, updater: (current: ChatMessage[]) => ChatMessage[]) {
-    setMessagesBySession(current => ({
-      ...current,
-      [sessionId]: updater(current[sessionId] ?? []),
-    }))
+    setMessagesBySession(current => {
+      const nextMessages = updater(current[sessionId] ?? [])
+      return {
+        ...current,
+        [sessionId]: nextMessages,
+      }
+    })
   }
   function setMessages(updater: (current: ChatMessage[]) => ChatMessage[]) {
     setSessionMessages(activeSession.id, updater)
   }
   const recentChanges = snapshot.recent_changes ?? []
   const sparkUser = snapshot.spark_user
+  const creditStatus = snapshot.credit_status
   const remoteDevice = snapshot.remote_device
-  const preferences = snapshot.preferences
+  const activeContextLabel = contextStatusLabel(activeContextPercent, preferences.auto_compact_enabled)
   const workspace = snapshot.workspace
   const projects = snapshot.projects ?? []
   const skills = snapshot.skills ?? []
@@ -2654,6 +3114,7 @@ function App() {
   }
 
   async function handleSparkLogout() {
+    intentionalLogoutRef.current = true
     setIsLoggingOut(true)
     setNotice(null)
     try {
@@ -2672,6 +3133,9 @@ function App() {
       setNotice(error instanceof Error ? error.message : String(error))
     } finally {
       setIsLoggingOut(false)
+      window.setTimeout(() => {
+        intentionalLogoutRef.current = false
+      }, 500)
     }
   }
 
@@ -2702,7 +3166,19 @@ function App() {
     setSnapshot(current => ({ ...current, preferences: next }))
     try {
       const saved = await safeInvoke<AppPreferences>('save_preferences', { preferences: next })
-      setSnapshot(current => ({ ...current, preferences: saved }))
+      setSnapshot(current => ({
+        ...current,
+        preferences: saved,
+        backend_runtime: {
+          ...current.backend_runtime,
+          context_limit: saved.context_limit,
+        },
+        sessions: current.sessions.map(session => ({
+          ...session,
+          context_limit: saved.context_limit,
+          context_used: Math.min(session.context_used, saved.context_limit),
+        })),
+      }))
       if (previous.permission_mode !== saved.permission_mode) {
         await refreshToolCatalog(saved.permission_mode)
       }
@@ -2794,6 +3270,26 @@ function App() {
       setMemoryDraft(document.content)
       setMemoryEntries(parseMemoryEntries(document.content))
       setNotice('记忆已保存')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error))
+    } finally {
+      setIsSavingMemory(false)
+    }
+  }
+
+  async function handleApplyPromptPreset(preset: PromptPreset) {
+    const entries = presetToMemoryEntries(preset)
+    const content = serializeMemoryEntries(entries)
+    setMemoryEntries(entries)
+    setMemoryDraft(content)
+    setIsSavingMemory(true)
+    setNotice(null)
+    try {
+      const document = await safeInvoke<MemoryDocument>('save_memory_file', { content })
+      setMemoryDocument(document)
+      setMemoryDraft(document.content)
+      setMemoryEntries(parseMemoryEntries(document.content))
+      setNotice(`已切换到「${preset.title}」`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error))
     } finally {
@@ -3407,7 +3903,7 @@ function App() {
         title,
         tokens: 0,
         context_used: 0,
-        context_limit: 1_000_000,
+        context_limit: preferences.context_limit,
         project_path: projectPath,
         remote: snapshot.remote.configured,
       }
@@ -3673,20 +4169,32 @@ function App() {
     }
   }
 
-  function bumpSessionUsage(sessionId: string, effectivePrompt: string, images: ImageAttachment[]) {
-    const used = Math.ceil(effectivePrompt.length / 2) + (images.length * 120) + 480
-    setSnapshot(current => ({
-      ...current,
-      sessions: current.sessions.map(session =>
-        session.id === sessionId
-          ? {
-              ...session,
-              tokens: session.tokens + used,
-              context_used: Math.min(session.context_limit, session.context_used + used),
-            }
-          : session,
-      ),
-    }))
+  function compactSessionContext(sessionId: string, reason: 'manual' | 'auto') {
+    const now = Date.now()
+    setSessionMessages(sessionId, current => {
+      const visible = current.filter(message => message.role !== 'system')
+      const preserved = visible.slice(-8)
+      const marker: ChatMessage = {
+        id: `compact-${reason}-${now}`,
+        role: 'system',
+        content: reason === 'auto'
+          ? '自动压缩已触发：已保留最近上下文并整理早期内容。'
+          : '上下文已压缩：已保留最近上下文并整理早期内容。',
+        created_at: now,
+      }
+      return [marker, ...preserved]
+    })
+    if (reason === 'auto') {
+      addLocalResultMessage('上下文超过阈值，已自动压缩。', sessionId)
+    }
+  }
+
+  function maybeAutoCompactBeforeSend(session: Session) {
+    const percent = contextPercent(session)
+    if (!preferences.auto_compact_enabled || percent < 85) return
+    if (autoCompactSessionIdsRef.current.has(session.id)) return
+    autoCompactSessionIdsRef.current.add(session.id)
+    compactSessionContext(session.id, 'auto')
   }
 
   async function streamPromptContent(input: {
@@ -3694,6 +4202,7 @@ function App() {
     targetSession: Session
     shouldResumeBackendSession: boolean
     images: ImageAttachment[]
+    historyMessages: BackendHistoryMessage[]
   }): Promise<boolean> {
     const runtime = snapshot.backend_runtime
     const baseUrl = runtime.local_url?.trim().replace(/\/+$/, '')
@@ -3753,7 +4262,7 @@ function App() {
 
 	    const upsertToolOutput = (toolUseId: string, toolName: string, content: string) => {
 	      const id = `terminal-output-${toolUseId || runtimeEventId('tool-result')}`
-      const resultContent = serializeToolResult(toolName, content)
+      const resultContent = serializeToolResult(toolName, content, toolInputByUseIdRef.current[toolUseId])
 	      setSessionMessages(input.targetSession.id, current => {
 	        if (current.some(message => message.id === id)) {
 	          return keepAssistantAtEnd(current.map(message =>
@@ -3846,6 +4355,7 @@ function App() {
 	        const toolUseId = typeof block.id === 'string' ? block.id : runtimeEventId('tool-use')
 	        const name = typeof block.name === 'string' ? block.name : '工具'
         toolNameByUseIdRef.current[toolUseId] = name
+        toolInputByUseIdRef.current[toolUseId] = block.input
 	        const title = toolInputTitle(name, block.input)
 	        const body = toolInputBody(name, block.input)
 	        appendThinkingEvent({
@@ -3860,7 +4370,14 @@ function App() {
 		        const toolUseId = typeof block.tool_use_id === 'string' ? block.tool_use_id : ''
             const toolName = toolNameByUseIdRef.current[toolUseId] || '工具'
 		        const result = toolResultText(block.content || block.tool_use_result || block)
-		        upsertToolOutput(toolUseId, toolName, result || '工具已完成')
+		        appendThinkingEvent({
+		          id: `thinking-tool-result-${toolUseId || runtimeEventId('tool-result')}`,
+		          label: `已调用 ${toolActionLabel(toolName)}`,
+		          value: isHiddenToolName(toolName) || looksLikeHiddenToolOutput(result)
+                ? '已更新 Todo'
+                : (result || '工具已完成').slice(0, 180),
+		          tone: 'success',
+		        })
 		      }
       if (record.type === 'error') {
         throw new StreamPromptError(
@@ -3887,7 +4404,7 @@ function App() {
           typeof record.content === 'string'
             ? record.content
             : textFromStreamContent(record.content)
-	        if (!assistantContent.trim() && hasToolOutput && looksLikeToolOnlyOutput(finalText)) {
+	        if (hasToolOutput && (looksLikeHiddenToolOutput(finalText) || looksLikeToolOnlyOutput(finalText) || looksLikeTerminalOutput(finalText))) {
 	          setSessionMessages(input.targetSession.id, current =>
 	            current.filter(message => message.id !== assistantId),
 	          )
@@ -3941,43 +4458,45 @@ function App() {
       const abortController = new AbortController()
       const totalTimeout = window.setTimeout(() => abortController.abort(), 10 * 60 * 1000)
       let firstChunkTimeout = window.setTimeout(() => abortController.abort(), 12 * 1000)
+      const streamUrl = `${baseUrl}/prompt/stream`
 
       try {
-        const response = await fetch(`${baseUrl}/prompt/stream`, {
-          method: 'POST',
-          signal: abortController.signal,
-          headers: {
-            authorization: `Bearer ${runtime.auth_token}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            session_id: input.targetSession.id,
-            session_key: `sparkcode-app:${input.targetSession.project_path || activeProjectPathForRequest}:${input.targetSession.id}`,
-            prompt: input.effectivePrompt,
-            cwd: input.targetSession.project_path || activeProjectPathForRequest,
-            model: snapshot.model.selected,
-            permission_mode: backendPermissionMode(preferences.permission_mode),
-            resume: input.shouldResumeBackendSession,
-            images: input.images,
-          }),
-        })
+        const response = await fetch(streamUrl, {
+            method: 'POST',
+            signal: abortController.signal,
+            headers: {
+              authorization: `Bearer ${runtime.auth_token}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              session_id: input.targetSession.id,
+              session_key: `sparkcode-app:${input.targetSession.project_path || activeProjectPathForRequest}:${input.targetSession.id}`,
+              prompt: input.effectivePrompt,
+              cwd: input.targetSession.project_path || activeProjectPathForRequest,
+              model: snapshot.model.selected,
+              permission_mode: backendPermissionMode(preferences.permission_mode),
+              resume: input.shouldResumeBackendSession,
+              messages: input.historyMessages,
+              images: input.images,
+            }),
+          }).catch(error => {
+            throw new StreamPromptError(normalizeStreamError(error, '连接流式接口', streamUrl), false)
+          })
 
         if (!response.ok) {
-          const errorText = await response.text().catch(() => '')
-          throw new StreamPromptError(
-            errorText ? `本地流式接口不可用：${response.status} ${errorText}` : `本地流式接口不可用：${response.status}`,
-            true,
-          )
+          throw new StreamPromptError(await streamHttpErrorMessage(response, streamUrl), true)
         }
         if (!response.body) {
-          throw new StreamPromptError('本地流式接口没有返回数据流', false)
+          throw new StreamPromptError(`本地流式接口没有返回数据流\n接口：${streamUrl}`, false)
         }
 
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
         while (true) {
-          const { done, value } = await reader.read()
+          const { done, value } = await reader.read().catch(error => {
+            throw new StreamPromptError(normalizeStreamError(error, '读取流式响应', streamUrl), false)
+          })
           if (done) break
           if (firstChunkTimeout) {
             window.clearTimeout(firstChunkTimeout)
@@ -4009,24 +4528,24 @@ function App() {
 
     try {
       const retryLimit = 5
-      for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
+      for (let attempt = 1; attempt <= retryLimit; attempt += 1) {
         try {
           assistantContent = ''
           completed = false
           hasToolOutput = false
-          if (attempt === 0) setAssistantStatus(null, true)
+          if (attempt === 1) setAssistantStatus(null, true)
           await runAttempt()
           return true
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-	          if (attempt < retryLimit) {
+          if (attempt < retryLimit) {
 	            appendThinkingEvent({
 	              id: runtimeEventId('reconnect'),
 	              label: 'Reconnecting',
 	              value: streamRetryMessage(message, attempt, retryLimit),
 	              tone: 'warning',
 	            })
-	            setAssistantStatus(null, true)
+            setAssistantStatus(`Reconnecting ... ${attempt}/${retryLimit}\n${message}`, true)
               await refreshAuthBeforeRetry(message)
 	            await new Promise(resolve => window.setTimeout(resolve, 700))
 	            continue
@@ -4037,7 +4556,7 @@ function App() {
             value: `已重试 ${retryLimit} 次仍失败：${message}`,
             tone: 'warning',
           })
-          setAssistantStatus(`连接失败，已重试 ${retryLimit} 次`, true)
+          setAssistantStatus(`流式传输失败，已重试 ${retryLimit} 次\n${message}`, true)
           finishThinkingChain()
           throw new StreamPromptError(
             `流式传输失败，已重试 ${retryLimit} 次：${message}`,
@@ -4117,12 +4636,14 @@ function App() {
     const trimmed = content.trim()
     const effectivePrompt = trimmed || (images.length > 0 ? '请分析这些图片' : '')
     if (!effectivePrompt || isSending) return
+    maybeAutoCompactBeforeSend(targetSession)
     const requestProjectPath = targetSession.project_path || activeProjectPathForRequest
     const targetSessionForRequest = {
       ...targetSession,
       project_path: requestProjectPath,
     }
-    const shouldResumeBackendSession = (messagesBySession[targetSession.id] ?? [])
+    const existingSessionMessages = messagesBySession[targetSession.id] ?? []
+    const shouldResumeBackendSession = existingSessionMessages
       .some(message => message.role !== 'system')
 
     const userMessage: ChatMessage = {
@@ -4133,6 +4654,7 @@ function App() {
       images,
     }
     setSessionMessages(targetSession.id, current => [...current, userMessage])
+    const historyMessages = backendHistoryMessages(existingSessionMessages, userMessage)
     if (!shouldResumeBackendSession) {
       updateSessionTitle(targetSession, sessionTitleFromPrompt(effectivePrompt, images.length))
     }
@@ -4155,6 +4677,7 @@ function App() {
           targetSession: targetSessionForRequest,
           shouldResumeBackendSession,
           images,
+          historyMessages,
         })
       } catch (streamError) {
         const message = streamError instanceof Error ? streamError.message : String(streamError)
@@ -4174,6 +4697,7 @@ function App() {
           model: snapshot.model.selected,
           permissionMode: preferences.permission_mode,
           resume: shouldResumeBackendSession,
+          messages: historyMessages,
           images,
         })
         setSessionMessages(targetSession.id, current => [...current, {
@@ -4187,13 +4711,13 @@ function App() {
           tone: 'success',
         })
       }
-      bumpSessionUsage(targetSession.id, effectivePrompt, images)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      addSystemMessage(message, targetSession.id)
       if (isAuthExpiredMessage(message)) {
-        setNotice('连接授权暂时失效，已保留登录态，请重试或重新登录')
-        await refreshSnapshot().catch(() => {})
+        setAuthExpiredMessage(message)
+        setNotice(null)
+      } else {
+        addSystemMessage(message, targetSession.id)
       }
     } finally {
       setIsSending(false)
@@ -4281,18 +4805,7 @@ function App() {
     }
 
     if (parsed.name === 'compact') {
-      setMessages(() => [])
-      setSnapshot(current => ({
-        ...current,
-        sessions: current.sessions.map(session =>
-          session.id === activeSession.id
-            ? {
-                ...session,
-                context_used: Math.min(session.context_limit, Math.ceil(session.context_used * 0.12)),
-              }
-            : session,
-        ),
-      }))
+      compactSessionContext(activeSession.id, 'manual')
       setPrompt('')
       return true
     }
@@ -5056,6 +5569,30 @@ function App() {
               >
                 <Archive size={16} aria-hidden="true" />
               </button>
+              <button
+                aria-label={`上下文占用 ${activeContextPercent}%`}
+                className={`context-meter-button ${activeContextTone}`}
+                disabled={visibleMessages.length === 0 || activeContextUsed <= 0}
+                onClick={() => compactSessionContext(activeSession.id, 'manual')}
+                title="点击压缩上下文"
+                type="button"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`context-ring ${activeContextTone}`}
+                  style={contextRingStyle(activeContextPercent)}
+                >
+                  <i aria-hidden="true" />
+                </span>
+                {activeContextPercent >= 70 ? <em>{activeContextPercent}%</em> : null}
+                <span className={`context-meter-tooltip ${activeContextTone}`}>
+                  <strong>{activeContextLabel}</strong>
+                  <small>
+                    {activeContextPercent}% · {formatTokens(activeContextUsed)} / {formatTokens(activeContextLimit)}
+                    {preferences.auto_compact_enabled ? ' · 自动压缩开' : ' · 自动压缩关'}
+                  </small>
+                </span>
+              </button>
               <div className="model-menu-control" onClick={event => event.stopPropagation()}>
                 <button
                   aria-expanded={modelMenuOpen}
@@ -5078,7 +5615,6 @@ function App() {
                   }}
                   type="button"
                 >
-                  <Cpu size={16} aria-hidden="true" />
                   <span>{currentModelName}</span>
                   <ChevronDown size={15} aria-hidden="true" />
                 </button>
@@ -6220,6 +6756,35 @@ function App() {
                 刷新
               </button>
             </div>
+            <div className="prompt-preset-panel">
+              <div className="prompt-preset-copy">
+                <Sparkles size={17} aria-hidden="true" />
+                <span>
+                  <strong>超级提示词</strong>
+                  <small>切换后会立即保存到用户记忆文件。</small>
+                </span>
+              </div>
+              <div className="prompt-preset-buttons" role="group" aria-label="超级提示词预设">
+                {promptPresets.map(preset => (
+                  <button
+                    className={activePromptPresetId === preset.id ? 'active' : ''}
+                    disabled={isLoadingMemory || isSavingMemory}
+                    key={preset.id}
+                    onClick={() => {
+                      void handleApplyPromptPreset(preset)
+                    }}
+                    type="button"
+                  >
+                    {preset.id === 'coding' ? <Code2 size={16} aria-hidden="true" /> : <ListChecks size={16} aria-hidden="true" />}
+                    <span>
+                      <strong>{preset.title}</strong>
+                      <small>{preset.description}</small>
+                    </span>
+                    {activePromptPresetId === preset.id ? <Check size={15} aria-hidden="true" /> : null}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="memory-editor">
               <div className="memory-list" aria-label="记忆列表">
                 {memoryEntries.length > 0 ? (
@@ -6451,6 +7016,18 @@ function App() {
             </div>
             <div className="setting-toggle-grid">
               <SettingToggle label="自动压缩" description="接近上下文上限时自动整理会话" checked={preferences.auto_compact_enabled} disabled={isSavingPreferences} onChange={value => updatePreference('auto_compact_enabled', value)} />
+              <label className="settings-select-row" htmlFor="context-limit-select">
+                <span>上下文限额</span>
+                <select
+                  disabled={isSavingPreferences}
+                  id="context-limit-select"
+                  onChange={event => updatePreference('context_limit', Number(event.target.value))}
+                  value={preferences.context_limit}
+                >
+                  <option value={DEFAULT_CONTEXT_LIMIT}>256K</option>
+                  <option value={LARGE_CONTEXT_LIMIT}>1M</option>
+                </select>
+              </label>
               <SettingToggle label="显示耗时" description="回复完成后显示本轮处理耗时" checked={preferences.show_turn_duration} disabled={isSavingPreferences} onChange={value => updatePreference('show_turn_duration', value)} />
               <SettingToggle label="终端进度条" description="运行命令时显示终端进度反馈" checked={preferences.terminal_progress_bar_enabled} disabled={isSavingPreferences} onChange={value => updatePreference('terminal_progress_bar_enabled', value)} />
               <SettingToggle label="文件检查点" description="为文件修改保留可回退记录" checked={preferences.file_checkpointing_enabled} disabled={isSavingPreferences} onChange={value => updatePreference('file_checkpointing_enabled', value)} />
@@ -6704,6 +7281,7 @@ function App() {
             {isStartingLogin ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <KeyRound size={16} aria-hidden="true" />}
             连接到 Spark
           </button>
+          {notice ? <p className="auth-notice">{notice}</p> : null}
         </section>
       </main>
     )
@@ -6849,6 +7427,21 @@ function App() {
                   <span>{sparkUserSecondary(sparkUser)}</span>
                 </div>
               </div>
+              {sparkUser.logged_in ? (
+                <div className={creditIsLow(creditStatus) ? 'credit-status-card low' : 'credit-status-card'}>
+                  <div className="credit-status-head">
+                    <Gauge size={16} aria-hidden="true" />
+                    <span>剩余额度</span>
+                    <strong>{formatCredit(creditStatus.available)}</strong>
+                  </div>
+                  <p>{creditLine(creditStatus)}</p>
+                  {creditIsLow(creditStatus) ? (
+                    <button className="credit-topup-button" onClick={() => window.open(creditStatus.topup_url, '_blank', 'noopener,noreferrer')} type="button">
+                      去充值
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               <button className="sidebar-settings" onClick={() => {
                 setActiveView('settings')
                 setSettingsMenuOpen(false)
@@ -7033,6 +7626,33 @@ function App() {
       {renderSearchModal()}
       {renderRemoteBindDialog()}
       {renderContextMenu()}
+      {authExpiredMessage ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="auth-expired-dialog" role="dialog" aria-modal="true" aria-label="登录已失效">
+            <KeyRound size={22} aria-hidden="true" />
+            <div>
+              <h2>您的登录已失效</h2>
+              <p>当前 Spark 授权已过期或令牌无效。请退出登录后重新连接 Spark。</p>
+              <small>{authExpiredMessage}</small>
+            </div>
+            <div className="auth-expired-actions">
+              <button onClick={() => setAuthExpiredMessage(null)} type="button">稍后处理</button>
+              <button
+                className="danger"
+                disabled={isLoggingOut}
+                onClick={() => {
+                  setAuthExpiredMessage(null)
+                  void handleSparkLogout()
+                }}
+                type="button"
+              >
+                {isLoggingOut ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}
+                退出登录
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

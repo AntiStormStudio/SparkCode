@@ -6,25 +6,70 @@
   "description": "Spark Code",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5188",
+    "electron:dev": "concurrently -k \"bun run dev\" \"wait-on http://127.0.0.1:5188 && VITE_DEV_SERVER_URL=http://127.0.0.1:5188 electron .\"",
     "build": "tsc && vite build",
     "prepare:backend": "bun run ./scripts/prepare-backend-resource.mjs",
+    "electron:build": "bun run prepare:backend && bun run build && electron-builder",
+    "electron:build:win": "bun run prepare:backend && bun run build && electron-builder --win nsis",
+    "electron:build:linux": "bun run prepare:backend && bun run build && electron-builder --linux deb AppImage",
+    "electron:build:mac": "bun run prepare:backend && bun run build && electron-builder --mac dmg",
     "preview": "vite preview --host 127.0.0.1",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "top.spark-ai.sparkcode-app",
+    "productName": "Spark Code",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "src-tauri/resources/spark-code-backend.tar.gz",
+        "to": "spark-code-backend.tar.gz"
+      }
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "icon": "src-tauri/icons/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "src-tauri/icons/icon.ico"
+    },
+    "linux": {
+      "target": ["deb", "AppImage"],
+      "icon": "src-tauri/icons/icon.png",
+      "category": "Development"
+    }
+  },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
+    "highlight.js": "^11.11.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^26.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^10.0.3",
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "wait-on": "^9.0.10"
   }
 }

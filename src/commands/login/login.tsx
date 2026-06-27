@@ -1,6 +1,6 @@
 import { feature } from 'bun:bundle'
 import axios from 'axios'
-import { randomUUID } from 'crypto'
+import { createHash, randomBytes, randomUUID } from 'crypto'
 import { createServer, type ServerResponse } from 'http'
 import type { AddressInfo } from 'net'
 import * as React from 'react'
@@ -35,10 +35,6 @@ import {
   resetAutoModeGateCheck,
   resetBypassPermissionsCheck,
 } from '../../utils/permissions/bypassPermissionsKillswitch.js'
-import {
-  getOrCreateSparkAndroidDevice,
-  type SparkAndroidDevice,
-} from '../../utils/sparkAndroidAuth.js'
 import { resetUserCache } from '../../utils/user.js'
 import { performLogout } from '../logout/logout.js'
 
@@ -64,8 +60,10 @@ type LocalOAuthCallbackServer = {
 
 const OAUTH_TIMEOUT_MS = 10 * 60 * 1000
 const OAUTH_CALLBACK_PATH = '/spark/oauth/callback'
-const SPARK_OAUTH_AUTHORIZE_PATH = '/oauth/mobile/authorize'
-const SPARK_AUTH_REFRESH_PATH = '/api/v1/android/auth/refresh'
+const SPARK_OAUTH_AUTHORIZE_PATH = '/oauth2/authorize'
+const SPARK_OAUTH_TOKEN_PATH = '/oauth2/token'
+const SPARK_OAUTH_CLIENT_ID = 'spc_dHO3yMN-aKwgza37p2DNozfI47-SEXx9'
+const SPARK_OAUTH_SCOPE = 'openid profile email'
 
 class LoginCanceledError extends Error {}
 
@@ -148,9 +146,9 @@ function describeHttpError(error: unknown): string {
     : error.message
 }
 
-function parseAndroidTokenResponse(data: unknown): SparkTokenPair {
+function parseOAuthTokenResponse(data: unknown): SparkTokenPair {
   if (!isRecord(data)) {
-    throw new Error('后端返回的 Android 登录令牌数据无效')
+    throw new Error('后端返回的 OAuth 登录令牌数据无效')
   }
 
   const accessToken =
@@ -172,17 +170,16 @@ function buildOAuthAuthorizeUrl(
   baseUrl: string,
   callbackUrl: string,
   state: string,
-  device: SparkAndroidDevice,
+  codeChallenge: string,
 ): string {
   const url = new URL(SPARK_OAUTH_AUTHORIZE_PATH, baseUrl)
+  url.searchParams.set('response_type', 'code')
+  url.searchParams.set('client_id', SPARK_OAUTH_CLIENT_ID)
   url.searchParams.set('redirect_uri', callbackUrl)
-  url.searchParams.set('response_mode', 'query')
-  url.searchParams.set('install_id', device.installId)
-  url.searchParams.set('device_id', device.deviceId)
-  url.searchParams.set('package_name', device.packageName)
-  url.searchParams.set('cert_sha256', device.certSha256)
-  url.searchParams.set('app_version', device.appVersion)
+  url.searchParams.set('scope', SPARK_OAUTH_SCOPE)
   url.searchParams.set('state', state)
+  url.searchParams.set('code_challenge', codeChallenge)
+  url.searchParams.set('code_challenge_method', 'S256')
   return url.toString()
 }
 
@@ -200,12 +197,20 @@ function parseOAuthCallback(
     throw new Error('授权状态校验失败，请重新运行 /login')
   }
 
-  const refreshToken = getString(params.get('refresh_token'))
-  if (!refreshToken) {
-    throw new Error('授权回调里没有刷新令牌')
+  const code = getString(params.get('code'))
+  if (!code) {
+    throw new Error('授权回调里没有授权码')
   }
 
-  return refreshToken
+  return code
+}
+
+function createPkceVerifier(): string {
+  return randomBytes(48).toString('base64url')
+}
+
+function createPkceChallenge(verifier: string): string {
+  return createHash('sha256').update(verifier).digest('base64url')
 }
 
 function escapeHtml(value: string): string {
@@ -217,28 +222,29 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;')
 }
 
-async function refreshAndroidToken(
+async function exchangeOAuthCode(
   baseUrl: string,
-  refreshToken: string,
-  device: SparkAndroidDevice,
+  code: string,
+  callbackUrl: string,
+  codeVerifier: string,
 ): Promise<SparkTokenPair> {
   try {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: SPARK_OAUTH_CLIENT_ID,
+      code,
+      redirect_uri: callbackUrl,
+      code_verifier: codeVerifier,
+    })
     const response = await axios.post(
-      `${baseUrl}${SPARK_AUTH_REFRESH_PATH}`,
+      `${baseUrl}${SPARK_OAUTH_TOKEN_PATH}`,
+      body.toString(),
       {
-        refresh_token: refreshToken,
-        install_id: device.installId,
-        device_id: device.deviceId,
-        package_name: device.packageName,
-        cert_sha256: device.certSha256,
-        app_version: device.appVersion,
-      },
-      {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         timeout: 15_000,
       },
     )
-    return parseAndroidTokenResponse(response.data)
+    return parseOAuthTokenResponse(response.data)
   } catch (error) {
     throw new Error(`换取登录令牌失败：${describeHttpError(error)}`)
   }
@@ -276,7 +282,7 @@ function writeHtml(res: ServerResponse, title: string, body: string): void {
 async function startLocalOAuthCallbackServer(
   baseUrl: string,
   state: string,
-  device: SparkAndroidDevice,
+  codeVerifier: string,
 ): Promise<LocalOAuthCallbackServer> {
   return new Promise((resolve, reject) => {
     let settled = false
@@ -320,15 +326,13 @@ async function startLocalOAuthCallbackServer(
           return
         }
 
-        const callbackRefreshToken = parseOAuthCallback(
+        const code = parseOAuthCallback(
           requestUrl.searchParams,
           state,
         )
-        const tokenPair = await refreshAndroidToken(
-          baseUrl,
-          callbackRefreshToken,
-          device,
-        )
+        const address = server.address() as AddressInfo
+        const callbackUrl = `http://127.0.0.1:${address.port}${OAUTH_CALLBACK_PATH}`
+        const tokenPair = await exchangeOAuthCode(baseUrl, code, callbackUrl, codeVerifier)
 
         resolveOnce({ baseUrl, tokenPair })
         writeHtml(res, '登录成功', '可以关闭这个页面，回到终端继续使用。')
@@ -361,7 +365,7 @@ async function startLocalOAuthCallbackServer(
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo
       resolve({
-        callbackUrl: `http://localhost:${address.port}${OAUTH_CALLBACK_PATH}`,
+        callbackUrl: `http://127.0.0.1:${address.port}${OAUTH_CALLBACK_PATH}`,
         waitForCallback: () => callbackPromise,
         close: () => rejectOnce(new LoginCanceledError('登录已取消')),
       })
@@ -391,18 +395,19 @@ export function SparkLoginForm({ onDone }: SparkLoginFormProps): React.ReactNode
         }
 
         const normalizedBaseUrl = normalizeApiBaseUrl(configuredBaseUrl)
-        const device = getOrCreateSparkAndroidDevice()
         const state = randomUUID()
+        const codeVerifier = createPkceVerifier()
+        const codeChallenge = createPkceChallenge(codeVerifier)
         const server = await startLocalOAuthCallbackServer(
           normalizedBaseUrl,
           state,
-          device,
+          codeVerifier,
         )
         const nextAuthUrl = buildOAuthAuthorizeUrl(
           normalizedBaseUrl,
           server.callbackUrl,
           state,
-          device,
+          codeChallenge,
         )
 
         if (!active) {

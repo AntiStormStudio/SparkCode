@@ -74,9 +74,6 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install root dependencies
         shell: bash
         run: bun install --frozen-lockfile
@@ -89,24 +86,23 @@ jobs:
       - name: Build Windows installer
         shell: bash
         working-directory: sparkcode-app
-        run: bun run tauri build --bundles nsis
+        run: bun run electron:build:win
 
       - name: Verify Windows backend runtime
         shell: bash
         working-directory: sparkcode-app
         run: |
-          test -f src-tauri/resources/spark-code-backend.tar.gz
-          tar -tf src-tauri/resources/spark-code-backend.tar.gz > backend-files.txt
+          test -f release/win-unpacked/resources/spark-code-backend.tar.gz
+          tar -tf release/win-unpacked/resources/spark-code-backend.tar.gz > backend-files.txt
           grep -qx 'spark-code-backend/runtime/bun.exe' backend-files.txt
-          tar -xOf src-tauri/resources/spark-code-backend.tar.gz spark-code-backend/backend-resource.json
+          tar -xOf release/win-unpacked/resources/spark-code-backend.tar.gz spark-code-backend/backend-resource.json
 
       - name: Collect Windows EXE
         shell: bash
         run: |
           mkdir -p dist
           shopt -s nullglob
-          cp sparkcode-app/src-tauri/target/release/bundle/nsis/*.exe dist/ 2>/dev/null || true
-          cp sparkcode-app/src-tauri/target/release/*.exe dist/ 2>/dev/null || true
+          cp sparkcode-app/release/*.exe dist/ 2>/dev/null || true
           ls -lah dist
           test "$(find dist -maxdepth 1 -name '*.exe' -type f | wc -l)" -gt 0
 
@@ -129,22 +125,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
 
       - name: Install root dependencies
         run: bun install --frozen-lockfile
@@ -155,14 +139,14 @@ jobs:
 
       - name: Build Linux packages
         working-directory: sparkcode-app
-        run: bun run tauri build --bundles deb,appimage
+        run: bun run electron:build:linux
 
       - name: Collect Linux packages
         run: |
           mkdir -p dist
           shopt -s nullglob
-          cp sparkcode-app/src-tauri/target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
-          cp sparkcode-app/src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
+          cp sparkcode-app/release/*.deb dist/ 2>/dev/null || true
+          cp sparkcode-app/release/*.AppImage dist/ 2>/dev/null || true
           ls -lah dist
           test "$(find dist -maxdepth 1 \( -name '*.deb' -o -name '*.AppImage' \) -type f | wc -l)" -gt 0
 
@@ -192,9 +176,6 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install root dependencies
         run: bun install --frozen-lockfile
 
@@ -204,13 +185,13 @@ jobs:
 
       - name: Build macOS package
         working-directory: sparkcode-app
-        run: bun run tauri build --bundles dmg
+        run: bun run electron:build:mac
 
       - name: Collect macOS package
         run: |
           mkdir -p dist
           shopt -s nullglob
-          cp sparkcode-app/src-tauri/target/release/bundle/dmg/*.dmg dist/ 2>/dev/null || true
+          cp sparkcode-app/release/*.dmg dist/ 2>/dev/null || true
           ls -lah dist
           test "$(find dist -maxdepth 1 -name '*.dmg' -type f | wc -l)" -gt 0
 
