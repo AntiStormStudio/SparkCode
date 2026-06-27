@@ -489,13 +489,21 @@ async function modelOptions() {
       if (!nextToken) throw error
       return fetchModels(nextToken)
     })
-    const raw = Array.isArray(value) ? value : Array.isArray(value.models) ? value.models : Array.isArray(value.data) ? value.data : []
+    const raw = Array.isArray(value)
+      ? value
+      : Array.isArray(value.items)
+        ? value.items
+        : Array.isArray(value.models)
+          ? value.models
+          : Array.isArray(value.data)
+            ? value.data
+            : []
     return raw.map((item) => {
       const id = typeof item === 'string' ? item : item.id || item.name || item.model
       return id ? {
         id,
         name: item.display_name || item.name || id,
-        description: item.description || null,
+        description: item.description || item.provider || null,
       } : null
     }).filter(Boolean)
   } catch {
@@ -506,7 +514,8 @@ async function modelOptions() {
 async function modelConfig() {
   const options = await modelOptions()
   const config = readSparkConfig()
-  const selected = valueString(config.model) || options[0]?.id || 'spark-code'
+  const saved = valueString(config.model)
+  const selected = saved && options.some(option => option.id === saved) ? saved : options[0]?.id || saved || 'spark-code'
   return { selected, options }
 }
 
