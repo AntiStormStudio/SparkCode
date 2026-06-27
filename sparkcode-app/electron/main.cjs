@@ -412,7 +412,7 @@ function backendRuntimeSnapshot() {
     available: true,
     local_url: readLocalBackendUrl(),
     auth_token: LOCAL_BACKEND_AUTH_TOKEN,
-    streaming_enabled: true,
+    streaming_enabled: false,
     context_limit: loadPreferences().context_limit,
   }
 }
