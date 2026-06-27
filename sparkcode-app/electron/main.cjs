@@ -18,6 +18,7 @@ const OAUTH_CALLBACK_HOST = '127.0.0.1'
 const OAUTH_CALLBACK_PORT = 17654
 const OAUTH_CALLBACK_PATH = '/spark/oauth/callback'
 const SPARK_OAUTH_CLIENT_ID = 'spc_dHO3yMN-aKwgza37p2DNozfI47-SEXx9'
+const SPARK_OAUTH_CLIENT_SECRET = 'soc_TX9GM_5nlOuv19O52D-Y4rTL8F2U-7LR1XzyFPqDvuA'
 const SPARK_OAUTH_SCOPE = 'openid profile email'
 const SPARK_OAUTH_CLIENT_SECRET_ENV_KEY = 'SPARK_OAUTH_CLIENT_SECRET'
 const SPARK_AUTH_TOKEN_ENV_KEY = 'ANTHROPIC_AUTH_TOKEN'
@@ -177,6 +178,14 @@ function envString(config, key) {
 
 function valueString(value) {
   return typeof value === 'string' && value.trim() ? value : null
+}
+
+function oauthClientSecret() {
+  const config = readSparkConfig()
+  return valueString(process.env[SPARK_OAUTH_CLIENT_SECRET_ENV_KEY]) ||
+    valueString(config.oauthClientSecret) ||
+    valueString(config.env?.[SPARK_OAUTH_CLIENT_SECRET_ENV_KEY]) ||
+    SPARK_OAUTH_CLIENT_SECRET
 }
 
 function canonicalProjectPath(input) {
@@ -926,7 +935,7 @@ async function exchangeOauthCode(code, verifier, redirectUri) {
     redirect_uri: redirectUri,
     code_verifier: verifier,
   })
-  const secret = process.env[SPARK_OAUTH_CLIENT_SECRET_ENV_KEY]
+  const secret = oauthClientSecret()
   if (secret) params.set('client_secret', secret)
   return curlJson(`${FIXED_BACKEND_URL}/oauth2/token`, {
     method: 'POST',
@@ -941,7 +950,7 @@ async function exchangeOauthRefreshToken(refreshToken) {
     client_id: SPARK_OAUTH_CLIENT_ID,
     refresh_token: refreshToken,
   })
-  const secret = process.env[SPARK_OAUTH_CLIENT_SECRET_ENV_KEY]
+  const secret = oauthClientSecret()
   if (secret) params.set('client_secret', secret)
   return curlJson(`${FIXED_BACKEND_URL}/oauth2/token`, {
     method: 'POST',
