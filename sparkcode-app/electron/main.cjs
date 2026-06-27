@@ -956,6 +956,9 @@ function createWindow() {
     minWidth: 980,
     minHeight: 640,
     title: PRODUCT_NAME,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 16, y: 18 },
+    backgroundColor: '#090b0f',
     icon: appIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

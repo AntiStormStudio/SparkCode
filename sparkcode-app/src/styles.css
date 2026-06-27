@@ -111,6 +111,7 @@ p {
     radial-gradient(circle at 0% 20%, rgba(36, 103, 96, 0.38), transparent 34%),
     linear-gradient(90deg, rgba(11, 35, 35, 0.78), #17191d 38%, #181818 100%);
   transition: grid-template-columns 220ms ease;
+  -webkit-app-region: drag;
 }
 
 .app-shell.review-open {
@@ -132,11 +133,24 @@ p {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 10px 9px;
+  padding: 56px 9px 10px;
   border-right: 1px solid var(--line-soft);
   background: rgba(12, 18, 24, 0.54);
   -webkit-backdrop-filter: blur(26px) saturate(1.25);
   backdrop-filter: blur(26px) saturate(1.25);
+}
+
+.left-sidebar button,
+.left-sidebar input,
+.left-sidebar select,
+.left-sidebar textarea,
+.main-workspace button,
+.main-workspace input,
+.main-workspace select,
+.main-workspace textarea,
+.main-workspace a,
+.main-workspace [role="button"] {
+  -webkit-app-region: no-drag;
 }
 
 .settings-sidebar-content {
@@ -798,7 +812,7 @@ p {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 0;
+  padding: 10px 0 0;
   background: #181818;
 }
 
@@ -807,7 +821,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 54px;
+  min-height: 44px;
   padding: 0 18px;
   border-bottom: 1px solid var(--line-soft);
   background: #181818;
