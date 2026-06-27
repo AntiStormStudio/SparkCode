@@ -508,7 +508,7 @@ async function modelOptions() {
       return id ? {
         id,
         name: item.display_name || item.name || id,
-        description: item.description || item.provider || null,
+        description: item.description || null,
       } : null
     }).filter(Boolean)
   } catch {

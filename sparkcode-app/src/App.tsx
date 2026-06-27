@@ -349,6 +349,28 @@ function formatModelName(model: ModelConfig): string {
   return model.options.find(option => option.id === model.selected)?.name ?? model.selected
 }
 
+function isLegacyFallbackModel(option: ModelConfig['options'][number]): boolean {
+  const id = option.id.trim().toLowerCase()
+  const name = option.name.trim()
+  const description = option.description?.trim() ?? ''
+  if (['default', 'sonnet', 'opus', 'haiku', 'sonnet-4'].includes(id)) return true
+  if (['默认（推荐）', '默认 (推荐)', 'Sonnet（1M 上下文）', 'Sonnet (1M 上下文)', 'Opus（1M 上下文）', 'Opus (1M 上下文)', 'Haiku', 'Sonnet 4'].includes(name)) return true
+  return description.includes('使用默认模型') || description.includes('中转站.claude') || description.includes('per Mtok')
+}
+
+function normalizeBackendModelConfig(model: ModelConfig): ModelConfig {
+  const seen = new Set<string>()
+  const options = model.options
+    .filter(option => option.id.trim() && !isLegacyFallbackModel(option))
+    .filter(option => {
+      if (seen.has(option.id)) return false
+      seen.add(option.id)
+      return true
+    })
+  const selected = options.some(option => option.id === model.selected) ? model.selected : options[0]?.id ?? ''
+  return { selected, options }
+}
+
 function displayValue(value: string | null | undefined, fallback = '未设置'): string {
   return value?.trim() || fallback
 }
@@ -2309,7 +2331,7 @@ function App() {
             remote: next.remote,
             remote_device: next.remote_device,
             preferences: next.preferences,
-            model: next.model,
+            model: normalizeBackendModelConfig(next.model),
             workspace: next.workspace,
             skills: next.skills,
             mcp_servers: next.mcp_servers,
@@ -2327,6 +2349,7 @@ function App() {
         }
         return {
           ...next,
+          model: normalizeBackendModelConfig(next.model),
           sessions: mergeSessions(next.sessions, current.sessions),
         }
       })
@@ -2436,7 +2459,7 @@ function App() {
     setIsLoadingModelConfig(true)
     setModelSyncError(null)
     try {
-      const model = await safeInvoke<ModelConfig>('get_model_config')
+      const model = normalizeBackendModelConfig(await safeInvoke<ModelConfig>('get_model_config'))
       setSnapshot(current => ({ ...current, model }))
       if (model.options.length > 0) {
         modelSyncRetryRef.current = 0
@@ -3150,7 +3173,7 @@ function App() {
     setModelSyncError(null)
     setModelMenuOpen(false)
     try {
-      const next = await safeInvoke<ModelConfig>('save_model_config', { model: selected })
+      const next = normalizeBackendModelConfig(await safeInvoke<ModelConfig>('save_model_config', { model: selected }))
       setSnapshot(current => ({ ...current, model: next }))
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error))
@@ -5294,7 +5317,6 @@ function App() {
     ].filter(Boolean).join(' ')
     const currentModelName =
       selectedModel?.name ||
-      snapshot.model.selected ||
       (isLoadingModelConfig ? '同步模型' : '选择模型')
     const modelDisabled = isSavingModel
 
@@ -6873,8 +6895,8 @@ function App() {
                 value={modelSelectValue}
               >
                 {!hasModelOptions ? (
-                  <option value={snapshot.model.selected}>
-                    {snapshot.model.selected || (isLoadingModelConfig ? '正在同步后端模型' : '暂无后端模型')}
+                  <option value="">
+                    {isLoadingModelConfig ? '正在同步后端模型' : '暂无后端模型'}
                   </option>
                 ) : modelOptions.map(option => (
                   <option key={option.id} value={option.id}>
