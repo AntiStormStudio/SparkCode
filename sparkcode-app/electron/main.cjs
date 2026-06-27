@@ -12,6 +12,7 @@ const FIXED_BACKEND_URL = 'https://chat.spark-ai.top'
 const LOCAL_BACKEND_AUTH_TOKEN = 'sparkcode-app-local'
 const DEFAULT_CONTEXT_LIMIT = 256_000
 const LARGE_CONTEXT_LIMIT = 1_000_000
+const SPARK_CODE_API_PATH = '/api/v1/spark-code'
 const OAUTH_CALLBACK_HOST = '127.0.0.1'
 const OAUTH_CALLBACK_PORT = 17654
 const OAUTH_CALLBACK_PATH = '/spark/oauth/callback'
@@ -20,6 +21,8 @@ const SPARK_OAUTH_SCOPE = 'openid profile email'
 const SPARK_OAUTH_CLIENT_SECRET_ENV_KEY = 'SPARK_OAUTH_CLIENT_SECRET'
 const SPARK_AUTH_TOKEN_ENV_KEY = 'ANTHROPIC_AUTH_TOKEN'
 const SPARK_REFRESH_TOKEN_ENV_KEY = 'SPARK_ANDROID_REFRESH_TOKEN'
+const SPARK_INSTALL_ID_ENV_KEY = 'SPARK_ANDROID_INSTALL_ID'
+const SPARK_DEVICE_ID_ENV_KEY = 'SPARK_ANDROID_DEVICE_ID'
 const SPARK_BASE_URL_ENV_KEY = 'ANTHROPIC_BASE_URL'
 
 let mainWindow = null
@@ -65,6 +68,10 @@ function appConfigPath(fileName) {
   return path.join(app.getPath('userData'), fileName)
 }
 
+function remoteClientConfigPath() {
+  return appConfigPath('remote-client.json')
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
@@ -88,6 +95,64 @@ function readSparkConfig() {
 
 function writeSparkConfig(value) {
   writeJson(sparkConfigPath(), value)
+}
+
+function loadRemoteClientConfig() {
+  return readJson(remoteClientConfigPath(), {})
+}
+
+function saveRemoteClientConfig(value) {
+  writeJson(remoteClientConfigPath(), value)
+}
+
+function removeRemoteClientConfig() {
+  try {
+    fs.rmSync(remoteClientConfigPath(), { force: true })
+  } catch {
+    // Ignore cleanup failures.
+  }
+}
+
+function getOrCreateAndroidDevice(config) {
+  config.env = config.env || {}
+  const installId = valueString(config.env[SPARK_INSTALL_ID_ENV_KEY]) || compactId('spark-code-')
+  const deviceId = valueString(config.env[SPARK_DEVICE_ID_ENV_KEY]) || compactId('spark-device-')
+  config.env[SPARK_INSTALL_ID_ENV_KEY] = installId
+  config.env[SPARK_DEVICE_ID_ENV_KEY] = deviceId
+  return { installId, deviceId }
+}
+
+function isLoopbackEndpoint(value) {
+  try {
+    const url = new URL(value)
+    return url.hostname === 'localhost' || url.hostname === '0.0.0.0' || url.hostname === '::1' || url.hostname.startsWith('127.')
+  } catch {
+    return false
+  }
+}
+
+function resolveRemoteEndpoint(value) {
+  return valueString(value) && !isLoopbackEndpoint(value) ? value : `${FIXED_BACKEND_URL}${SPARK_CODE_API_PATH}`
+}
+
+function loadRemoteDeviceBinding() {
+  const config = readSparkConfig()
+  const installId = envString(config, SPARK_INSTALL_ID_ENV_KEY)
+  const deviceId = envString(config, SPARK_DEVICE_ID_ENV_KEY)
+  const remoteClient = loadRemoteClientConfig()
+  const bound = Boolean(valueString(remoteClient.client_token))
+  const configured = Boolean(installId && deviceId)
+  return {
+    configured,
+    bound,
+    install_id: installId,
+    device_id: deviceId,
+    binding_id: valueString(remoteClient.binding_id) || null,
+    client_name: valueString(remoteClient.client_name) || null,
+    package_name: 'top.spark-ai.sparkcode-app',
+    app_version: app.getVersion(),
+    status: bound ? '已绑定' : configured ? '待输入绑定码' : '未绑定',
+  }
 }
 
 function envString(config, key) {
@@ -607,17 +672,7 @@ async function appSnapshot() {
     remote: { backend_url: FIXED_BACKEND_URL, configured: true },
     spark_user: loadSparkUserProfile(),
     credit_status: await getCreditStatus(),
-    remote_device: {
-      configured: false,
-      bound: false,
-      install_id: null,
-      device_id: null,
-      binding_id: null,
-      client_name: null,
-      package_name: 'top.spark-ai.sparkcode-app',
-      app_version: app.getVersion(),
-      status: '未绑定',
-    },
+    remote_device: loadRemoteDeviceBinding(),
     preferences: loadPreferences(),
     model: await modelConfig(),
     workspace: workspaceInfo(),
@@ -631,6 +686,45 @@ async function appSnapshot() {
     update_status: updateStatus(),
     sessions: ensureSessions(),
   }
+}
+
+async function bindRemoteDevice(bindingCode) {
+  const code = valueString(bindingCode)
+  if (!code) throw new Error('请输入 Remote 绑定码')
+  const config = readSparkConfig()
+  const { installId, deviceId } = getOrCreateAndroidDevice(config)
+  writeSparkConfig(config)
+  const clientName = 'Spark Code Desktop'
+  const value = await curlJson(`${FIXED_BACKEND_URL}${SPARK_CODE_API_PATH}/client/bind`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      code,
+      client_id: installId,
+      client_name: clientName,
+      client_version: app.getVersion(),
+      data: {
+        platform: process.platform,
+        editor: 'sparkcode-app',
+      },
+      meta: {
+        device_id: deviceId,
+        app: PRODUCT_NAME,
+      },
+    }),
+  })
+  const clientToken = valueString(value.client_token)
+  if (!clientToken) throw new Error('后端没有返回 Remote client_token')
+  const endpoint = resolveRemoteEndpoint(value.endpoint)
+  saveRemoteClientConfig({
+    binding_id: valueString(value.id) || null,
+    client_token: clientToken,
+    endpoint,
+    stream_endpoint: resolveRemoteEndpoint(value.stream_endpoint || endpoint),
+    client_name: valueString(value.client_name) || clientName,
+    status: valueString(value.status) || null,
+  })
+  return loadRemoteDeviceBinding()
 }
 
 function updateStatus() {
@@ -865,6 +959,11 @@ async function invoke(command, args = {}) {
     case 'refresh_spark_auth': {
       return ensureFreshSparkAuth()
     }
+    case 'bind_remote_device':
+      return bindRemoteDevice(args.bindingCode)
+    case 'unbind_remote_device':
+      removeRemoteClientConfig()
+      return loadRemoteDeviceBinding()
     case 'pick_project_folder': {
       const requestedPath = valueString(args.basePath)
       const defaultPath = requestedPath && requestedPath !== '__sparkcode_no_project__' && fs.existsSync(requestedPath)
