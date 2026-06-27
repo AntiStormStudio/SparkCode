@@ -311,6 +311,18 @@ function ensureLocalBackend() {
   return backendRuntimeSnapshot()
 }
 
+function stopLocalBackend() {
+  if (backendProcess && !backendProcess.killed) {
+    backendProcess.kill()
+  }
+  backendProcess = null
+  try {
+    fs.rmSync(serverLockPath(), { force: true })
+  } catch {
+    // Ignore cleanup failures.
+  }
+}
+
 function backendRuntimeSnapshot() {
   return {
     available: true,
@@ -362,6 +374,18 @@ async function curlJson(url, options = {}) {
   return value
 }
 
+async function ensureFreshSparkAuth() {
+  const config = readSparkConfig()
+  const refreshToken = envString(config, SPARK_REFRESH_TOKEN_ENV_KEY)
+  if (!refreshToken) return loadSparkUserProfile()
+  const refreshed = await exchangeOauthRefreshToken(refreshToken)
+  const nextToken = refreshed.access_token || refreshed.accessToken
+  const profile = nextToken ? await fetchProfile(nextToken).catch(() => null) : null
+  saveSparkLogin(refreshed, profile)
+  stopLocalBackend()
+  return loadSparkUserProfile()
+}
+
 function loadSparkUserProfile() {
   const config = readSparkConfig()
   const account = config.oauthAccount || config.account || {}
@@ -397,11 +421,24 @@ function emptyCreditStatus(error = null) {
 }
 
 async function getCreditStatus() {
-  const token = envString(readSparkConfig(), SPARK_AUTH_TOKEN_ENV_KEY)
+  const config = readSparkConfig()
+  const token = envString(config, SPARK_AUTH_TOKEN_ENV_KEY)
   if (!token) return emptyCreditStatus('未登录')
+  const fetchStatus = accessToken => curlJson(`${FIXED_BACKEND_URL}/api/v1/credit/status`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  })
   try {
-    const value = await curlJson(`${FIXED_BACKEND_URL}/api/v1/credit/status`, {
-      headers: { authorization: `Bearer ${token}` },
+    const value = await fetchStatus(token).catch(async error => {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!/401|unauthorized/i.test(message)) throw error
+      const refreshToken = envString(config, SPARK_REFRESH_TOKEN_ENV_KEY)
+      if (!refreshToken) throw error
+      const refreshed = await exchangeOauthRefreshToken(refreshToken)
+      const nextToken = refreshed.access_token || refreshed.accessToken
+      if (!nextToken) throw error
+      const profile = await fetchProfile(nextToken).catch(() => null)
+      saveSparkLogin(refreshed, profile)
+      return fetchStatus(nextToken)
     })
     const dailyLimit = Number(value.daily_limit || 0)
     const dailyUsed = Number(value.daily_used || 0)
@@ -427,11 +464,20 @@ async function getCreditStatus() {
 }
 
 async function modelOptions() {
-  const token = envString(readSparkConfig(), SPARK_AUTH_TOKEN_ENV_KEY)
+  const config = readSparkConfig()
+  const token = envString(config, SPARK_AUTH_TOKEN_ENV_KEY)
   if (!token) return []
+  const fetchModels = accessToken => curlJson(`${FIXED_BACKEND_URL}/api/v1/spark-code/oauth/models`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  })
   try {
-    const value = await curlJson(`${FIXED_BACKEND_URL}/api/v1/spark-code/oauth/models`, {
-      headers: { authorization: `Bearer ${token}` },
+    const value = await fetchModels(token).catch(async error => {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!/401|unauthorized/i.test(message)) throw error
+      await ensureFreshSparkAuth()
+      const nextToken = envString(readSparkConfig(), SPARK_AUTH_TOKEN_ENV_KEY)
+      if (!nextToken) throw error
+      return fetchModels(nextToken)
     })
     const raw = Array.isArray(value) ? value : Array.isArray(value.models) ? value.models : Array.isArray(value.data) ? value.data : []
     return raw.map((item) => {
@@ -705,6 +751,21 @@ async function exchangeOauthCode(code, verifier, redirectUri) {
   })
 }
 
+async function exchangeOauthRefreshToken(refreshToken) {
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: SPARK_OAUTH_CLIENT_ID,
+    refresh_token: refreshToken,
+  })
+  const secret = process.env[SPARK_OAUTH_CLIENT_SECRET_ENV_KEY]
+  if (secret) params.set('client_secret', secret)
+  return curlJson(`${FIXED_BACKEND_URL}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: params,
+  })
+}
+
 async function fetchProfile(accessToken) {
   return curlJson(`${FIXED_BACKEND_URL}/oauth2/userinfo`, {
     headers: { authorization: `Bearer ${accessToken}` },
@@ -714,7 +775,8 @@ async function fetchProfile(accessToken) {
 function saveSparkLogin(token, profile) {
   const config = readSparkConfig()
   config.env = config.env || {}
-  config.env[SPARK_AUTH_TOKEN_ENV_KEY] = token.access_token || token.accessToken
+  const accessToken = token.access_token || token.accessToken
+  if (accessToken) config.env[SPARK_AUTH_TOKEN_ENV_KEY] = accessToken
   if (token.refresh_token || token.refreshToken) config.env[SPARK_REFRESH_TOKEN_ENV_KEY] = token.refresh_token || token.refreshToken
   config.env[SPARK_BASE_URL_ENV_KEY] = FIXED_BACKEND_URL
   if (profile) config.oauthAccount = profile
@@ -772,8 +834,9 @@ async function invoke(command, args = {}) {
       return startSparkLogin()
     case 'logout_spark':
       return logoutSpark()
-    case 'refresh_spark_auth':
-      return loadSparkUserProfile()
+    case 'refresh_spark_auth': {
+      return ensureFreshSparkAuth()
+    }
     case 'pick_project_folder': {
       const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], defaultPath: args.basePath || workspacePath() })
       return result.canceled ? null : result.filePaths[0]
@@ -849,7 +912,13 @@ async function invoke(command, args = {}) {
         messages: args.messages || [],
         images: args.images || [],
       }
-      const value = await postLocalBackendJson('/prompt', body)
+      const value = await postLocalBackendJson('/prompt', body).catch(async error => {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!/未登录|401|unauthorized/i.test(message)) throw error
+        await ensureFreshSparkAuth()
+        ensureLocalBackend()
+        return postLocalBackendJson('/prompt', body)
+      })
       return { id: value.id || compactId('assistant-'), role: value.role || 'assistant', content: value.content || '已完成' }
     }
     case 'submit_feedback':
