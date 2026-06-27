@@ -121,7 +121,7 @@ type TauriBridgeWindow = Window &
 
 const FIXED_BACKEND_URL = 'https://chat.spark-ai.top'
 const DEFAULT_CONTEXT_LIMIT = 256_000
-const LARGE_CONTEXT_LIMIT = 1_000_000
+const LARGE_CONTEXT_LIMIT = DEFAULT_CONTEXT_LIMIT
 const ACTIVE_PROJECT_STORAGE_KEY = 'sparkcode-active-project-path'
 const CONVERSATION_STORAGE_KEY = 'sparkcode-conversation-state-v1'
 const ARCHIVED_SESSIONS_STORAGE_KEY = 'sparkcode-archived-sessions-v1'
@@ -7042,7 +7042,6 @@ function App() {
                   value={preferences.context_limit}
                 >
                   <option value={DEFAULT_CONTEXT_LIMIT}>256K</option>
-                  <option value={LARGE_CONTEXT_LIMIT}>1M</option>
                 </select>
               </label>
               <SettingToggle label="显示耗时" description="回复完成后显示本轮处理耗时" checked={preferences.show_turn_duration} disabled={isSavingPreferences} onChange={value => updatePreference('show_turn_duration', value)} />

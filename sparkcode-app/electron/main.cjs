@@ -142,7 +142,11 @@ function ensureSessions() {
 function loadPreferences() {
   const config = readSparkConfig()
   const bool = (key, fallback) => typeof config[key] === 'boolean' ? config[key] : fallback
-  const contextLimit = Number(config.contextLimit) === LARGE_CONTEXT_LIMIT ? LARGE_CONTEXT_LIMIT : DEFAULT_CONTEXT_LIMIT
+  const contextLimit = DEFAULT_CONTEXT_LIMIT
+  if (config.contextLimit !== DEFAULT_CONTEXT_LIMIT) {
+    config.contextLimit = DEFAULT_CONTEXT_LIMIT
+    writeSparkConfig(config)
+  }
   return {
     theme: valueString(config.theme) || 'system',
     editor_font_size: Number(config.editorFontSize) || 14,
@@ -171,7 +175,7 @@ function savePreferences(preferences) {
   config.sandboxAutoAllow = preferences.sandbox_auto_allow
   config.remoteControlAtStartup = preferences.remote_control_at_startup
   config.autoCompactEnabled = preferences.auto_compact_enabled
-  config.contextLimit = preferences.context_limit === LARGE_CONTEXT_LIMIT ? LARGE_CONTEXT_LIMIT : DEFAULT_CONTEXT_LIMIT
+  config.contextLimit = DEFAULT_CONTEXT_LIMIT
   config.showTurnDuration = preferences.show_turn_duration
   config.terminalProgressBarEnabled = preferences.terminal_progress_bar_enabled
   config.fileCheckpointingEnabled = preferences.file_checkpointing_enabled
@@ -481,7 +485,7 @@ async function getCreditStatus() {
 async function modelOptions() {
   const config = readSparkConfig()
   const token = envString(config, SPARK_AUTH_TOKEN_ENV_KEY)
-  if (!token) return []
+  if (!token) throw new Error('未登录，无法同步模型列表')
   const fetchModels = accessToken => curlJson(`${FIXED_BACKEND_URL}/api/v1/spark-code/oauth/models`, {
     headers: { authorization: `Bearer ${accessToken}` },
   })
@@ -489,9 +493,14 @@ async function modelOptions() {
     const value = await fetchModels(token).catch(async error => {
       const message = error instanceof Error ? error.message : String(error)
       if (!/401|unauthorized/i.test(message)) throw error
-      await ensureFreshSparkAuth()
+      try {
+        await ensureFreshSparkAuth()
+      } catch (refreshError) {
+        const reason = refreshError instanceof Error ? refreshError.message : String(refreshError)
+        throw new Error(`登录已失效，刷新令牌失败：${reason}`)
+      }
       const nextToken = envString(readSparkConfig(), SPARK_AUTH_TOKEN_ENV_KEY)
-      if (!nextToken) throw error
+      if (!nextToken) throw new Error('登录已失效，刷新后仍未获得访问令牌')
       return fetchModels(nextToken)
     })
     const raw = Array.isArray(value)
@@ -511,8 +520,8 @@ async function modelOptions() {
         description: item.description || null,
       } : null
     }).filter(Boolean)
-  } catch {
-    return []
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -520,7 +529,7 @@ async function modelConfig() {
   const options = await modelOptions()
   const config = readSparkConfig()
   const saved = valueString(config.model)
-  const selected = saved && options.some(option => option.id === saved) ? saved : options[0]?.id || saved || 'spark-code'
+  const selected = saved && options.some(option => option.id === saved) ? saved : options[0]?.id || ''
   return { selected, options }
 }
 
